@@ -10,7 +10,11 @@ load_dotenv(ROOT / ".env")
 BASE_URL = "https://www.najcijena.hr"
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY")
+SUPABASE_KEY = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    or os.getenv("SUPABASE_KEY")
+    or os.getenv("VITE_SUPABASE_ANON_KEY")
+)
 
 STORE_SLUGS = {
     "lidl": "lidl",
