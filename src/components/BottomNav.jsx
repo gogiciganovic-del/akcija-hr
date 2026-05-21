@@ -1,10 +1,9 @@
-import { Home, Search, Heart, MapPin } from "lucide-react";
+import { Home, Search, Heart } from "lucide-react";
 
 const TABS = [
   { id: "home", label: "Početna", Icon: Home },
   { id: "search", label: "Pretraga", Icon: Search },
   { id: "fav", label: "Favoriti", Icon: Heart },
-  { id: "near", label: "Blizina", Icon: MapPin },
 ];
 
 export function BottomNav({ activeTab, onTabChange, favCount = 0 }) {

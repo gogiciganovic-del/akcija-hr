@@ -1,5 +1,6 @@
 ﻿import { useState, useRef, useCallback } from "react";
-import { Search, X } from "lucide-react";
+import { X } from "lucide-react";
+import { CjenkoFace } from "../components/CjenkoFace";
 import { useProducts } from "../hooks/useProducts";
 
 function highlight(text, query) {
@@ -42,7 +43,9 @@ export function SearchPage({ onProductSelect }) {
         <p style={{ color:"rgba(255,255,255,0.3)",fontSize:13,marginBottom:16 }}>Pronađi svoju sljedeću uštedu</p>
 
         <div className="relative mb-4">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color:"rgba(255,255,255,0.3)" }} />
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+            <CjenkoFace size={22} />
+          </div>
           <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)}
             placeholder="Npr. Nike, Lidl, kava..."
             className="w-full rounded-2xl pl-11 pr-11 py-3.5 text-white text-[15px] outline-none transition-all duration-200"

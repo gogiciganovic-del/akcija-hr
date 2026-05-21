@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { adaptDeal } from '../lib/adapters'
 
-export function useProducts({ category, search, sortBy } = {}) {
+export function useProducts({ category, search, sortBy, chain } = {}) {
   const [products, setProducts] = useState([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState(null)
@@ -16,6 +16,8 @@ export function useProducts({ category, search, sortBy } = {}) {
         let query = supabase.from('active_deals').select('*')
 
         if (category) query = query.eq('category', category)
+
+        if (chain) query = query.ilike('store_name', `${chain}%`)
 
         if (search) query = query.or(`name.ilike.%${search}%,brand.ilike.%${search}%`)
 
@@ -34,7 +36,7 @@ export function useProducts({ category, search, sortBy } = {}) {
     }
 
     fetchProducts()
-  }, [category, search, sortBy])
+  }, [category, search, sortBy, chain])
 
   return { products, loading, error }
 }

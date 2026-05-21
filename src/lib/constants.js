@@ -17,4 +17,13 @@ export const CATEGORIES = [
 
 export const CHAINS = ['Lidl', 'Kaufland', 'Spar', 'Konzum', 'Eurospin', 'Plodine']
 
+export const STORES = [
+  { id: 'Lidl',      label: 'Lidl',      logo: '/stores/lidl.svg',       color: '#00c864' },
+  { id: 'Kaufland',  label: 'Kaufland',  logo: '/stores/kaufland.png',   color: '#d4af37' },
+  { id: 'Konzum',    label: 'Konzum',    logo: '/stores/konzum.png',     color: '#c41e3a' },
+  { id: 'Spar',      label: 'Spar',      logo: '/stores/spar.png',       color: '#e63329' },
+  { id: 'Plodine',   label: 'Plodine',   logo: '/stores/plodine.png',    color: '#ff6b35' },
+  { id: 'Eurospin',  label: 'Eurospin',  logo: '/stores/eurospin.png',   color: '#0055a5' },
+]
+
 export const RADIUS_OPTIONS = [1, 2, 5, 10, 20]

@@ -1,105 +1,218 @@
-import { useState } from "react";
-import { Zap, Star, Search, ChevronRight } from "lucide-react";
+import { useState, useCallback } from "react";
+import { ChevronRight } from "lucide-react";
+import { CjenkoLogo } from "../components/CjenkoLogo";
+import { CjenkoFace } from "../components/CjenkoFace";
 import { ProductCard } from "../components/ProductCard";
 import { useProducts } from "../hooks/useProducts";
-import { CATEGORIES } from "../lib/constants";
+import { useStoreStats } from "../hooks/useStoreStats";
+import { useUserLocation } from "../hooks/useUserLocation";
+import { CATEGORIES, STORES } from "../lib/constants";
 
-function HeroCard({ onOpen }) {
+function StoreFilterRow({ selectedStore, onSelect }) {
   return (
-    <div onClick={onOpen} className="relative rounded-3xl overflow-hidden cursor-pointer mx-4 mb-4 transition-all duration-300 hover:-translate-y-0.5"
-      style={{ background: "linear-gradient(135deg,rgba(15,12,5,0.97),rgba(22,18,7,0.98))", border: "1px solid rgba(212,175,55,0.22)", minHeight: 170 }}>
-      <div className="absolute pointer-events-none" style={{ top:-40,right:-40,width:180,height:180,background:"radial-gradient(circle,rgba(212,175,55,0.22),transparent 70%)" }} />
-      <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none" style={{ background:"linear-gradient(90deg,transparent,rgba(212,175,55,0.45),transparent)" }} />
-      <div className="relative z-10 p-[22px]">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span style={{ color:"rgba(212,175,55,0.55)",fontSize:9,fontWeight:700,letterSpacing:"0.2em" }}>✦ PREMIUM PARTNER</span>
-            </div>
-            <h2 className="font-black text-white" style={{ fontSize:26,letterSpacing:"-0.03em",lineHeight:1.1 }}>Konzum PLUS</h2>
-            <p style={{ color:"rgba(255,255,255,0.4)",fontSize:12,marginTop:4 }}>Ekskluzivne ponude samo za vas</p>
-          </div>
-          <div className="flex items-center justify-center rounded-[14px] font-black flex-shrink-0"
-            style={{ width:54,height:54,background:"linear-gradient(135deg,#d4af37,#f5d981)",color:"#020617",fontSize:13 }}>K+</div>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <div className="flex-1 rounded-[14px] px-3.5 py-2.5"
-            style={{ background:"rgba(212,175,55,0.08)",border:"1px solid rgba(212,175,55,0.15)" }}>
-            <p style={{ color:"rgba(212,175,55,0.6)",fontSize:8,fontWeight:700,letterSpacing:"0.18em",marginBottom:3 }}>OVOTJEDNA PONUDA</p>
-            <p className="font-bold text-white" style={{ fontSize:13 }}>Do -50% na svježe meso</p>
-          </div>
-          <div className="flex items-center justify-center rounded-[14px] flex-shrink-0"
-            style={{ width:44,height:44,background:"rgba(212,175,55,0.12)",border:"1px solid rgba(212,175,55,0.28)",color:"#d4af37",fontSize:18 }}>↗</div>
-        </div>
+    <div className="mx-4 mb-3 rounded-2xl px-2.5 py-2.5"
+      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 8, fontWeight: 700, letterSpacing: "0.16em", marginBottom: 8, paddingLeft: 2 }}>
+        TRGOVINE
+      </p>
+      <div className="grid grid-cols-6 gap-1">
+        {STORES.map((store) => {
+          const active = selectedStore === store.id;
+          return (
+            <button
+              key={store.id}
+              type="button"
+              onClick={() => onSelect(store.id)}
+              className="flex flex-col items-center gap-1 min-w-0 transition-all duration-200"
+            >
+              <div
+                className="flex items-center justify-center rounded-xl overflow-hidden w-full transition-all duration-200"
+                style={{
+                  aspectRatio: "1",
+                  maxHeight: 40,
+                  background: "#fff",
+                  border: active ? `2px solid ${store.color}` : "1px solid rgba(255,255,255,0.12)",
+                  boxShadow: active ? `0 0 10px ${store.color}44` : "none",
+                }}
+              >
+                <img
+                  src={store.logo}
+                  alt={store.label}
+                  className="object-contain"
+                  style={{ width: "78%", height: "78%" }}
+                  loading="lazy"
+                />
+              </div>
+              <span
+                className="font-semibold rounded-full px-1 py-0.5 w-full text-center truncate"
+                style={{
+                  fontSize: 8,
+                  lineHeight: 1.2,
+                  color: active ? "#fff" : "rgba(255,255,255,0.45)",
+                  background: active ? store.color : "rgba(255,255,255,0.06)",
+                }}
+              >
+                {store.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function StatsRow({ total }) {
-  const stats = [
-    { label:"Aktivnih akcija", value: total.toString(), color:"#00ff88" },
-    { label:"Glitch cijena",   value: Math.floor(total * 0.3).toString(), color:"#ffd700" },
-    { label:"Prosj. ušteda",   value:"-45%",  color:"#ff6b6b" },
+function StoreInfoBar({ store, stats, loading, listFiltered, onAkcijeClick }) {
+  const items = [
+    {
+      key: "akcije",
+      label: "Akcija",
+      value: loading ? "…" : stats?.total?.toString() ?? "0",
+      color: "#00ff88",
+      clickable: true,
+      active: listFiltered,
+    },
+    {
+      key: "hot",
+      label: "Vruće ponude",
+      value: loading ? "…" : stats?.hotCount?.toString() ?? "0",
+      color: "#ffd700",
+      clickable: false,
+    },
+    {
+      key: "avg",
+      label: "Prosj. ušteda",
+      value: loading ? "…" : stats?.avgDiscount ? `-${stats.avgDiscount}%` : "—",
+      color: "#ff6b6b",
+      clickable: false,
+    },
   ];
+
   return (
-    <div className="grid grid-cols-3 gap-2 mx-4 mb-4">
-      {stats.map(({ label,value,color }) => (
-        <div key={label} className="rounded-2xl p-3 text-center"
-          style={{ background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)" }}>
-          <p className="font-black" style={{ fontSize:15,letterSpacing:"-0.02em",color }}>{value}</p>
-          <p style={{ color:"rgba(255,255,255,0.28)",fontSize:9,marginTop:2,lineHeight:1.35 }}>{label}</p>
-        </div>
-      ))}
+    <div
+      className="mx-4 mb-4 rounded-2xl px-3 py-3"
+      style={{
+        background: `linear-gradient(135deg, ${store.color}18, rgba(255,255,255,0.02))`,
+        border: `1px solid ${store.color}44`,
+      }}
+    >
+      <p className="font-bold text-white mb-2.5" style={{ fontSize: 12 }}>
+        {store.label}
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {items.map(({ key, label, value, color, clickable, active }) => {
+          const inner = (
+            <>
+              <p className="font-black" style={{ fontSize: 15, letterSpacing: "-0.02em", color }}>{value}</p>
+              <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 9, marginTop: 2, lineHeight: 1.35 }}>{label}</p>
+            </>
+          );
+
+          if (clickable) {
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={onAkcijeClick}
+                className="rounded-xl p-2.5 text-center transition-all duration-200"
+                style={{
+                  background: active ? "rgba(0,255,136,0.12)" : "rgba(255,255,255,0.04)",
+                  border: active ? "1px solid rgba(0,255,136,0.45)" : "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                {inner}
+              </button>
+            );
+          }
+
+          return (
+            <div
+              key={key}
+              className="rounded-xl p-2.5 text-center"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+            >
+              {inner}
+            </div>
+          );
+        })}
+      </div>
+      {listFiltered && (
+        <p style={{ color: "rgba(0,255,136,0.55)", fontSize: 9, marginTop: 8, textAlign: "center" }}>
+          Prikazane su samo akcije iz {store.label}
+        </p>
+      )}
     </div>
   );
 }
 
-export function HomePage({ onProductSelect, onSponsorOpen, onSearchFocus, isFav, onToggleFav }) {
+export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav }) {
   const [activeCat, setActiveCat] = useState(null);
-  const { products, loading } = useProducts({ category: activeCat, sortBy: 'discount' });
+  const [selectedStore, setSelectedStore] = useState(null);
+  const [listStoreFilter, setListStoreFilter] = useState(false);
 
-  const glitchProducts  = products.filter((p) => p.isGlitch);
+  const storeMeta = STORES.find((s) => s.id === selectedStore);
+  const { stats: storeStats, loading: statsLoading } = useStoreStats(selectedStore);
+  const { locationLabel } = useUserLocation();
+
+  const { products, loading } = useProducts({
+    category: activeCat,
+    sortBy: "discount",
+    chain: listStoreFilter && selectedStore ? selectedStore : undefined,
+  });
+
+  const handleStoreSelect = useCallback((storeId) => {
+    setSelectedStore((prev) => {
+      if (prev === storeId) return null;
+      return storeId;
+    });
+    setListStoreFilter(false);
+  }, []);
+
+  const handleAkcijeClick = useCallback(() => {
+    if (!selectedStore) return;
+    setListStoreFilter((prev) => !prev);
+  }, [selectedStore]);
+
+  const hotProducts = products.filter((p) => p.isGlitch);
   const regularProducts = products.filter((p) => !p.isGlitch);
+  const filterLabel = listStoreFilter ? storeMeta?.label : null;
 
   return (
-    <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth:"none" }}>
-      <div className="flex items-center justify-between px-5 pt-12 pb-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-[26px] h-[26px] rounded-lg flex items-center justify-center"
-              style={{ background:"linear-gradient(135deg,#00ff88,#00cc6a)" }}>
-              <Zap size={13} fill="#020617" stroke="none" />
-            </div>
-            <h1 className="font-black text-white" style={{ fontSize:21,letterSpacing:"-0.03em" }}>
-              akcije<span style={{ color:"#00ff88" }}>.hr</span>
-            </h1>
-          </div>
-          <p style={{ color:"rgba(255,255,255,0.28)",fontSize:10,marginTop:2 }}>Zagreb, HR · Ažurirano upravo</p>
-        </div>
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl"
-          style={{ background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)" }}>
-          <Star size={11} fill="#ffd700" stroke="#ffd700" />
-          <span style={{ color:"rgba(255,255,255,0.7)",fontSize:11,fontWeight:700 }}>PRO</span>
-        </div>
+    <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+      <div className="px-5 pt-12 pb-3">
+        <CjenkoLogo height={34} />
+        <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+          {filterLabel ? `Filtar: ${filterLabel}` : `${locationLabel} · Sve trgovine`}
+        </p>
       </div>
 
       <div onClick={onSearchFocus} className="mx-4 mb-4 flex items-center gap-3 rounded-2xl px-4 py-3 cursor-pointer"
-        style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)" }}>
-        <Search size={14} style={{ color:"rgba(255,255,255,0.3)" }} />
-        <span style={{ color:"rgba(255,255,255,0.2)",fontSize:13 }}>Traži akcije, proizvode, trgovine…</span>
+        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <CjenkoFace size={22} />
+        <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>Traži akcije, proizvode, trgovine…</span>
       </div>
 
-      <HeroCard onOpen={onSponsorOpen} />
-      <StatsRow total={products.length} />
+      <StoreFilterRow selectedStore={selectedStore} onSelect={handleStoreSelect} />
 
-      <div className="flex gap-2 px-4 pb-4 overflow-x-auto" style={{ scrollbarWidth:"none" }}>
+      {storeMeta && (
+        <StoreInfoBar
+          store={storeMeta}
+          stats={storeStats}
+          loading={statsLoading}
+          listFiltered={listStoreFilter}
+          onAkcijeClick={handleAkcijeClick}
+        />
+      )}
+
+      <div className="flex gap-2 px-4 pb-4 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
         {CATEGORIES.map((c) => (
           <button key={c.label} onClick={() => setActiveCat(c.id)}
             className="whitespace-nowrap px-3.5 py-1.5 rounded-full text-[11px] font-semibold flex-shrink-0 transition-all duration-200"
-            style={{ background: activeCat===c.id?"#00ff88":"rgba(255,255,255,0.05)",
-              color: activeCat===c.id?"#020617":"rgba(255,255,255,0.45)",
-              border: activeCat===c.id?"1px solid #00ff88":"1px solid rgba(255,255,255,0.06)" }}>
+            style={{
+              background: activeCat === c.id ? "#00ff88" : "rgba(255,255,255,0.05)",
+              color: activeCat === c.id ? "#020617" : "rgba(255,255,255,0.45)",
+              border: activeCat === c.id ? "1px solid #00ff88" : "1px solid rgba(255,255,255,0.06)",
+            }}>
             {c.emoji} {c.label}
           </button>
         ))}
@@ -107,32 +220,36 @@ export function HomePage({ onProductSelect, onSponsorOpen, onSearchFocus, isFav,
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <p style={{ color:"rgba(255,255,255,0.3)",fontSize:14 }}>Učitavanje akcija...</p>
+          <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 14 }}>Učitavanje akcija...</p>
         </div>
       ) : (
         <>
           <section className="mb-5">
             <div className="flex items-center justify-between px-4 mb-3">
               <div>
-                <h2 className="font-black text-white" style={{ fontSize:16,letterSpacing:"-0.02em" }}>⚡ Glitch Cijene</h2>
-                <p style={{ color:"rgba(255,255,255,0.28)",fontSize:10,marginTop:2 }}>{glitchProducts.length} aktivnih · Ograničeno</p>
+                <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>⚡ Vruće ponude</h2>
+                <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+                  {hotProducts.length} aktivnih{filterLabel ? ` · ${filterLabel}` : ""}
+                </p>
               </div>
-              <button className="flex items-center gap-0.5" style={{ color:"#00ff88",fontSize:11,fontWeight:700 }}>
+              <button className="flex items-center gap-0.5" style={{ color: "#00ff88", fontSize: 11, fontWeight: 700 }}>
                 Sve <ChevronRight size={12} />
               </button>
             </div>
-            {glitchProducts.length === 0 ? (
-              <p className="px-4" style={{ color:"rgba(255,255,255,0.2)",fontSize:13 }}>Nema glitch cijena trenutno.</p>
+            {hotProducts.length === 0 ? (
+              <p className="px-4" style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>
+                {filterLabel ? `Nema vrućih ponuda u ${filterLabel}.` : "Nema vrućih ponuda trenutno."}
+              </p>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-2.5 px-4 mb-2.5">
-                  {glitchProducts.slice(0,2).map((p) => (
+                  {hotProducts.slice(0, 2).map((p) => (
                     <ProductCard key={p.id} product={p} isFavorite={isFav(p.id)} onToggleFavorite={onToggleFav} onClick={() => onProductSelect(p)} />
                   ))}
                 </div>
-                {glitchProducts[2] && (
+                {hotProducts[2] && (
                   <div className="px-4">
-                    <ProductCard product={glitchProducts[2]} size="large" isFavorite={isFav(glitchProducts[2].id)} onToggleFavorite={onToggleFav} onClick={() => onProductSelect(glitchProducts[2])} />
+                    <ProductCard product={hotProducts[2]} size="large" isFavorite={isFav(hotProducts[2].id)} onToggleFavorite={onToggleFav} onClick={() => onProductSelect(hotProducts[2])} />
                   </div>
                 )}
               </>
@@ -142,15 +259,17 @@ export function HomePage({ onProductSelect, onSponsorOpen, onSearchFocus, isFav,
           <section className="mb-5">
             <div className="flex items-center justify-between px-4 mb-3">
               <div>
-                <h2 className="font-black text-white" style={{ fontSize:16,letterSpacing:"-0.02em" }}>🔥 Danas Ističe</h2>
-                <p style={{ color:"rgba(255,255,255,0.28)",fontSize:10,marginTop:2 }}>Požuri dok ima zaliha</p>
+                <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>🔥 Danas Ističe</h2>
+                <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>Požuri dok ima zaliha</p>
               </div>
-              <button className="flex items-center gap-0.5" style={{ color:"#00ff88",fontSize:11,fontWeight:700 }}>
+              <button className="flex items-center gap-0.5" style={{ color: "#00ff88", fontSize: 11, fontWeight: 700 }}>
                 Sve <ChevronRight size={12} />
               </button>
             </div>
             {regularProducts.length === 0 ? (
-              <p className="px-4" style={{ color:"rgba(255,255,255,0.2)",fontSize:13 }}>Nema aktivnih akcija.</p>
+              <p className="px-4" style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>
+                {filterLabel ? `Nema aktivnih akcija u ${filterLabel}.` : "Nema aktivnih akcija."}
+              </p>
             ) : (
               <div className="grid grid-cols-2 gap-2.5 px-4">
                 {regularProducts.map((p) => (
