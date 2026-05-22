@@ -2,6 +2,7 @@
 import { X } from "lucide-react";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { useProducts } from "../hooks/useProducts";
+import { chainFromStoreName } from "../lib/constants";
 
 function highlight(text, query) {
   if (!query) return text;
@@ -125,7 +126,9 @@ export function SearchPage({ onProductSelect }) {
             </div>
           ) : (
             <div className="flex flex-col gap-2.5 pb-8">
-              {results.map((p) => (
+              {results.map((p) => {
+                const storeLabel = p.chain ?? chainFromStoreName(p.store);
+                return (
                 <div key={p.id} onClick={() => onProductSelect(p)}
                   className="flex items-center rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                   style={{ background:"rgba(255,255,255,0.03)",
@@ -134,7 +137,12 @@ export function SearchPage({ onProductSelect }) {
                     style={{ width:80,height:80,background:p.imageBg,opacity:0.85 }}
                     onError={(e) => e.target.style.display="none"} />
                   <div className="flex-1 px-3 py-2.5 min-w-0">
-                    <p className="font-bold text-white text-[12.5px] leading-tight mb-2 truncate">{highlight(p.name,query)}</p>
+                    <p className="font-bold text-white text-[12.5px] leading-tight mb-1 truncate">{highlight(p.name,query)}</p>
+                    {storeLabel && (
+                      <p className="truncate" style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, marginBottom: 6 }}>
+                        {storeLabel}
+                      </p>
+                    )}
                     <div className="flex items-center gap-2">
                       <div>
                         <p style={{ color:"rgba(255,255,255,0.25)",fontSize:10,textDecoration:"line-through" }}>{fmt(p.originalPrice)}</p>
@@ -147,7 +155,8 @@ export function SearchPage({ onProductSelect }) {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>

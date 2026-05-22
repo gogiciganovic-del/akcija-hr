@@ -150,12 +150,14 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
   const [activeCat, setActiveCat] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
   const [listStoreFilter, setListStoreFilter] = useState(false);
+  const [hotExpanded, setHotExpanded] = useState(false);
 
   useEffect(() => {
     if (!homeResetSignal) return;
     setActiveCat(null);
     setSelectedStore(null);
     setListStoreFilter(false);
+    setHotExpanded(false);
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [homeResetSignal]);
@@ -182,6 +184,10 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
     if (!selectedStore) return;
     setListStoreFilter((prev) => !prev);
   }, [selectedStore]);
+
+  const handleHotExpand = useCallback(() => {
+    setHotExpanded((prev) => !prev);
+  }, []);
 
   const hotProducts = products.filter((p) => p.isGlitch);
   const regularProducts = products.filter((p) => !p.isGlitch);
@@ -256,14 +262,29 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
                   {hotProducts.length} aktivnih{filterLabel ? ` · ${filterLabel}` : ""}
                 </p>
               </div>
-              <button className="flex items-center gap-0.5" style={{ color: "#00ff88", fontSize: 11, fontWeight: 700 }}>
-                Sve <ChevronRight size={12} />
+              <button
+                type="button"
+                onClick={handleHotExpand}
+                className="flex items-center gap-0.5 transition-opacity duration-200"
+                style={{
+                  color: hotExpanded ? "#ffd700" : "#00ff88",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                {hotExpanded ? "Manje" : "Sve"} <ChevronRight size={12} style={{ transform: hotExpanded ? "rotate(90deg)" : "none" }} />
               </button>
             </div>
             {hotProducts.length === 0 ? (
               <p className="px-4" style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>
                 {filterLabel ? `Nema vrućih ponuda u ${filterLabel}.` : "Nema vrućih ponuda trenutno."}
               </p>
+            ) : hotExpanded ? (
+              <div className="grid grid-cols-2 gap-2.5 px-4">
+                {hotProducts.map((p) => (
+                  <ProductCard key={p.id} product={p} isFavorite={isFav(p.id)} onToggleFavorite={onToggleFav} onClick={() => onProductSelect(p)} />
+                ))}
+              </div>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-2.5 px-4 mb-2.5">
@@ -280,6 +301,7 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
             )}
           </section>
 
+          {!hotExpanded && (
           <section className="mb-5">
             <div className="flex items-center justify-between px-4 mb-3">
               <div>
@@ -302,6 +324,7 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
               </div>
             )}
           </section>
+          )}
         </>
       )}
       <div className="pb-4" />
