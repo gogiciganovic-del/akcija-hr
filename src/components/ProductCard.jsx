@@ -1,9 +1,11 @@
 import { Heart } from "lucide-react";
+import { chainFromStoreName } from "../lib/constants";
 
 const fmt = (v) => v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
 
 export function ProductCard({ product, size = "normal", isFavorite, onToggleFavorite, onClick }) {
   const large = size === "large";
+  const storeLabel = product.chain ?? chainFromStoreName(product.store);
 
   return (
     <div
@@ -47,9 +49,11 @@ export function ProductCard({ product, size = "normal", isFavorite, onToggleFavo
         >
           {product.name}
         </p>
-        <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, marginBottom: 6 }}>
-          {product.store}{product.isHot ? " · 🔥" : ""}
-        </p>
+        {storeLabel && (
+          <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, marginBottom: 6 }}>
+            {storeLabel}
+          </p>
+        )}
         <div className="flex items-end justify-between">
           <div>
             <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 9, textDecoration: "line-through" }}>

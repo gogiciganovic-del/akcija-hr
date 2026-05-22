@@ -4,6 +4,7 @@ import { ProductSheet }  from "./components/ProductSheet";
 import { HomePage }      from "./pages/HomePage";
 import { SearchPage }    from "./pages/SearchPage";
 import { FavoritesPage } from "./pages/FavoritesPage";
+import { CartPage }      from "./pages/CartPage";
 import { Admin }         from "./pages/Admin";
 import { useFavorites }  from "./hooks/useFavorites";
 import { CjenkoPeek }    from "./components/CjenkoPeek";
@@ -12,9 +13,14 @@ export default function App() {
   const { favorites, isFav, toggle, clear } = useFavorites();
   const [activeTab, setActiveTab] = useState("home");
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [homeResetSignal, setHomeResetSignal] = useState(0);
 
   const handleProductSelect = useCallback((product) => setSelectedProduct(product), []);
   const handleCloseSheet    = useCallback(() => setSelectedProduct(null), []);
+  const handleHomeClick     = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setHomeResetSignal((n) => n + 1);
+  }, []);
   const handleTabChange     = useCallback((tab) => setActiveTab(tab), []);
 
   if (window.location.pathname === "/admin") return <Admin />;
@@ -26,9 +32,11 @@ export default function App() {
         onSearchFocus={() => setActiveTab("search")}
         isFav={isFav}
         onToggleFav={toggle}
+        homeResetSignal={homeResetSignal}
       />
     ),
     search: <SearchPage onProductSelect={handleProductSelect} />,
+    cart: <CartPage />,
     fav: (
       <FavoritesPage
         favorites={favorites}
@@ -46,8 +54,15 @@ export default function App() {
       style={{ background: "#020617", fontFamily: "'DM Sans','Inter',sans-serif" }}
     >
       <CjenkoPeek />
-      {pages[activeTab]}
-      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} favCount={favorites.size} />
+      <main className="flex-1 min-h-0 overflow-hidden pb-[72px]">
+        {pages[activeTab]}
+      </main>
+      <BottomNav
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onHomeClick={handleHomeClick}
+        favCount={favorites.size}
+      />
       <ProductSheet
         product={selectedProduct}
         isOpen={!!selectedProduct}

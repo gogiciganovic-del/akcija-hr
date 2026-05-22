@@ -26,4 +26,11 @@ export const STORES = [
   { id: 'Eurospin',  label: 'Eurospin',  logo: '/stores/eurospin.png',   color: '#0055a5' },
 ]
 
+/** Samo naziv lanca (npr. "Lidl"), bez grada/kvarta iz store_name. */
+export function chainFromStoreName(storeName) {
+  if (!storeName) return null
+  const match = STORES.find((s) => storeName.startsWith(s.id))
+  return match?.id ?? null
+}
+
 export const RADIUS_OPTIONS = [1, 2, 5, 10, 20]

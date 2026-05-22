@@ -63,7 +63,7 @@ export function FavoritesPage({
   const hasItems = items.length > 0;
 
   return (
-    <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+    <div className="flex-1 min-h-0 h-full overflow-y-auto" style={{ scrollbarWidth: "none" }}>
       <div className="px-4 pt-8 pb-3">
         <div className="flex items-center justify-between mb-1">
           <h1 className="font-black text-white" style={{ fontSize: 26, letterSpacing: "-0.03em" }}>

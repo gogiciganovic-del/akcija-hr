@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { ChevronRight } from "lucide-react";
 import { CjenkoLogo } from "../components/CjenkoLogo";
 import { CjenkoFace } from "../components/CjenkoFace";
@@ -145,10 +145,20 @@ function StoreInfoBar({ store, stats, loading, listFiltered, onAkcijeClick }) {
   );
 }
 
-export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav }) {
+export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, homeResetSignal = 0 }) {
+  const scrollRef = useRef(null);
   const [activeCat, setActiveCat] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
   const [listStoreFilter, setListStoreFilter] = useState(false);
+
+  useEffect(() => {
+    if (!homeResetSignal) return;
+    setActiveCat(null);
+    setSelectedStore(null);
+    setListStoreFilter(false);
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [homeResetSignal]);
 
   const storeMeta = STORES.find((s) => s.id === selectedStore);
   const { stats: storeStats, loading: statsLoading } = useStoreStats(selectedStore);
@@ -178,20 +188,34 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav })
   const filterLabel = listStoreFilter ? storeMeta?.label : null;
 
   return (
-    <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
-      <div className="px-5 pt-12 pb-3">
-        <CjenkoLogo height={34} />
-        <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
-          {filterLabel ? `Filtar: ${filterLabel}` : `${locationLabel} · Sve trgovine`}
-        </p>
-      </div>
+    <div className="flex flex-col flex-1 min-h-0 h-full">
+      <header
+        className="flex-shrink-0 z-30"
+        style={{
+          position: "sticky",
+          top: 0,
+          background: "#020617",
+          boxShadow: "0 4px 24px rgba(2,6,23,0.85)",
+        }}
+      >
+        <div className="px-5 pt-12 pb-2">
+          <CjenkoLogo height={34} />
+          <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+            {filterLabel ? `Filtar: ${filterLabel}` : `${locationLabel} · Sve trgovine`}
+          </p>
+        </div>
 
-      <div onClick={onSearchFocus} className="mx-4 mb-4 flex items-center gap-3 rounded-2xl px-4 py-3 cursor-pointer"
-        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-        <CjenkoFace size={22} />
-        <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>Traži akcije, proizvode, trgovine…</span>
-      </div>
+        <div
+          onClick={onSearchFocus}
+          className="mx-4 mb-3 flex items-center gap-3 rounded-2xl px-4 py-3 cursor-pointer"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+        >
+          <CjenkoFace size={22} />
+          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>Traži akcije, proizvode, trgovine…</span>
+        </div>
+      </header>
 
+      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: "none" }}>
       <StoreFilterRow selectedStore={selectedStore} onSelect={handleStoreSelect} />
 
       {storeMeta && (
@@ -280,7 +304,8 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav })
           </section>
         </>
       )}
-      <div className="pb-8" />
+      <div className="pb-4" />
+      </div>
     </div>
   );
 }

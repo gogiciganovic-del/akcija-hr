@@ -37,7 +37,7 @@ export function SearchPage({ onProductSelect }) {
   }, []);
 
   return (
-    <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth:"none" }}>
+    <div className="flex-1 min-h-0 h-full overflow-y-auto" style={{ scrollbarWidth:"none" }}>
       <div className="px-4 pt-8 pb-4">
         <h1 className="font-black text-white mb-1" style={{ fontSize:26,letterSpacing:"-0.03em" }}>Pretraga</h1>
         <p style={{ color:"rgba(255,255,255,0.3)",fontSize:13,marginBottom:16 }}>Pronađi svoju sljedeću uštedu</p>
@@ -134,8 +134,7 @@ export function SearchPage({ onProductSelect }) {
                     style={{ width:80,height:80,background:p.imageBg,opacity:0.85 }}
                     onError={(e) => e.target.style.display="none"} />
                   <div className="flex-1 px-3 py-2.5 min-w-0">
-                    <p className="font-bold text-white text-[12.5px] leading-tight mb-1 truncate">{highlight(p.name,query)}</p>
-                    <p style={{ color:"rgba(255,255,255,0.3)",fontSize:10,marginBottom:6 }}>{p.store} · {p.category}{p.isHot?" · 🔥":""}</p>
+                    <p className="font-bold text-white text-[12.5px] leading-tight mb-2 truncate">{highlight(p.name,query)}</p>
                     <div className="flex items-center gap-2">
                       <div>
                         <p style={{ color:"rgba(255,255,255,0.25)",fontSize:10,textDecoration:"line-through" }}>{fmt(p.originalPrice)}</p>

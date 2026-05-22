@@ -1,9 +1,12 @@
+import { chainFromStoreName } from './constants'
+
 export function adaptDeal(deal) {
   return {
     id:            deal.deal_id,
     product_id:    deal.product_id,
     name:          deal.name,
     store:         deal.store_name,
+    chain:         chainFromStoreName(deal.store_name),
     category:      deal.category,
     originalPrice: parseFloat(deal.original_price),
     salePrice:     parseFloat(deal.price),
@@ -17,7 +20,7 @@ export function adaptDeal(deal) {
     distanceM:     deal.distance_km ? Math.round(deal.distance_km * 1000) : null,
     inStock:       true,
     keywords:      `${deal.name} ${deal.store_name} ${deal.category}`.toLowerCase(),
-    description:   `${deal.name} na akciji u ${deal.store_name}. Popust ${deal.discount_pct}%.`,
+    description:   `${deal.name} na akciji. Popust ${deal.discount_pct}%.`,
   }
 }
 

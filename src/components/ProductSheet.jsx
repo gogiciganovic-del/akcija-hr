@@ -1,4 +1,4 @@
-import { X, Heart, MapPin } from "lucide-react";
+import { X, Heart } from "lucide-react";
 import { usePriceHistory } from "../hooks/usePriceHistory";
 
 const fmt = (v) => v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -46,7 +46,7 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
             {product.name}
           </h2>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginBottom: 16 }}>
-            {product.store} · {product.category}
+            {product.category}
           </p>
 
           <div className="flex items-center gap-3 mb-5">
@@ -78,16 +78,6 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
             </p>
           )}
 
-          <div
-            className="flex items-center gap-2 rounded-2xl px-4 py-3 mb-5"
-            style={{ background: "rgba(0,255,136,0.06)", border: "1px solid rgba(0,255,136,0.15)" }}
-          >
-            <MapPin size={14} style={{ color: "#00ff88" }} />
-            <span style={{ color: "#00ff88", fontSize: 12, fontWeight: 600 }}>
-              {product.distanceM ? `${product.distanceM}m udaljeno` : product.store}
-            </span>
-          </div>
-
           <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.12em", marginBottom: 12 }}>
             POVIJEST CIJENA
           </p>
@@ -104,7 +94,7 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
                   style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}
                 >
                   <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
-                    {h.stores?.name || h.stores?.chain || "Trgovina"}
+                    {h.stores?.chain || "Trgovina"}
                   </span>
                   <span className="font-bold text-white" style={{ fontSize: 13 }}>
                     {fmt(h.price)}
