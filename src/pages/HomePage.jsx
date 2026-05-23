@@ -71,15 +71,14 @@ function StoreFilterRow({ selectedStore, onSelect }) {
   );
 }
 
-function StoreInfoBar({ store, stats, loading, listFiltered, onAkcijeClick }) {
+function StoreInfoBar({ store, stats, loading }) {
   const items = [
     {
       key: "akcije",
       label: "Akcija",
       value: loading ? "…" : stats?.total?.toString() ?? "0",
       color: "#00ff88",
-      clickable: true,
-      active: listFiltered,
+      clickable: false,
     },
     {
       key: "hot",
@@ -145,11 +144,9 @@ function StoreInfoBar({ store, stats, loading, listFiltered, onAkcijeClick }) {
           );
         })}
       </div>
-      {listFiltered && (
-        <p style={{ color: "rgba(0,255,136,0.55)", fontSize: 9, marginTop: 8, textAlign: "center" }}>
-          Prikazane su samo akcije iz {store.label}
-        </p>
-      )}
+      <p style={{ color: "rgba(0,255,136,0.55)", fontSize: 9, marginTop: 8, textAlign: "center" }}>
+        Prikazane su samo akcije iz {store.label}
+      </p>
     </div>
   );
 }
@@ -158,14 +155,12 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
   const scrollRef = useRef(null);
   const [activeCat, setActiveCat] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
-  const [listStoreFilter, setListStoreFilter] = useState(false);
   const [hotExpanded, setHotExpanded] = useState(false);
 
   useEffect(() => {
     if (!homeResetSignal) return;
     setActiveCat(null);
     setSelectedStore(null);
-    setListStoreFilter(false);
     setHotExpanded(false);
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -175,32 +170,38 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
   const { stats: storeStats, loading: statsLoading } = useStoreStats(selectedStore);
   const { locationLabel } = useUserLocation();
 
-  const { products, loading } = useProducts({
-    category: activeCat,
+  const { products: storeProducts, loading } = useProducts({
     sortBy: "discount",
-    chain: listStoreFilter && selectedStore ? selectedStore : undefined,
+    chain: selectedStore ?? undefined,
   });
 
-  const handleStoreSelect = useCallback((storeId) => {
-    setSelectedStore((prev) => {
-      if (prev === storeId) return null;
-      return storeId;
-    });
-    setListStoreFilter(false);
-  }, []);
+  const visibleCategories = CATEGORIES.filter(
+    (c) => c.id === null || storeProducts.some((p) => p.category === c.id)
+  );
 
-  const handleAkcijeClick = useCallback(() => {
-    if (!selectedStore) return;
-    setListStoreFilter((prev) => !prev);
-  }, [selectedStore]);
+  useEffect(() => {
+    if (activeCat && !storeProducts.some((p) => p.category === activeCat)) {
+      setActiveCat(null);
+    }
+  }, [activeCat, storeProducts]);
+
+  const handleStoreSelect = useCallback((storeId) => {
+    setSelectedStore((prev) => (prev === storeId ? null : storeId));
+    setActiveCat(null);
+    setHotExpanded(false);
+  }, []);
 
   const handleHotExpand = useCallback(() => {
     setHotExpanded((prev) => !prev);
   }, []);
 
+  const products = activeCat
+    ? storeProducts.filter((p) => p.category === activeCat)
+    : storeProducts;
+
   const hotProducts = products.filter((p) => p.isGlitch);
   const regularProducts = products.filter((p) => !p.isGlitch);
-  const filterLabel = listStoreFilter ? storeMeta?.label : null;
+  const filterLabel = selectedStore ? storeMeta?.label : null;
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full">
@@ -238,13 +239,11 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
           store={storeMeta}
           stats={storeStats}
           loading={statsLoading}
-          listFiltered={listStoreFilter}
-          onAkcijeClick={handleAkcijeClick}
         />
       )}
 
       <div className="flex gap-2 px-4 pb-4 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-        {CATEGORIES.map((c) => (
+        {visibleCategories.map((c) => (
           <button key={c.label} onClick={() => setActiveCat(c.id)}
             className="whitespace-nowrap px-3.5 py-1.5 rounded-full text-[11px] font-semibold flex-shrink-0 transition-all duration-200"
             style={{
