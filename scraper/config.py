@@ -7,7 +7,7 @@ ROOT = Path(__file__).parent
 load_dotenv(ROOT.parent / ".env")
 load_dotenv(ROOT / ".env")
 
-BASE_URL = "https://www.najcijena.hr"
+BASE_URL = "https://najcijena.hr"
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
 SUPABASE_KEY = (
@@ -23,6 +23,12 @@ STORE_SLUGS = {
     "spar": "spar",
     "plodine": "plodine",
     "eurospin": "eurospin",
+    "tommy": "tommy",
+    "interspar": "interspar",
+    "dm": "dm",
+    "studenac": "studenac",
+    "mueller": "mueller",
+    "bipa": "bipa",
 }
 
 CHAIN_NAMES = {
@@ -32,4 +38,12 @@ CHAIN_NAMES = {
     "spar": "Spar",
     "plodine": "Plodine",
     "eurospin": "Eurospin",
+    "tommy": "Tommy",
+    "interspar": "Interspar",
+    "dm": "Dm",
+    "studenac": "Studenac",
+    "mueller": "Mueller",
+    "bipa": "Bipa",
 }
+
+STORES = list(STORE_SLUGS.keys())

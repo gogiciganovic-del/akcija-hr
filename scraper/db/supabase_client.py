@@ -29,7 +29,22 @@ class SupabaseWriter:
             .execute()
         )
         if not res.data:
-            raise RuntimeError(f"Trgovina '{chain}' nije u tablici stores.")
+            inserted = (
+                self.client.table("stores")
+                .insert(
+                    {
+                        "name": f"{chain} Hrvatska",
+                        "chain": chain,
+                        "city": "Zagreb",
+                        "lat": 45.815,
+                        "lng": 15.982,
+                    }
+                )
+                .execute()
+            )
+            store_id = inserted.data[0]["id"]
+            self._store_cache[chain] = store_id
+            return store_id
         store_id = res.data[0]["id"]
         self._store_cache[chain] = store_id
         return store_id

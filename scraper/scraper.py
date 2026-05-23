@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Scraper za sve trgovine: Lidl, Kaufland, Konzum, Spar, Plodine, Eurospin
+Scraper za sve trgovine na najcijena.hr
 Korištenje: py scraper.py --store lidl --pages 2
             py scraper.py --all --pages 3
 """
 
 from __future__ import annotations
+
 import argparse
 import sys
 import time
@@ -15,19 +16,9 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from parser import parse_listing_page, ScrapedDeal
+from config import BASE_URL, CHAIN_NAMES, STORES
+from parser import parse_listing_page
 from supabase_writer import SupabaseWriter
-
-CHAIN_NAMES = {
-    "lidl": "Lidl",
-    "kaufland": "Kaufland",
-    "konzum": "Konzum",
-    "spar": "Spar",
-    "plodine": "Plodine",
-    "eurospin": "Eurospin",
-}
-
-BASE_URL = "https://najcijena.hr"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -35,30 +26,44 @@ HEADERS = {
     "Accept-Language": "hr,en;q=0.9",
 }
 
-STORES = ["lidl", "kaufland", "konzum", "spar", "plodine", "eurospin"]
+
+def _listing_url(store_slug: str, page: int, use_vendor: bool) -> str:
+    if use_vendor:
+        return f"{BASE_URL}/?vendor={store_slug}&page={page}"
+    return f"{BASE_URL}/trgovina/{store_slug}?page={page}"
 
 
 def fetch_store(client, store_slug, max_pages):
     chain = CHAIN_NAMES[store_slug]
     all_deals = []
     seen = set()
+    use_vendor = False
 
     for page in range(1, max_pages + 1):
-        url = f"{BASE_URL}/trgovina/{store_slug}" + (f"?page={page}" if page > 1 else "")
-        print(f"  → Učitavam {url}")
+        url = _listing_url(store_slug, page, use_vendor)
+        print(f"  -> Ucitavam {url}")
         try:
             resp = client.get(url, headers=HEADERS, timeout=30)
             resp.raise_for_status()
         except Exception as e:
-            print(f"  ✗ Greška: {e}")
+            print(f"  X Greska: {e}")
             break
 
         batch = parse_listing_page(resp.text, chain)
+
+        if page == 1 and len(batch) == 0 and not use_vendor:
+            use_vendor = True
+            url = _listing_url(store_slug, page, use_vendor)
+            print(f"  -> Nema akcija na /trgovina/, pokusavam {url}")
+            resp = client.get(url, headers=HEADERS, timeout=30)
+            resp.raise_for_status()
+            batch = parse_listing_page(resp.text, chain)
+
         new = [d for d in batch if d.external_id not in seen]
         for d in new:
             seen.add(d.external_id)
         all_deals.extend(new)
-        print(f"    Pronađeno {len(new)} novih akcija (ukupno {len(all_deals)})")
+        print(f"    Pronadeno {len(new)} novih akcija (ukupno {len(all_deals)})")
 
         if len(new) == 0:
             break
@@ -84,21 +89,21 @@ def main():
     with httpx.Client() as client:
         all_deals = []
         for store in stores:
-            print(f"\n🛒 Scraping: {store.upper()}")
+            print(f"\nScraping: {store.upper()}")
             deals = fetch_store(client, store, args.pages)
             all_deals.extend(deals)
-            print(f"  ✓ {store}: {len(deals)} akcija")
+            print(f"  OK {store}: {len(deals)} akcija")
 
     print(f"\nUkupno: {len(all_deals)} akcija")
 
     if args.dry_run:
-        print("DRY RUN — ništa nije spremljeno.")
+        print("DRY RUN — nista nije spremljeno.")
         return 0
 
     print("\nSpremanje u Supabase...")
     writer = SupabaseWriter()
     stats = writer.save_deals(all_deals)
-    print(f"✓ Gotovo: {stats['deals']} akcija, {stats['errors']} grešaka")
+    print(f"Gotovo: {stats['deals']} akcija, {stats['errors']} gresaka")
     return 0
 
 

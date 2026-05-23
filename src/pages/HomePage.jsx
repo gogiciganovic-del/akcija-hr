@@ -6,7 +6,55 @@ import { ProductCard } from "../components/ProductCard";
 import { useProducts } from "../hooks/useProducts";
 import { useStoreStats } from "../hooks/useStoreStats";
 import { useUserLocation } from "../hooks/useUserLocation";
-import { CATEGORIES, STORES } from "../lib/constants";
+import { CATEGORIES, STORES, STORES_ROW_1, STORES_ROW_2 } from "../lib/constants";
+
+function StoreGrid({ stores, selectedStore, onSelect }) {
+  return (
+    <div className="grid grid-cols-6 gap-1">
+      {stores.map((store) => {
+        const active = selectedStore === store.id;
+        return (
+          <button
+            key={store.id}
+            type="button"
+            onClick={() => onSelect(store.id)}
+            className="flex flex-col items-center gap-1 min-w-0 transition-all duration-200"
+          >
+            <div
+              className="flex items-center justify-center rounded-xl overflow-hidden w-full transition-all duration-200"
+              style={{
+                aspectRatio: "1",
+                maxHeight: 40,
+                background: "#fff",
+                border: active ? `2px solid ${store.color}` : "1px solid rgba(255,255,255,0.12)",
+                boxShadow: active ? `0 0 10px ${store.color}44` : "none",
+              }}
+            >
+              <img
+                src={store.logo}
+                alt={store.label}
+                className="object-contain"
+                style={{ width: "78%", height: "78%" }}
+                loading="lazy"
+              />
+            </div>
+            <span
+              className="font-semibold rounded-full px-1 py-0.5 w-full text-center truncate"
+              style={{
+                fontSize: 8,
+                lineHeight: 1.2,
+                color: active ? "#fff" : "rgba(255,255,255,0.45)",
+                background: active ? store.color : "rgba(255,255,255,0.06)",
+              }}
+            >
+              {store.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function StoreFilterRow({ selectedStore, onSelect }) {
   return (
@@ -15,48 +63,9 @@ function StoreFilterRow({ selectedStore, onSelect }) {
       <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 8, fontWeight: 700, letterSpacing: "0.16em", marginBottom: 8, paddingLeft: 2 }}>
         TRGOVINE
       </p>
-      <div className="grid grid-cols-6 gap-1">
-        {STORES.map((store) => {
-          const active = selectedStore === store.id;
-          return (
-            <button
-              key={store.id}
-              type="button"
-              onClick={() => onSelect(store.id)}
-              className="flex flex-col items-center gap-1 min-w-0 transition-all duration-200"
-            >
-              <div
-                className="flex items-center justify-center rounded-xl overflow-hidden w-full transition-all duration-200"
-                style={{
-                  aspectRatio: "1",
-                  maxHeight: 40,
-                  background: "#fff",
-                  border: active ? `2px solid ${store.color}` : "1px solid rgba(255,255,255,0.12)",
-                  boxShadow: active ? `0 0 10px ${store.color}44` : "none",
-                }}
-              >
-                <img
-                  src={store.logo}
-                  alt={store.label}
-                  className="object-contain"
-                  style={{ width: "78%", height: "78%" }}
-                  loading="lazy"
-                />
-              </div>
-              <span
-                className="font-semibold rounded-full px-1 py-0.5 w-full text-center truncate"
-                style={{
-                  fontSize: 8,
-                  lineHeight: 1.2,
-                  color: active ? "#fff" : "rgba(255,255,255,0.45)",
-                  background: active ? store.color : "rgba(255,255,255,0.06)",
-                }}
-              >
-                {store.label}
-              </span>
-            </button>
-          );
-        })}
+      <StoreGrid stores={STORES_ROW_1} selectedStore={selectedStore} onSelect={onSelect} />
+      <div className="mt-1.5">
+        <StoreGrid stores={STORES_ROW_2} selectedStore={selectedStore} onSelect={onSelect} />
       </div>
     </div>
   );
