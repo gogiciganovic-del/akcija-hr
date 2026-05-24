@@ -15,6 +15,7 @@ export function adaptDeal(deal) {
     imageBg:       "#0d1f3a",
     isGlitch:      deal.discount_pct >= 50,
     isHot:         deal.discount_pct >= 30,
+    validUntil:    deal.valid_until,
     expiresIn:     daysLeftLabel(deal.valid_until),
     expiryUrgency: urgency(deal.valid_until),
     distanceM:     deal.distance_km ? Math.round(deal.distance_km * 1000) : null,

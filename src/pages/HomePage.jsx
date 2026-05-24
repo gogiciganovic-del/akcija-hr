@@ -151,6 +151,17 @@ function StoreInfoBar({ store, stats, loading }) {
   );
 }
 
+function isExpiringToday(validUntil) {
+  if (!validUntil) return false;
+  const end = new Date(validUntil);
+  const today = new Date();
+  return (
+    end.getFullYear() === today.getFullYear() &&
+    end.getMonth() === today.getMonth() &&
+    end.getDate() === today.getDate()
+  );
+}
+
 export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, homeResetSignal = 0 }) {
   const scrollRef = useRef(null);
   const [activeCat, setActiveCat] = useState(null);
@@ -200,7 +211,9 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
     : storeProducts;
 
   const hotProducts = products.filter((p) => p.isGlitch);
-  const regularProducts = products.filter((p) => !p.isGlitch);
+  const expiringTodayProducts = products.filter((p) => isExpiringToday(p.validUntil));
+  const expiringTodayIds = new Set(expiringTodayProducts.map((p) => p.id));
+  const regularProducts = products.filter((p) => !p.isGlitch && !expiringTodayIds.has(p.id));
   const filterLabel = selectedStore ? storeMeta?.label : null;
 
   return (
@@ -309,16 +322,41 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
             )}
           </section>
 
+          {!hotExpanded && expiringTodayProducts.length > 0 && (
+            <section className="mb-5">
+              <div className="flex items-center justify-between px-4 mb-3">
+                <div>
+                  <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>
+                    ⏰ Danas ističe
+                  </h2>
+                  <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+                    {expiringTodayProducts.length} ponuda{filterLabel ? ` · ${filterLabel}` : ""}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 px-4">
+                {expiringTodayProducts.map((p) => (
+                  <ProductCard
+                    key={p.id}
+                    product={p}
+                    isFavorite={isFav(p.id)}
+                    onToggleFavorite={onToggleFav}
+                    onClick={() => onProductSelect(p)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
           {!hotExpanded && (
           <section className="mb-5">
             <div className="flex items-center justify-between px-4 mb-3">
               <div>
-                <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>🔥 Danas Ističe</h2>
-                <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>Požuri dok ima zaliha</p>
+                <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>🏷️ Sve akcije</h2>
+                <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+                  {regularProducts.length} aktivnih{filterLabel ? ` · ${filterLabel}` : ""}
+                </p>
               </div>
-              <button className="flex items-center gap-0.5" style={{ color: "#00ff88", fontSize: 11, fontWeight: 700 }}>
-                Sve <ChevronRight size={12} />
-              </button>
             </div>
             {regularProducts.length === 0 ? (
               <p className="px-4" style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>
