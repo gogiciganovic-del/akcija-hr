@@ -48,7 +48,7 @@ export function ProductCard({ product, size = "normal", isFavorite, onToggleFavo
           {product.name}
         </p>
         <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, marginBottom: 6 }}>
-          {product.store}{product.isHot ? " · 🔥" : ""}
+          Hrvatska{product.isHot ? " · 🔥" : ""}
         </p>
         <div className="flex items-end justify-between">
           <div>
