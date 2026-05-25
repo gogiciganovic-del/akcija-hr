@@ -151,6 +151,13 @@ function StoreInfoBar({ store, stats, loading }) {
   );
 }
 
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+const SPECIAL_FILTERS = [
+  { id: "novo", label: "Novo", emoji: "✨" },
+  { id: "expiring", label: "Danas ističe", emoji: "⏰" },
+];
+
 function isExpiringToday(validUntil) {
   if (!validUntil) return false;
   const end = new Date(validUntil);
@@ -162,15 +169,23 @@ function isExpiringToday(validUntil) {
   );
 }
 
+function isNewProduct(product) {
+  const ref = product.createdAt ?? product.validFrom;
+  if (!ref) return false;
+  return Date.now() - new Date(ref).getTime() <= SEVEN_DAYS_MS;
+}
+
 export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, homeResetSignal = 0 }) {
   const scrollRef = useRef(null);
   const [activeCat, setActiveCat] = useState(null);
+  const [specialFilter, setSpecialFilter] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
   const [hotExpanded, setHotExpanded] = useState(false);
 
   useEffect(() => {
     if (!homeResetSignal) return;
     setActiveCat(null);
+    setSpecialFilter(null);
     setSelectedStore(null);
     setHotExpanded(false);
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -187,7 +202,9 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
   });
 
   const visibleCategories = CATEGORIES.filter(
-    (c) => c.id === null || storeProducts.some((p) => p.category === c.id)
+    (c) =>
+      c.id !== "dom" &&
+      (c.id === null || storeProducts.some((p) => p.category === c.id))
   );
 
   useEffect(() => {
@@ -199,22 +216,42 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
   const handleStoreSelect = useCallback((storeId) => {
     setSelectedStore((prev) => (prev === storeId ? null : storeId));
     setActiveCat(null);
+    setSpecialFilter(null);
     setHotExpanded(false);
+  }, []);
+
+  const handleCatSelect = useCallback((catId) => {
+    setActiveCat(catId);
+    setSpecialFilter(null);
+  }, []);
+
+  const handleSpecialSelect = useCallback((filterId) => {
+    setSpecialFilter((prev) => (prev === filterId ? null : filterId));
+    setActiveCat(null);
   }, []);
 
   const handleHotExpand = useCallback(() => {
     setHotExpanded((prev) => !prev);
   }, []);
 
-  const products = activeCat
-    ? storeProducts.filter((p) => p.category === activeCat)
-    : storeProducts;
+  const products = storeProducts.filter((p) => {
+    if (specialFilter === "novo" && !isNewProduct(p)) return false;
+    if (specialFilter === "expiring" && !isExpiringToday(p.validUntil)) return false;
+    if (activeCat && p.category !== activeCat) return false;
+    return true;
+  });
 
   const hotProducts = products.filter((p) => p.isGlitch);
   const expiringTodayProducts = products.filter((p) => isExpiringToday(p.validUntil));
   const expiringTodayIds = new Set(expiringTodayProducts.map((p) => p.id));
   const regularProducts = products.filter((p) => !p.isGlitch && !expiringTodayIds.has(p.id));
   const filterLabel = selectedStore ? storeMeta?.label : null;
+  const specialFilterMeta = SPECIAL_FILTERS.find((f) => f.id === specialFilter);
+  const headerFilterParts = [
+    filterLabel,
+    specialFilterMeta?.label,
+    activeCat ? CATEGORIES.find((c) => c.id === activeCat)?.label : null,
+  ].filter(Boolean);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full">
@@ -230,7 +267,9 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
         <div className="px-5 pt-12 pb-2">
           <CjenkoLogo height={34} />
           <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
-            {filterLabel ? `Filtar: ${filterLabel}` : `${locationLabel} · Sve trgovine`}
+            {headerFilterParts.length
+              ? `Filtar: ${headerFilterParts.join(" · ")}`
+              : `${locationLabel} · Sve trgovine`}
           </p>
         </div>
 
@@ -257,16 +296,39 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
 
       <div className="flex gap-2 px-4 pb-4 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
         {visibleCategories.map((c) => (
-          <button key={c.label} onClick={() => setActiveCat(c.id)}
+          <button
+            key={c.label}
+            type="button"
+            onClick={() => handleCatSelect(c.id)}
             className="whitespace-nowrap px-3.5 py-1.5 rounded-full text-[11px] font-semibold flex-shrink-0 transition-all duration-200"
             style={{
               background: activeCat === c.id ? "#00ff88" : "rgba(255,255,255,0.05)",
               color: activeCat === c.id ? "#020617" : "rgba(255,255,255,0.45)",
               border: activeCat === c.id ? "1px solid #00ff88" : "1px solid rgba(255,255,255,0.06)",
-            }}>
+            }}
+          >
             {c.emoji} {c.label}
           </button>
         ))}
+        {SPECIAL_FILTERS.map((f) => {
+          const active = specialFilter === f.id;
+          const accent = f.id === "novo" ? "#7dd3fc" : "#ff9f43";
+          return (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => handleSpecialSelect(f.id)}
+              className="whitespace-nowrap px-3.5 py-1.5 rounded-full text-[11px] font-semibold flex-shrink-0 transition-all duration-200"
+              style={{
+                background: active ? accent : "rgba(255,255,255,0.05)",
+                color: active ? "#020617" : "rgba(255,255,255,0.45)",
+                border: active ? `1px solid ${accent}` : "1px solid rgba(255,255,255,0.06)",
+              }}
+            >
+              {f.emoji} {f.label}
+            </button>
+          );
+        })}
       </div>
 
       {loading ? (
@@ -322,7 +384,7 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
             )}
           </section>
 
-          {!hotExpanded && expiringTodayProducts.length > 0 && (
+          {!hotExpanded && specialFilter !== "expiring" && expiringTodayProducts.length > 0 && (
             <section className="mb-5">
               <div className="flex items-center justify-between px-4 mb-3">
                 <div>

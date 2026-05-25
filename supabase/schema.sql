@@ -78,7 +78,9 @@ SELECT
   d.price,
   d.discount_pct,
   p.image_url,
-  d.valid_until
+  d.valid_from,
+  d.valid_until,
+  d.created_at
 FROM deals d
 JOIN products p ON p.id = d.product_id
 JOIN stores s   ON s.id = d.store_id
