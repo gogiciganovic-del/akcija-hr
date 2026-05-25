@@ -11,6 +11,12 @@ function newItem(name) {
   return { id: crypto.randomUUID(), name: name.trim() };
 }
 
+function cartResultImageSrc(product) {
+  if (product.image_url) return product.image_url;
+  if (product.image) return product.image;
+  return `https://placehold.co/80x80/0d1f3a/ffffff?text=${encodeURIComponent((product.name || "?").slice(0, 8))}`;
+}
+
 export function CartPage() {
   const [items, setItems] = useState([]);
   const [input, setInput] = useState("");
@@ -312,13 +318,13 @@ export function CartPage() {
                           title={`${product.name} — ${fmtEur(product.price)}`}
                         >
                           <img
-                            src={product.image}
+                            src={cartResultImageSrc(product)}
                             alt={product.name}
                             referrerPolicy="no-referrer"
                             className="w-full object-cover"
                             style={{ height: 64, background: "#0d1f3a" }}
                             onError={(e) => {
-                              const fallback = `https://placehold.co/80x80/0d1f3a/ffffff?text=${encodeURIComponent(product.name.slice(0, 8))}`;
+                              const fallback = `https://placehold.co/80x80/0d1f3a/ffffff?text=${encodeURIComponent((product.name || "?").slice(0, 8))}`;
                               if (e.currentTarget.src !== fallback) {
                                 e.currentTarget.onerror = null;
                                 e.currentTarget.src = fallback;

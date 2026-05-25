@@ -40,6 +40,7 @@ async function searchCheapestPerChain(term) {
       cheapestPerChain[chain] = {
         price,
         name: deal.name,
+        image_url: deal.image_url,
         image: dealImage(deal.name, deal.image_url),
       }
     }
@@ -81,6 +82,7 @@ export async function compareCart(cartItems) {
       chainTotals[chain].items.push({
         cartName: term,
         name: match.name,
+        image_url: match.image_url,
         image: match.image,
         price: match.price,
       })
