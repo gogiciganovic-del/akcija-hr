@@ -7,6 +7,7 @@ import { useProducts } from "../hooks/useProducts";
 import { useStoreStats } from "../hooks/useStoreStats";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { CATEGORIES, STORES, STORES_ROW_1, STORES_ROW_2 } from "../lib/constants";
+import { isNewProduct, isExpiringToday } from "../lib/dealDates";
 
 function StoreGrid({ stores, selectedStore, onSelect }) {
   return (
@@ -151,29 +152,10 @@ function StoreInfoBar({ store, stats, loading }) {
   );
 }
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
 const SPECIAL_FILTERS = [
   { id: "novo", label: "Novo", emoji: "✨" },
   { id: "expiring", label: "Danas ističe", emoji: "⏰" },
 ];
-
-function isExpiringToday(validUntil) {
-  if (!validUntil) return false;
-  const end = new Date(validUntil);
-  const today = new Date();
-  return (
-    end.getFullYear() === today.getFullYear() &&
-    end.getMonth() === today.getMonth() &&
-    end.getDate() === today.getDate()
-  );
-}
-
-function isNewProduct(product) {
-  const ref = product.createdAt ?? product.validFrom;
-  if (!ref) return false;
-  return Date.now() - new Date(ref).getTime() <= SEVEN_DAYS_MS;
-}
 
 export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, homeResetSignal = 0 }) {
   const scrollRef = useRef(null);

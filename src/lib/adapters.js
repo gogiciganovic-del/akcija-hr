@@ -1,6 +1,28 @@
 import { chainFromStoreName } from './constants'
 import { resolveProductImage } from './productImage'
 
+/** Red iz deals + products + stores (useProducts). */
+export function adaptDealRow(row) {
+  const product = row.products ?? {};
+  const store = row.stores ?? {};
+  return adaptDeal({
+    deal_id: row.id,
+    product_id: row.product_id,
+    name: product.name,
+    brand: product.brand,
+    store_name: store.name,
+    category: product.category,
+    original_price: row.original_price,
+    price: row.price,
+    discount_pct: row.discount_pct,
+    image_url: product.image_url,
+    valid_from: row.valid_from,
+    valid_until: row.valid_until,
+    created_at: row.created_at,
+    scraped_at: row.scraped_at,
+  });
+}
+
 export function adaptDeal(deal) {
   return {
     id:            deal.deal_id,
@@ -19,6 +41,7 @@ export function adaptDeal(deal) {
     validUntil:    deal.valid_until,
     validFrom:     deal.valid_from,
     createdAt:     deal.created_at,
+    scrapedAt:     deal.scraped_at,
     expiresIn:     daysLeftLabel(deal.valid_until),
     expiryUrgency: urgency(deal.valid_until),
     distanceM:     deal.distance_km ? Math.round(deal.distance_km * 1000) : null,

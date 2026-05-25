@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -18,7 +19,31 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config import BASE_URL, CHAIN_NAMES, STORES
 from parser import parse_listing_page
+from parsers.najcijena import ScrapedDeal
 from supabase_writer import SupabaseWriter
+
+
+class ScraperSupabaseWriter(SupabaseWriter):
+    """Upis u deals s scraped_at za filter Novo."""
+
+    def sync_deal(self, deal: ScrapedDeal, store_id: str, product_id: str) -> None:
+        self.client.table("deals").update({"is_active": False}).eq(
+            "store_id", store_id
+        ).eq("product_id", product_id).eq("is_active", True).execute()
+
+        self.client.table("deals").insert(
+            {
+                "product_id": product_id,
+                "store_id": store_id,
+                "price": deal.price,
+                "original_price": deal.original_price,
+                "discount_pct": deal.discount_pct,
+                "valid_from": deal.valid_from.isoformat(),
+                "valid_until": deal.valid_until.isoformat(),
+                "is_active": True,
+                "scraped_at": datetime.now().isoformat(),
+            }
+        ).execute()
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -101,7 +126,7 @@ def main():
         return 0
 
     print("\nSpremanje u Supabase...")
-    writer = SupabaseWriter()
+    writer = ScraperSupabaseWriter()
     stats = writer.save_deals(all_deals)
     print(f"Gotovo: {stats['deals']} akcija, {stats['errors']} gresaka")
     return 0
