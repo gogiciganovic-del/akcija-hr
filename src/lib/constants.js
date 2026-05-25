@@ -38,12 +38,20 @@ export const STORES = [
 export const STORES_ROW_1 = STORES.slice(0, 6)
 export const STORES_ROW_2 = STORES.slice(6, 12)
 
-/** Samo naziv lanca (npr. "Lidl"), bez grada/kvarta iz store_name. */
+/** Mapira store_name iz baze na lanac (npr. "Konzum Ilica" → "Konzum"). */
 export function chainFromStoreName(storeName) {
   if (!storeName) return null
+  const lower = storeName.toLowerCase().trim()
   const sorted = [...STORES].sort((a, b) => b.id.length - a.id.length)
-  const match = sorted.find((s) => storeName.startsWith(s.id))
-  return match?.id ?? null
+
+  for (const s of sorted) {
+    if (lower.startsWith(s.id.toLowerCase())) return s.id
+  }
+  for (const s of sorted) {
+    const id = s.id.toLowerCase()
+    if (id.length >= 3 && lower.includes(id)) return s.id
+  }
+  return null
 }
 
 export const RADIUS_OPTIONS = [1, 2, 5, 10, 20]
