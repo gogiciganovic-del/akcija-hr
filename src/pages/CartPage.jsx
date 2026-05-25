@@ -3,6 +3,7 @@ import { Plus, X, Trash2, Loader2 } from "lucide-react";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { compareCart } from "../lib/cartCompare";
 import { useProductSuggestions } from "../hooks/useProductSuggestions";
+import { resolveProductImage, productPlaceholderDataUri } from "../lib/productImage";
 
 const fmtEur = (v) =>
   v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -11,10 +12,39 @@ function newItem(name) {
   return { id: crypto.randomUUID(), name: name.trim() };
 }
 
-function cartResultImageSrc(product) {
-  if (product.image_url) return product.image_url;
-  if (product.image) return product.image;
-  return `https://placehold.co/80x80/0d1f3a/ffffff?text=${encodeURIComponent((product.name || "?").slice(0, 8))}`;
+function CartResultThumb({ product }) {
+  const src = product.image || resolveProductImage(product.name, product.image_url, 64);
+  const fallback = productPlaceholderDataUri(product.name, 64);
+
+  return (
+    <div
+      className="flex-shrink-0 rounded-xl overflow-hidden"
+      style={{
+        width: 64,
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.08)",
+      }}
+      title={`${product.name} — ${fmtEur(product.price)}`}
+    >
+      <img
+        src={src}
+        alt={product.name}
+        width={64}
+        height={64}
+        loading="eager"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        className="block w-full object-cover"
+        style={{ height: 64, minHeight: 64, background: "#0d1f3a" }}
+        onError={(e) => {
+          if (e.currentTarget.src !== fallback) {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = fallback;
+          }
+        }}
+      />
+    </div>
+  );
 }
 
 export function CartPage() {
@@ -307,31 +337,10 @@ export function CartPage() {
                   {row.items?.length > 0 && (
                     <div className="flex gap-2 mt-3 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
                       {row.items.map((product, idx) => (
-                        <div
-                          key={`${row.chain}-${idx}-${product.name}`}
-                          className="flex-shrink-0 rounded-xl overflow-hidden"
-                          style={{
-                            width: 64,
-                            background: "rgba(255,255,255,0.04)",
-                            border: "1px solid rgba(255,255,255,0.08)",
-                          }}
-                          title={`${product.name} — ${fmtEur(product.price)}`}
-                        >
-                          <img
-                            src={cartResultImageSrc(product)}
-                            alt={product.name}
-                            referrerPolicy="no-referrer"
-                            className="w-full object-cover"
-                            style={{ height: 64, background: "#0d1f3a" }}
-                            onError={(e) => {
-                              const fallback = `https://placehold.co/80x80/0d1f3a/ffffff?text=${encodeURIComponent((product.name || "?").slice(0, 8))}`;
-                              if (e.currentTarget.src !== fallback) {
-                                e.currentTarget.onerror = null;
-                                e.currentTarget.src = fallback;
-                              }
-                            }}
-                          />
-                        </div>
+                        <CartResultThumb
+                          key={`${row.chain}-${idx}-${product.cartName || ""}-${product.name}`}
+                          product={product}
+                        />
                       ))}
                     </div>
                   )}

@@ -1,9 +1,6 @@
 import { supabase } from './supabase'
 import { STORES, chainFromStoreName } from './constants'
-
-function dealImage(name, imageUrl) {
-  return imageUrl || `https://placehold.co/80x80/0d1f3a/ffffff?text=${encodeURIComponent(name.slice(0, 8))}`
-}
+import { normalizeImageUrl, resolveProductImage } from './productImage'
 
 function safeSearchTerm(term) {
   return term.replace(/[%_]/g, '').trim()
@@ -14,6 +11,39 @@ function compareRankings(a, b) {
   if (a.complete !== b.complete) return a.complete ? -1 : 1
   if (a.found !== b.found) return b.found - a.found
   return a.total - b.total
+}
+
+function updateCheapestForChain(cheapestPerChain, chain, deal, price) {
+  const imageUrl = normalizeImageUrl(deal.image_url)
+  const prev = cheapestPerChain[chain]
+
+  if (!prev || price < prev.price) {
+    cheapestPerChain[chain] = {
+      price,
+      name: deal.name,
+      image_url: imageUrl,
+      image: resolveProductImage(deal.name, imageUrl, 80),
+    }
+    return
+  }
+
+  if (price === prev.price && !prev.image_url && imageUrl) {
+    prev.image_url = imageUrl
+    prev.image = resolveProductImage(deal.name, imageUrl, 80)
+  }
+}
+
+function enrichChainImages(cheapestPerChain, data) {
+  for (const [chain, entry] of Object.entries(cheapestPerChain)) {
+    if (entry.image_url) continue
+    const withImage = data.find(
+      (d) => chainFromStoreName(d.store_name) === chain && normalizeImageUrl(d.image_url)
+    )
+    if (!withImage) continue
+    const imageUrl = normalizeImageUrl(withImage.image_url)
+    entry.image_url = imageUrl
+    entry.image = resolveProductImage(entry.name, imageUrl, 80)
+  }
 }
 
 async function searchCheapestPerChain(term) {
@@ -35,16 +65,10 @@ async function searchCheapestPerChain(term) {
     const price = parseFloat(deal.price)
     if (Number.isNaN(price)) continue
 
-    const prev = cheapestPerChain[chain]
-    if (!prev || price < prev.price) {
-      cheapestPerChain[chain] = {
-        price,
-        name: deal.name,
-        image_url: deal.image_url,
-        image: dealImage(deal.name, deal.image_url),
-      }
-    }
+    updateCheapestForChain(cheapestPerChain, chain, deal, price)
   }
+
+  enrichChainImages(cheapestPerChain, data)
 
   return Object.keys(cheapestPerChain).length ? cheapestPerChain : null
 }

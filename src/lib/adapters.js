@@ -1,4 +1,5 @@
 import { chainFromStoreName } from './constants'
+import { resolveProductImage } from './productImage'
 
 export function adaptDeal(deal) {
   return {
@@ -11,7 +12,7 @@ export function adaptDeal(deal) {
     originalPrice: parseFloat(deal.original_price),
     salePrice:     parseFloat(deal.price),
     discount:      deal.discount_pct,
-    image:         deal.image_url || `https://placehold.co/400x400/0d1f3a/ffffff?text=${encodeURIComponent(deal.name)}`,
+    image:         resolveProductImage(deal.name, deal.image_url, 400),
     imageBg:       "#0d1f3a",
     isGlitch:      deal.discount_pct >= 50,
     isHot:         deal.discount_pct >= 30,
