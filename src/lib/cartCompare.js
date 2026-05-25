@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { STORES, chainFromStoreName } from './constants'
-import { normalizeImageUrl, resolveProductImage } from './productImage'
+import { normalizeImageUrl } from './productImage'
+import { adaptDeal } from './adapters'
 
 function safeSearchTerm(term) {
   return term.replace(/[%_]/g, '').trim()
@@ -14,42 +15,33 @@ function compareRankings(a, b) {
 }
 
 function updateCheapestForChain(cheapestPerChain, chain, deal, price) {
-  const imageUrl = normalizeImageUrl(deal.image_url)
   const prev = cheapestPerChain[chain]
 
   if (!prev || price < prev.price) {
-    cheapestPerChain[chain] = {
-      price,
-      name: deal.name,
-      image_url: imageUrl,
-      image: resolveProductImage(deal.name, imageUrl, 80),
-    }
+    cheapestPerChain[chain] = { price, deal }
     return
   }
 
-  if (price === prev.price && !prev.image_url && imageUrl) {
-    prev.image_url = imageUrl
-    prev.image = resolveProductImage(deal.name, imageUrl, 80)
+  if (price === prev.price && !normalizeImageUrl(prev.deal?.image_url) && normalizeImageUrl(deal.image_url)) {
+    prev.deal = deal
   }
 }
 
 function enrichChainImages(cheapestPerChain, data) {
   for (const [chain, entry] of Object.entries(cheapestPerChain)) {
-    if (entry.image_url) continue
+    if (normalizeImageUrl(entry.deal?.image_url)) continue
     const withImage = data.find(
       (d) => chainFromStoreName(d.store_name) === chain && normalizeImageUrl(d.image_url)
     )
     if (!withImage) continue
-    const imageUrl = normalizeImageUrl(withImage.image_url)
-    entry.image_url = imageUrl
-    entry.image = resolveProductImage(entry.name, imageUrl, 80)
+    entry.deal = withImage
   }
 }
 
 async function searchCheapestPerChain(term) {
   const { data, error } = await supabase
     .from('active_deals')
-    .select('name, store_name, price, image_url')
+    .select('deal_id, product_id, name, store_name, price, original_price, discount_pct, image_url, category, valid_until')
     .ilike('name', `%${term}%`)
     .order('price', { ascending: true })
     .limit(1000)
@@ -105,10 +97,7 @@ export async function compareCart(cartItems) {
       chainTotals[chain].found += 1
       chainTotals[chain].items.push({
         cartName: term,
-        name: match.name,
-        image_url: match.image_url,
-        image: match.image,
-        price: match.price,
+        ...adaptDeal(match.deal),
       })
     }
   }

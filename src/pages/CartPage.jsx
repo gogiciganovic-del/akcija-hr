@@ -12,19 +12,23 @@ function newItem(name) {
   return { id: crypto.randomUUID(), name: name.trim() };
 }
 
-function CartResultThumb({ product }) {
+function CartResultThumb({ product, onSelect }) {
   const src = product.image || resolveProductImage(product.name, product.image_url, 64);
   const fallback = productPlaceholderDataUri(product.name, 64);
+  const price = product.salePrice ?? product.price;
 
   return (
-    <div
-      className="flex-shrink-0 rounded-xl overflow-hidden"
+    <button
+      type="button"
+      onClick={() => onSelect?.(product)}
+      className="flex-shrink-0 rounded-xl overflow-hidden cursor-pointer transition-transform hover:scale-[1.03] active:scale-[0.98]"
       style={{
         width: 64,
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.08)",
       }}
-      title={`${product.name} — ${fmtEur(product.price)}`}
+      title={`${product.name} — ${fmtEur(price)}`}
+      aria-label={`Detalji: ${product.name}`}
     >
       <img
         src={src}
@@ -34,8 +38,8 @@ function CartResultThumb({ product }) {
         loading="eager"
         decoding="async"
         referrerPolicy="no-referrer"
-        className="block w-full object-cover"
-        style={{ height: 64, minHeight: 64, background: "#0d1f3a" }}
+        className="block w-full object-cover pointer-events-none"
+        style={{ height: 64, minHeight: 64, background: product.imageBg || "#0d1f3a" }}
         onError={(e) => {
           if (e.currentTarget.src !== fallback) {
             e.currentTarget.onerror = null;
@@ -43,11 +47,11 @@ function CartResultThumb({ product }) {
           }
         }}
       />
-    </div>
+    </button>
   );
 }
 
-export function CartPage() {
+export function CartPage({ onProductSelect }) {
   const [items, setItems] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -338,8 +342,9 @@ export function CartPage() {
                     <div className="flex gap-2 mt-3 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
                       {row.items.map((product, idx) => (
                         <CartResultThumb
-                          key={`${row.chain}-${idx}-${product.cartName || ""}-${product.name}`}
+                          key={`${row.chain}-${idx}-${product.cartName || ""}-${product.id || product.name}`}
                           product={product}
+                          onSelect={onProductSelect}
                         />
                       ))}
                     </div>

@@ -36,7 +36,7 @@ export default function App() {
       />
     ),
     search: <SearchPage onProductSelect={handleProductSelect} />,
-    cart: <CartPage />,
+    cart: <CartPage onProductSelect={handleProductSelect} />,
     fav: (
       <FavoritesPage
         favorites={favorites}
