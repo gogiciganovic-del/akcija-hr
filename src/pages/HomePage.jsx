@@ -152,10 +152,9 @@ function StoreInfoBar({ store, stats, loading }) {
   );
 }
 
-const SPECIAL_FILTERS = [
-  { id: "novo", label: "Novo", emoji: "✨" },
-  { id: "expiring", label: "Danas ističe", emoji: "⏰" },
-];
+const SPECIAL_FILTERS = [{ id: "novo", label: "Novo", emoji: "✨" }];
+const EXPIRING_PREVIEW = 4;
+const NOVO_PREVIEW = 4;
 
 export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, homeResetSignal = 0 }) {
   const scrollRef = useRef(null);
@@ -163,6 +162,8 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
   const [specialFilter, setSpecialFilter] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
   const [hotExpanded, setHotExpanded] = useState(false);
+  const [expiringExpanded, setExpiringExpanded] = useState(false);
+  const [novoExpanded, setNovoExpanded] = useState(false);
 
   useEffect(() => {
     if (!homeResetSignal) return;
@@ -170,6 +171,8 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
     setSpecialFilter(null);
     setSelectedStore(null);
     setHotExpanded(false);
+    setExpiringExpanded(false);
+    setNovoExpanded(false);
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [homeResetSignal]);
@@ -200,32 +203,52 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
     setActiveCat(null);
     setSpecialFilter(null);
     setHotExpanded(false);
+    setExpiringExpanded(false);
+    setNovoExpanded(false);
   }, []);
 
   const handleCatSelect = useCallback((catId) => {
     setActiveCat(catId);
     setSpecialFilter(null);
+    setNovoExpanded(false);
   }, []);
 
   const handleSpecialSelect = useCallback((filterId) => {
     setSpecialFilter((prev) => (prev === filterId ? null : filterId));
     setActiveCat(null);
+    setNovoExpanded(false);
   }, []);
 
   const handleHotExpand = useCallback(() => {
     setHotExpanded((prev) => !prev);
   }, []);
 
+  const handleExpiringExpand = useCallback(() => {
+    setExpiringExpanded((prev) => !prev);
+  }, []);
+
+  const handleNovoExpand = useCallback(() => {
+    setNovoExpanded((prev) => !prev);
+  }, []);
+
+  const isNovoMode = specialFilter === "novo";
+
   const products = storeProducts.filter((p) => {
-    if (specialFilter === "novo" && !isNewProduct(p)) return false;
-    if (specialFilter === "expiring" && !isExpiringToday(p.validUntil)) return false;
     if (activeCat && p.category !== activeCat) return false;
     return true;
   });
 
+  const newProducts = products.filter((p) => isNewProduct(p));
+  const hasMoreNovo = newProducts.length > NOVO_PREVIEW;
+  const novoVisible = novoExpanded ? newProducts : newProducts.slice(0, NOVO_PREVIEW);
+
   const hotProducts = products.filter((p) => p.isGlitch);
   const expiringTodayProducts = products.filter((p) => isExpiringToday(p.validUntil));
   const expiringTodayIds = new Set(expiringTodayProducts.map((p) => p.id));
+  const hasMoreExpiring = expiringTodayProducts.length > EXPIRING_PREVIEW;
+  const expiringVisible = expiringExpanded
+    ? expiringTodayProducts
+    : expiringTodayProducts.slice(0, EXPIRING_PREVIEW);
   const regularProducts = products.filter((p) => !p.isGlitch && !expiringTodayIds.has(p.id));
   const filterLabel = selectedStore ? storeMeta?.label : null;
   const specialFilterMeta = SPECIAL_FILTERS.find((f) => f.id === specialFilter);
@@ -317,6 +340,55 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
         <div className="flex items-center justify-center py-20">
           <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 14 }}>Učitavanje akcija...</p>
         </div>
+      ) : isNovoMode ? (
+        <section className="mb-5">
+          <div className="flex items-center justify-between px-4 mb-3">
+            <div>
+              <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>
+                ✨ Novo
+              </h2>
+              <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+                {newProducts.length} ponuda
+                {filterLabel ? ` · ${filterLabel}` : ""}
+              </p>
+            </div>
+            {hasMoreNovo && (
+              <button
+                type="button"
+                onClick={handleNovoExpand}
+                className="flex items-center gap-0.5 transition-opacity duration-200"
+                style={{
+                  color: novoExpanded ? "#7dd3fc" : "#00ff88",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                {novoExpanded ? "Manje" : "Prikaži sve"}{" "}
+                <ChevronRight
+                  size={12}
+                  style={{ transform: novoExpanded ? "rotate(90deg)" : "none" }}
+                />
+              </button>
+            )}
+          </div>
+          {newProducts.length === 0 ? (
+            <p className="px-4" style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>
+              {filterLabel ? `Nema novih akcija u ${filterLabel} danas.` : "Nema novih akcija danas."}
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5 px-4">
+              {novoVisible.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  isFavorite={isFav(p.id)}
+                  onToggleFavorite={onToggleFav}
+                  onClick={() => onProductSelect(p)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
       ) : (
         <>
           <section className="mb-5">
@@ -377,9 +449,27 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
                     {expiringTodayProducts.length} ponuda{filterLabel ? ` · ${filterLabel}` : ""}
                   </p>
                 </div>
+                {hasMoreExpiring && (
+                  <button
+                    type="button"
+                    onClick={handleExpiringExpand}
+                    className="flex items-center gap-0.5 transition-opacity duration-200"
+                    style={{
+                      color: expiringExpanded ? "#ff9f43" : "#00ff88",
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {expiringExpanded ? "Manje" : "Prikaži sve"}{" "}
+                    <ChevronRight
+                      size={12}
+                      style={{ transform: expiringExpanded ? "rotate(90deg)" : "none" }}
+                    />
+                  </button>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2.5 px-4">
-                {expiringTodayProducts.map((p) => (
+                {expiringVisible.map((p) => (
                   <ProductCard
                     key={p.id}
                     product={p}

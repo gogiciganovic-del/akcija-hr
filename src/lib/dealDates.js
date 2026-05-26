@@ -1,4 +1,4 @@
-/** Kalendar u HR vremenskoj zoni — usklađeno s valid_until u bazi. */
+/** Kalendar u HR vremenskoj zoni (UTC+2, scraper ~06:00 UTC = 08:00 HR). */
 const TZ = "Europe/Zagreb";
 
 export function calendarDayKey(dateInput) {
@@ -6,13 +6,10 @@ export function calendarDayKey(dateInput) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(dateInput));
 }
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
-/** Novo: akcija scrapeana u zadnjih 7 dana (scraped_at, inače valid_from / created_at). */
+/** Novo: created_at pada na današnji dan u Europe/Zagreb. */
 export function isNewProduct(product) {
-  const ref = product.scrapedAt ?? product.validFrom ?? product.createdAt;
-  if (!ref) return false;
-  return Date.now() - new Date(ref).getTime() <= SEVEN_DAYS_MS;
+  if (!product.createdAt) return false;
+  return calendarDayKey(product.createdAt) === calendarDayKey(new Date());
 }
 
 /** Danas ističe: valid_until pada na današnji dan (HR). */
