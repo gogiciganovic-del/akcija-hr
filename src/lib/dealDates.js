@@ -12,8 +12,9 @@ export function isNewProduct(product) {
   return calendarDayKey(product.createdAt) === calendarDayKey(new Date());
 }
 
-/** Danas ističe: valid_until pada na današnji dan (HR). */
-export function isExpiringToday(validUntil) {
-  if (!validUntil) return false;
-  return calendarDayKey(validUntil) === calendarDayKey(new Date());
+/** Danas ističe: valid_until pada na današnji dan u Europe/Zagreb. */
+export function isExpiringTodayProduct(product) {
+  const ref = product?.validUntil ?? product?.valid_until;
+  if (!ref) return false;
+  return calendarDayKey(ref) === calendarDayKey(new Date());
 }

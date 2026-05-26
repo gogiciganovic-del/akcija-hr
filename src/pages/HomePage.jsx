@@ -7,7 +7,7 @@ import { useProducts } from "../hooks/useProducts";
 import { useStoreStats } from "../hooks/useStoreStats";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { CATEGORIES, STORES, STORES_ROW_1, STORES_ROW_2 } from "../lib/constants";
-import { isNewProduct, isExpiringToday } from "../lib/dealDates";
+import { isNewProduct, isExpiringTodayProduct } from "../lib/dealDates";
 
 function StoreGrid({ stores, selectedStore, onSelect }) {
   return (
@@ -152,7 +152,10 @@ function StoreInfoBar({ store, stats, loading }) {
   );
 }
 
-const SPECIAL_FILTERS = [{ id: "novo", label: "Novo", emoji: "✨" }];
+const SPECIAL_FILTERS = [
+  { id: "novo", label: "Novo", emoji: "✨" },
+  { id: "expiring", label: "Danas ističe", emoji: "⏰" },
+];
 const EXPIRING_PREVIEW = 4;
 const NOVO_PREVIEW = 4;
 
@@ -211,12 +214,14 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
     setActiveCat(catId);
     setSpecialFilter(null);
     setNovoExpanded(false);
+    setExpiringExpanded(false);
   }, []);
 
   const handleSpecialSelect = useCallback((filterId) => {
     setSpecialFilter((prev) => (prev === filterId ? null : filterId));
     setActiveCat(null);
     setNovoExpanded(false);
+    setExpiringExpanded(false);
   }, []);
 
   const handleHotExpand = useCallback(() => {
@@ -232,6 +237,7 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
   }, []);
 
   const isNovoMode = specialFilter === "novo";
+  const isExpiringMode = specialFilter === "expiring";
 
   const products = storeProducts.filter((p) => {
     if (activeCat && p.category !== activeCat) return false;
@@ -243,7 +249,7 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
   const novoVisible = novoExpanded ? newProducts : newProducts.slice(0, NOVO_PREVIEW);
 
   const hotProducts = products.filter((p) => p.isGlitch);
-  const expiringTodayProducts = products.filter((p) => isExpiringToday(p.validUntil));
+  const expiringTodayProducts = products.filter((p) => isExpiringTodayProduct(p));
   const expiringTodayIds = new Set(expiringTodayProducts.map((p) => p.id));
   const hasMoreExpiring = expiringTodayProducts.length > EXPIRING_PREVIEW;
   const expiringVisible = expiringExpanded
@@ -271,6 +277,9 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
       >
         <div className="px-5 pt-12 pb-2">
           <CjenkoLogo height={34} />
+          <p style={{ color: "rgba(255,255,255,0.22)", fontSize: 11, marginTop: 1, marginLeft: 42 }}>
+            akcije
+          </p>
           <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
             {headerFilterParts.length
               ? `Filtar: ${headerFilterParts.join(" · ")}`
@@ -378,6 +387,55 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
           ) : (
             <div className="grid grid-cols-2 gap-2.5 px-4">
               {novoVisible.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  isFavorite={isFav(p.id)}
+                  onToggleFavorite={onToggleFav}
+                  onClick={() => onProductSelect(p)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : isExpiringMode ? (
+        <section className="mb-5">
+          <div className="flex items-center justify-between px-4 mb-3">
+            <div>
+              <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>
+                ⏰ Danas ističe
+              </h2>
+              <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+                {expiringTodayProducts.length} ponuda
+                {filterLabel ? ` · ${filterLabel}` : ""}
+              </p>
+            </div>
+            {hasMoreExpiring && (
+              <button
+                type="button"
+                onClick={handleExpiringExpand}
+                className="flex items-center gap-0.5 transition-opacity duration-200"
+                style={{
+                  color: expiringExpanded ? "#ff9f43" : "#00ff88",
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                {expiringExpanded ? "Manje" : "Prikaži sve"}{" "}
+                <ChevronRight
+                  size={12}
+                  style={{ transform: expiringExpanded ? "rotate(90deg)" : "none" }}
+                />
+              </button>
+            )}
+          </div>
+          {expiringTodayProducts.length === 0 ? (
+            <p className="px-4" style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>
+              {filterLabel ? `Nema akcija koje danas ističu u ${filterLabel}.` : "Nema akcija koje danas ističu."}
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5 px-4">
+              {expiringVisible.map((p) => (
                 <ProductCard
                   key={p.id}
                   product={p}
