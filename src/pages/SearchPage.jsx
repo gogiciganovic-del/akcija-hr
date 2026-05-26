@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useCallback } from "react";
+﻿import { useState, useRef } from "react";
 import { X } from "lucide-react";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { useProducts } from "../hooks/useProducts";
@@ -14,8 +14,6 @@ function highlight(text, query) {
 }
 
 const fmt = (v) => v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
-const TRENDING = ["Nike","Dyson","kava","Samsung","Nutella","AirPods","Lidl","Konzum"];
-const RECENT   = ["📱 iPhone","🐱 Whiskas","🍫 Nutella"];
 
 export function SearchPage({ onProductSelect }) {
   const [query, setQuery]   = useState("");
@@ -31,11 +29,6 @@ export function SearchPage({ onProductSelect }) {
   const results = catFilter !== "Sve"
     ? products.filter(p => p.category === catFilter)
     : products;
-
-  const doSearch = useCallback((term) => {
-    setQuery(term);
-    inputRef.current?.focus();
-  }, []);
 
   return (
     <div className="flex-1 min-h-0 h-full overflow-y-auto" style={{ scrollbarWidth:"none" }}>
@@ -63,7 +56,7 @@ export function SearchPage({ onProductSelect }) {
         </div>
 
         <div className="flex gap-2 overflow-x-auto mb-2" style={{ scrollbarWidth:"none" }}>
-          {["Sve","Hrana","Elektronika","Obuća","Dom","Kućni ljubimci"].map((c) => (
+          {["Sve"].map((c) => (
             <button key={c} onClick={() => setCat(c)}
               className="whitespace-nowrap px-3 py-1.5 rounded-full text-[11px] font-semibold flex-shrink-0 transition-all duration-200"
               style={{ background: catFilter===c?"rgba(0,255,136,0.1)":"rgba(255,255,255,0.04)",
@@ -74,31 +67,6 @@ export function SearchPage({ onProductSelect }) {
           ))}
         </div>
       </div>
-
-      {!query && (
-        <div className="px-4">
-          <p style={{ fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.3)",letterSpacing:"0.12em",marginBottom:12 }}>POPULARNO DANAS</p>
-          <div className="flex flex-wrap gap-2 mb-5">
-            {TRENDING.map((t) => (
-              <button key={t} onClick={() => doSearch(t)}
-                className="px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-all duration-200 hover:bg-white/10"
-                style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",color:"rgba(255,255,255,0.55)" }}>
-                {t}
-              </button>
-            ))}
-          </div>
-          <p style={{ fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.3)",letterSpacing:"0.12em",marginBottom:12 }}>NEDAVNO</p>
-          <div className="flex flex-wrap gap-2">
-            {RECENT.map((t) => (
-              <button key={t} onClick={() => doSearch(t.replace(/^\S+ /,""))}
-                className="px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-all duration-200 hover:bg-white/10"
-                style={{ background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",color:"rgba(255,255,255,0.55)" }}>
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {query && (
         <div className="px-4">
