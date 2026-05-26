@@ -51,6 +51,26 @@ HEADERS = {
     "Accept-Language": "hr,en;q=0.9",
 }
 
+RETRY_STATUS = {429, 503}
+RETRY_WAIT_SEC = 10
+MAX_RETRIES = 2
+
+
+def get_with_retry(client: httpx.Client, url: str) -> httpx.Response:
+    """Na 429/503 čeka 10s i pokušava još MAX_RETRIES puta."""
+    for attempt in range(MAX_RETRIES + 1):
+        resp = client.get(url, headers=HEADERS, timeout=30)
+        if resp.status_code in RETRY_STATUS and attempt < MAX_RETRIES:
+            print(
+                f"  -> HTTP {resp.status_code}, cekam {RETRY_WAIT_SEC}s "
+                f"(pokusaj {attempt + 1}/{MAX_RETRIES})..."
+            )
+            time.sleep(RETRY_WAIT_SEC)
+            continue
+        resp.raise_for_status()
+        return resp
+    raise RuntimeError(f"Prekoracen broj pokusaja za {url}")
+
 
 def _listing_url(store_slug: str, page: int, use_vendor: bool) -> str:
     if use_vendor:
@@ -68,8 +88,7 @@ def fetch_store(client, store_slug, max_pages):
         url = _listing_url(store_slug, page, use_vendor)
         print(f"  -> Ucitavam {url}")
         try:
-            resp = client.get(url, headers=HEADERS, timeout=30)
-            resp.raise_for_status()
+            resp = get_with_retry(client, url)
         except Exception as e:
             print(f"  X Greska: {e}")
             break
@@ -80,8 +99,7 @@ def fetch_store(client, store_slug, max_pages):
             use_vendor = True
             url = _listing_url(store_slug, page, use_vendor)
             print(f"  -> Nema akcija na /trgovina/, pokusavam {url}")
-            resp = client.get(url, headers=HEADERS, timeout=30)
-            resp.raise_for_status()
+            resp = get_with_retry(client, url)
             batch = parse_listing_page(resp.text, chain)
 
         new = [d for d in batch if d.external_id not in seen]
