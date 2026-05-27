@@ -6,15 +6,26 @@ export function calendarDayKey(dateInput) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(dateInput));
 }
 
-/** Novo: created_at pada na današnji dan u Europe/Zagreb. */
+function todayKey() {
+  return calendarDayKey(new Date());
+}
+
+function yesterdayKey() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return calendarDayKey(d);
+}
+
+/** Novo: created_at pada na današnji dan u Europe/Zagreb, ili jučer ako danas nema. */
 export function isNewProduct(product) {
   if (!product.createdAt) return false;
-  return calendarDayKey(product.createdAt) === calendarDayKey(new Date());
+  const key = calendarDayKey(product.createdAt);
+  return key === todayKey() || key === yesterdayKey();
 }
 
 /** Danas ističe: valid_until pada na današnji dan u Europe/Zagreb. */
 export function isExpiringTodayProduct(product) {
   const ref = product?.validUntil ?? product?.valid_until;
   if (!ref) return false;
-  return calendarDayKey(ref) === calendarDayKey(new Date());
+  return calendarDayKey(ref) === todayKey();
 }
