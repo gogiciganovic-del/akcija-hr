@@ -45,6 +45,9 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
           <h2 className="font-black text-white mb-1" style={{ fontSize: 20, letterSpacing: "-0.03em" }}>
             {product.name}
           </h2>
+          <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, marginBottom: 4 }}>
+            {product.chain || product.store || "Trgovina"}
+          </p>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginBottom: 16 }}>
             {product.category}
           </p>
