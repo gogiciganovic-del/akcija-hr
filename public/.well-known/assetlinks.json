@@ -1,13 +1,12 @@
 [
   {
-    "relation": [
-      "delegate_permission/common.handle_all_urls"
-    ],
+    "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "app.cjenko.app",
+      "package_name": "app.cjenko.akcije",
       "sha256_cert_fingerprints": [
-        "B5:B9:DB:CD:FE:FE:A9:15:4F:7B:81:78:03:50:AD:B0:A5:CD:9A:D1:54:22:7A:EA:E5:AC:8A:CF:29:68:D6:9D"
+        "B5:B9:DB:CD:FE:FE:A9:15:4F:7B:81:78:03:50:AD:B0:A5:CD:9A:D1:54:22:7A:EA:E5:AC:8A:CF:29:68:D6:9D",
+        "51:2B:59:3E:C6:CA:31:6F:C9:8E:3A:BE:95:AE:EE:58:6B:A5:CA:03:62:A2:85:38:47:A0:1F:87:87:62:83:97"
       ]
     }
   }
