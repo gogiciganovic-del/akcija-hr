@@ -8,7 +8,7 @@ on:
 jobs:
   crawl-and-import:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -26,13 +26,12 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           uv sync
 
-      # POC: lidl + konzum; kasnije proširiti na sve v1 lance
       - name: Crawl price lists
         working-directory: /tmp/cijene-api
         run: |
           mkdir -p /tmp/cijene-out
           uv run -m crawler.cli.crawl /tmp/cijene-out \
-            -c lidl,konzum \
+            -c lidl,konzum,kaufland,spar,plodine,eurospin,tommy,studenac,dm \
             -z false \
             -v info
 
@@ -48,4 +47,4 @@ jobs:
           echo "Importing from /tmp/cijene-out/${DATE_DIR}"
           python scraper/import_regular_prices.py \
             --input "/tmp/cijene-out/${DATE_DIR}" \
-            --chains lidl,konzum
+            --chains lidl,konzum,kaufland,spar,plodine,eurospin,tommy,studenac,dm
