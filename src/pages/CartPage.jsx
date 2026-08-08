@@ -123,7 +123,7 @@ export function CartPage({ onProductSelect }) {
     if (e.key === "Enter") {
       e.preventDefault();
       if (suggestionsOpen && suggestions.length > 0) {
-        addByName(suggestions[0]);
+        addByName(suggestions[0].name);
       } else {
         addItem();
       }
@@ -205,19 +205,34 @@ export function CartPage({ onProductSelect }) {
                   boxShadow: "0 12px 32px rgba(0,0,0,0.45)",
                 }}
               >
-                {suggestions.map((name) => (
-                  <li key={name}>
-                    <button
-                      type="button"
-                      onClick={() => addByName(name)}
-                      className="w-full text-left px-4 py-2.5 text-white truncate transition-colors hover:bg-white/5"
-                      style={{ fontSize: 14 }}
-                    >
-                      {name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                {suggestions.map((s) => {
+                  const isRegular = s.source === "regular";
+                  return (
+                    <li key={`${s.source}-${s.name}`}>
+                      <button
+                        type="button"
+                        onClick={() => addByName(s.name)}
+                        className="w-full text-left px-4 py-2.5 text-white transition-colors hover:bg-white/5 flex items-center gap-2"
+                        style={{ fontSize: 14 }}
+                      >
+                        <span className="truncate flex-1 min-w-0">{s.name}</span>
+                        <span
+                          className="flex-shrink-0 font-bold rounded px-1.5 py-0.5"
+                          style={{
+                            fontSize: 9,
+                            letterSpacing: "0.04em",
+                            color: isRegular ? "rgba(255,255,255,0.85)" : "#633806",
+                            background: isRegular
+                              ? "rgba(255,255,255,0.12)"
+                              : "rgba(239,159,39,0.95)",
+                          }}
+                        >
+                          {isRegular ? "REDOVNA" : "AKCIJA"}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}              </ul>
             )}
           </div>
           <button

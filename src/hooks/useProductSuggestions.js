@@ -5,6 +5,21 @@ function safeSearchTerm(term) {
   return term.replace(/[%_]/g, '').trim()
 }
 
+function uniqueNames(rows, source, limit) {
+  const seen = new Set()
+  const out = []
+  for (const row of rows || []) {
+    const name = row.name?.trim()
+    if (!name) continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ name, source })
+    if (out.length >= limit) break
+  }
+  return out
+}
+
 export function useProductSuggestions(query) {
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(false)
@@ -21,26 +36,30 @@ export function useProductSuggestions(query) {
     const timer = setTimeout(async () => {
       setLoading(true)
       try {
-        const { data, error } = await supabase
-          .from('active_deals')
-          .select('name')
-          .ilike('name', `%${term}%`)
-          .order('name')
-          .limit(30)
+        const pattern = `%${term}%`
+        const [saleRes, regularRes] = await Promise.all([
+          supabase
+            .from('active_deals')
+            .select('name')
+            .ilike('name', pattern)
+            .order('name')
+            .limit(30),
+          supabase
+            .from('regular_prices')
+            .select('name')
+            .ilike('name', pattern)
+            .order('name')
+            .limit(30),
+        ])
 
-        if (error) throw error
+        if (saleRes.error) throw saleRes.error
+        if (regularRes.error) throw regularRes.error
 
-        const seen = new Set()
-        const names = []
-        for (const row of data || []) {
-          const n = row.name?.trim()
-          if (!n || seen.has(n.toLowerCase())) continue
-          seen.add(n.toLowerCase())
-          names.push(n)
-          if (names.length >= 8) break
-        }
+        const sale = uniqueNames(saleRes.data, 'sale', 8)
+        const regular = uniqueNames(regularRes.data, 'regular', 8)
+        const merged = [...sale, ...regular].slice(0, 8)
 
-        if (!cancelled) setSuggestions(names)
+        if (!cancelled) setSuggestions(merged)
       } catch {
         if (!cancelled) setSuggestions([])
       } finally {
