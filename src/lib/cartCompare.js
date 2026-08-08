@@ -71,50 +71,46 @@ async function searchSalePerChain(term) {
   return Object.keys(cheapestPerChain).length ? cheapestPerChain : null
 }
 
-async function searchRegularPerChain(term, missingChains) {
-  if (!missingChains.length) return null
-
+/** Najjeftiniji regular match samo unutar jednog lanca (bez globalnog limita). */
+async function searchRegularForChain(term, chain) {
   const { data, error } = await supabase
     .from('regular_prices')
     .select('barcode, name, brand, chain, price, category, special_price')
     .ilike('name', `%${term}%`)
-    .in('chain', missingChains)
+    .eq('chain', chain)
     .order('price', { ascending: true })
-    .limit(500)
+    .limit(1)
 
   if (error) throw error
-  if (!data?.length) return null
+  const row = data?.[0]
+  if (!row) return null
 
-  const cheapestPerChain = {}
-  for (const row of data) {
-    const chain = row.chain
-    if (!chain || !missingChains.includes(chain)) continue
+  const price = parseFloat(row.price)
+  if (Number.isNaN(price)) return null
 
-    const price = parseFloat(row.price)
-    if (Number.isNaN(price)) continue
-
-    const prev = cheapestPerChain[chain]
-    if (!prev || price < prev.price) {
-      cheapestPerChain[chain] = {
-        price,
-        deal: row,
-        priceSource: 'regular',
-      }
-    }
-  }
-
-  return Object.keys(cheapestPerChain).length ? cheapestPerChain : null
+  return { price, deal: row, priceSource: 'regular' }
 }
 
-/** Akcija prvo; za lance bez matcha → regular_prices. */
+/** Po lancu: akcija ako postoji; inače regular upit filtriran na taj lanac. */
 async function searchCheapestPerChain(term) {
-  const sale = await searchSalePerChain(term)
-  const covered = new Set(Object.keys(sale || {}))
-  const missing = STORES.map((s) => s.id).filter((id) => !covered.has(id))
-  const regular = await searchRegularPerChain(term, missing)
+  const sale = (await searchSalePerChain(term)) || {}
+  const missing = STORES.map((s) => s.id).filter((id) => !sale[id])
 
-  if (!sale && !regular) return null
-  return { ...(regular || {}), ...(sale || {}) }
+  const regularEntries = await Promise.all(
+    missing.map(async (chain) => {
+      const match = await searchRegularForChain(term, chain)
+      return match ? [chain, match] : null
+    })
+  )
+
+  const result = { ...sale }
+  for (const entry of regularEntries) {
+    if (!entry) continue
+    const [chain, match] = entry
+    result[chain] = match
+  }
+
+  return Object.keys(result).length ? result : null
 }
 
 /**

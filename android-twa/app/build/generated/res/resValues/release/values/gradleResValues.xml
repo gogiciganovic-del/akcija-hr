@@ -30,7 +30,7 @@
     <!-- Value from default config. -->
     <string name="fullScopeUrl" translatable="false">https://cjenko.app/</string>
     <!-- Value from default config. -->
-    <string name="generatorApp" translatable="false">unknown</string>
+    <string name="generatorApp" translatable="false">bubblewrap-cli</string>
     <!-- Value from default config. -->
     <string name="hostName" translatable="false">cjenko.app</string>
     <!-- Value from default config. -->
@@ -40,7 +40,7 @@
     <!-- Value from default config. -->
     <string name="orientation" translatable="false">portrait</string>
     <!-- Value from default config. -->
-    <string name="providerAuthority" translatable="false">app.cjenko.app.fileprovider</string>
+    <string name="providerAuthority" translatable="false">app.cjenko.akcije.fileprovider</string>
     <!-- Value from default config. -->
     <string name="webManifestUrl" translatable="false">https://cjenko.app/manifest.json</string>
 

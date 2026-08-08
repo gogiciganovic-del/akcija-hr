@@ -4,7 +4,7 @@
     "type": "COMPATIBLE_SCREEN_MANIFEST",
     "kind": "Directory"
   },
-  "applicationId": "app.cjenko.app",
+  "applicationId": "app.cjenko.akcije",
   "variantName": "release",
   "elements": []
 }

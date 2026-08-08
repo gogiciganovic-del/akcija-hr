@@ -431,7 +431,9 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
           </div>
           {expiringTodayProducts.length === 0 ? (
             <p className="px-4" style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>
-              {filterLabel ? `Nema akcija koje danas ističu u ${filterLabel}.` : "Nema akcija koje danas ističu."}
+              {filterLabel
+                ? `⏰ Nema akcija koje ističu danas u ${filterLabel} — provjeri sutra!`
+                : "⏰ Nema akcija koje ističu danas — provjeri sutra!"}
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-2.5 px-4">

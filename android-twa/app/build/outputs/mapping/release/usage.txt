@@ -7668,15 +7668,15 @@ androidx.viewpager.widget.ViewPager$SavedState
 androidx.viewpager.widget.ViewPager$SimpleOnPageChangeListener
 androidx.viewpager.widget.ViewPager$ViewPositionComparator
 androidx.viewpager.widget.ViewPager
-app.cjenko.app.R$bool
-app.cjenko.app.R$color
-app.cjenko.app.R$drawable
-app.cjenko.app.R$integer
-app.cjenko.app.R$mipmap
-app.cjenko.app.R$raw
-app.cjenko.app.R$string
-app.cjenko.app.R$xml
-app.cjenko.app.R
+app.cjenko.akcije.R$bool
+app.cjenko.akcije.R$color
+app.cjenko.akcije.R$drawable
+app.cjenko.akcije.R$integer
+app.cjenko.akcije.R$mipmap
+app.cjenko.akcije.R$raw
+app.cjenko.akcije.R$string
+app.cjenko.akcije.R$xml
+app.cjenko.akcije.R
 com.google.androidbrowserhelper.BuildConfig
 com.google.androidbrowserhelper.R$drawable:
     private void <init>()

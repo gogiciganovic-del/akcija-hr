@@ -5,4 +5,7 @@ dist
 *.log
 android-sdk/
 android-twa/build/
+android-twa/android.keystore
+android-twa/keystore.properties
 android-cmdline-tools.zip
+.vercel

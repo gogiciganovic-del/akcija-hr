@@ -339,7 +339,7 @@
     <string name="fallback_menu_item_open_in_browser">Open in browser</string>
     <string name="fallback_menu_item_share_link">Share link</string>
     <string name="fullScopeUrl" translatable="false">https://cjenko.app/</string>
-    <string name="generatorApp" translatable="false">unknown</string>
+    <string name="generatorApp" translatable="false">bubblewrap-cli</string>
     <string name="hostName" translatable="false">cjenko.app</string>
     <string name="launchUrl" translatable="false">https://cjenko.app/</string>
     <string name="launcherName" translatable="false">Cjenko</string>
@@ -347,7 +347,7 @@
     <string name="manage_space_not_supported_toast">This app\'s data is stored in %1$s.</string>
     <string name="no_provider_toast">Please install Chrome Stable 72 or later.</string>
     <string name="orientation" translatable="false">portrait</string>
-    <string name="providerAuthority" translatable="false">app.cjenko.app.fileprovider</string>
+    <string name="providerAuthority" translatable="false">app.cjenko.akcije.fileprovider</string>
     <string name="search_menu_title">Search</string>
     <string name="status_bar_notification_info_overflow">999+</string>
     <string name="update_chrome_toast">Please update to Chrome Stable 72 or later.</string>

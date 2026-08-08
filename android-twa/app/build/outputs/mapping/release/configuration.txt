@@ -3,9 +3,9 @@
 -keep class androidx.core.content.FileProvider { <init>(); }
 -keep class androidx.profileinstaller.ProfileInstallReceiver { <init>(); }
 -keep class androidx.startup.InitializationProvider { <init>(); }
--keep class app.cjenko.app.Application { <init>(); }
--keep class app.cjenko.app.DelegationService { <init>(); }
--keep class app.cjenko.app.LauncherActivity { <init>(); }
+-keep class app.cjenko.akcije.Application { <init>(); }
+-keep class app.cjenko.akcije.DelegationService { <init>(); }
+-keep class app.cjenko.akcije.LauncherActivity { <init>(); }
 -keep class com.google.androidbrowserhelper.trusted.FocusActivity { <init>(); }
 -keep class com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity { <init>(); }
 -keep class com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity { <init>(); }

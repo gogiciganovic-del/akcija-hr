@@ -4,7 +4,7 @@
     "type": "BUNDLE",
     "kind": "RegularFile"
   },
-  "applicationId": "app.cjenko.app",
+  "applicationId": "app.cjenko.akcije",
   "variantName": "release",
   "elements": [
     {

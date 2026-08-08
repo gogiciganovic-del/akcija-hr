@@ -3,8 +3,8 @@
 # min_api: 21
 # common_typos_disable
 # {"id":"com.android.tools.r8.mapping","version":"2.2"}
-# pg_map_id: 449d0e9
-# pg_map_hash: SHA-256 449d0e980efd05964bdbe44af67361de5aea6d84cdf30d41e7dd658f2d4821aa
+# pg_map_id: 86cf34b
+# pg_map_hash: SHA-256 86cf34bcc6b1fb874b7c9839617718c82dc3abe361633e118d5cf1b821da89ba
 android.support.customtabs.ICustomTabsCallback -> a.a:
 # {"id":"sourceFile","fileName":"ICustomTabsCallback.java"}
     java.lang.String DESCRIPTOR -> a
@@ -22694,15 +22694,15 @@ androidx.versionedparcelable.VersionedParcelParcel -> androidx.versionedparcelab
     1:6:void writeBoolean(boolean):181:181 -> y
 androidx.versionedparcelable.VersionedParcelable -> H.a:
 # {"id":"sourceFile","fileName":"VersionedParcelable.java"}
-app.cjenko.app.Application -> app.cjenko.app.Application:
+app.cjenko.akcije.Application -> app.cjenko.akcije.Application:
 # {"id":"sourceFile","fileName":"Application.java"}
     1:4:void <init>():20:20 -> <init>
     1:4:void onCreate():26:26 -> onCreate
-app.cjenko.app.DelegationService -> app.cjenko.app.DelegationService:
+app.cjenko.akcije.DelegationService -> app.cjenko.akcije.DelegationService:
 # {"id":"sourceFile","fileName":"DelegationService.java"}
     1:4:void <init>():5:5 -> <init>
     1:4:void onCreate():9:9 -> onCreate
-app.cjenko.app.LauncherActivity -> app.cjenko.app.LauncherActivity:
+app.cjenko.akcije.LauncherActivity -> app.cjenko.akcije.LauncherActivity:
 # {"id":"sourceFile","fileName":"LauncherActivity.java"}
     1:4:void <init>():25:25 -> <init>
     1:5:android.net.Uri getLaunchingUrl():48:48 -> i

@@ -1,5 +1,5 @@
 {
-  "packageId": "app.cjenko.app",
+  "packageId": "app.cjenko.akcije",
   "host": "cjenko.app",
   "name": "Cjenko",
   "launcherName": "Cjenko",
@@ -20,10 +20,10 @@
     "path": "C:\\Users\\Korisnik\\Documents\\moja app\\android-twa\\android.keystore",
     "alias": "upload"
   },
-  "appVersionName": "1",
-  "appVersionCode": 1,
+  "appVersionName": "2",
+  "appVersionCode": 2,
   "shortcuts": [],
-  "generatorApp": "unknown",
+  "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://cjenko.app/manifest.json",
   "fallbackType": "customtabs",
   "features": {},
@@ -43,5 +43,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "1"
+  "appVersion": "2"
 }
