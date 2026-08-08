@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { STORES, chainFromStoreName } from './constants'
 import { normalizeImageUrl } from './productImage'
-import { adaptDeal } from './adapters'
+import { adaptDeal, adaptRegularPrice } from './adapters'
 
 function safeSearchTerm(term) {
   return term.replace(/[%_]/g, '').trim()
@@ -14,16 +14,22 @@ function compareRankings(a, b) {
   return a.total - b.total
 }
 
-function updateCheapestForChain(cheapestPerChain, chain, deal, price) {
+function updateCheapestForChain(cheapestPerChain, chain, deal, price, priceSource) {
   const prev = cheapestPerChain[chain]
 
   if (!prev || price < prev.price) {
-    cheapestPerChain[chain] = { price, deal }
+    cheapestPerChain[chain] = { price, deal, priceSource }
     return
   }
 
-  if (price === prev.price && !normalizeImageUrl(prev.deal?.image_url) && normalizeImageUrl(deal.image_url)) {
+  if (
+    price === prev.price &&
+    priceSource === 'sale' &&
+    !normalizeImageUrl(prev.deal?.image_url) &&
+    normalizeImageUrl(deal.image_url)
+  ) {
     prev.deal = deal
+    prev.priceSource = priceSource
   }
 }
 
@@ -38,7 +44,7 @@ function enrichChainImages(cheapestPerChain, data) {
   }
 }
 
-async function searchCheapestPerChain(term) {
+async function searchSalePerChain(term) {
   const { data, error } = await supabase
     .from('active_deals')
     .select('deal_id, product_id, name, store_name, price, original_price, discount_pct, image_url, category, valid_until')
@@ -57,12 +63,58 @@ async function searchCheapestPerChain(term) {
     const price = parseFloat(deal.price)
     if (Number.isNaN(price)) continue
 
-    updateCheapestForChain(cheapestPerChain, chain, deal, price)
+    updateCheapestForChain(cheapestPerChain, chain, deal, price, 'sale')
   }
 
   enrichChainImages(cheapestPerChain, data)
 
   return Object.keys(cheapestPerChain).length ? cheapestPerChain : null
+}
+
+async function searchRegularPerChain(term, missingChains) {
+  if (!missingChains.length) return null
+
+  const { data, error } = await supabase
+    .from('regular_prices')
+    .select('barcode, name, brand, chain, price, category, special_price')
+    .ilike('name', `%${term}%`)
+    .in('chain', missingChains)
+    .order('price', { ascending: true })
+    .limit(500)
+
+  if (error) throw error
+  if (!data?.length) return null
+
+  const cheapestPerChain = {}
+  for (const row of data) {
+    const chain = row.chain
+    if (!chain || !missingChains.includes(chain)) continue
+
+    const price = parseFloat(row.price)
+    if (Number.isNaN(price)) continue
+
+    const prev = cheapestPerChain[chain]
+    if (!prev || price < prev.price) {
+      cheapestPerChain[chain] = {
+        price,
+        deal: row,
+        priceSource: 'regular',
+      }
+    }
+  }
+
+  return Object.keys(cheapestPerChain).length ? cheapestPerChain : null
+}
+
+/** Akcija prvo; za lance bez matcha → regular_prices. */
+async function searchCheapestPerChain(term) {
+  const sale = await searchSalePerChain(term)
+  const covered = new Set(Object.keys(sale || {}))
+  const missing = STORES.map((s) => s.id).filter((id) => !covered.has(id))
+  const regular = await searchRegularPerChain(term, missing)
+
+  if (!sale && !regular) return null
+  return { ...(regular || {}), ...(sale || {}) }
 }
 
 /**
@@ -93,11 +145,20 @@ export async function compareCart(cartItems) {
     }
 
     for (const [chain, match] of Object.entries(matches)) {
+      if (!chainTotals[chain]) continue
+
       chainTotals[chain].total += match.price
       chainTotals[chain].found += 1
+
+      const adapted =
+        match.priceSource === 'regular'
+          ? adaptRegularPrice(match.deal)
+          : adaptDeal(match.deal)
+
       chainTotals[chain].items.push({
         cartName: term,
-        ...adaptDeal(match.deal),
+        priceSource: match.priceSource,
+        ...adapted,
       })
     }
   }

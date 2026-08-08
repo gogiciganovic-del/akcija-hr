@@ -46,8 +46,40 @@ export function adaptDeal(deal) {
     expiryUrgency: urgency(deal.valid_until),
     distanceM:     deal.distance_km ? Math.round(deal.distance_km * 1000) : null,
     inStock:       true,
+    priceSource:   'sale',
     keywords:      `${deal.name} ${deal.store_name} ${deal.category}`.toLowerCase(),
     description:   `${deal.name} na akciji. Popust ${deal.discount_pct}%.`,
+  }
+}
+
+/** Red iz regular_prices (redovna cijena, nije akcija). */
+export function adaptRegularPrice(row) {
+  const price = parseFloat(row.price)
+  return {
+    id:            row.barcode,
+    product_id:    row.barcode,
+    name:          row.name,
+    store:         row.chain,
+    chain:         row.chain,
+    category:      row.category,
+    originalPrice: price,
+    salePrice:     price,
+    discount:      0,
+    image:         resolveProductImage(row.name, null, 400),
+    imageBg:       '#0d1f3a',
+    isGlitch:      false,
+    isHot:         false,
+    validUntil:    null,
+    validFrom:     null,
+    createdAt:     null,
+    scrapedAt:     null,
+    expiresIn:     null,
+    expiryUrgency: 'ok',
+    distanceM:     null,
+    inStock:       true,
+    priceSource:   'regular',
+    keywords:      `${row.name} ${row.chain} ${row.category || ''}`.toLowerCase(),
+    description:   `${row.name} — redovna cijena u ${row.chain}.`,
   }
 }
 

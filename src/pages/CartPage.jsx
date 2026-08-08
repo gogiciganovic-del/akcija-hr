@@ -16,19 +16,21 @@ function CartResultThumb({ product, onSelect }) {
   const src = product.image || resolveProductImage(product.name, product.image_url, 64);
   const fallback = productPlaceholderDataUri(product.name, 64);
   const price = product.salePrice ?? product.price;
+  const isRegular = product.priceSource === "regular";
+  const sourceLabel = isRegular ? "redovna" : "akcija";
 
   return (
     <button
       type="button"
       onClick={() => onSelect?.(product)}
-      className="flex-shrink-0 rounded-xl overflow-hidden cursor-pointer transition-transform hover:scale-[1.03] active:scale-[0.98]"
+      className="flex-shrink-0 rounded-xl overflow-hidden cursor-pointer transition-transform hover:scale-[1.03] active:scale-[0.98] relative"
       style={{
         width: 64,
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.08)",
       }}
-      title={`${product.name} — ${fmtEur(price)}`}
-      aria-label={`Detalji: ${product.name}`}
+      title={`${product.name} — ${fmtEur(price)} (${sourceLabel})`}
+      aria-label={`Detalji: ${product.name} (${sourceLabel})`}
     >
       <img
         src={src}
@@ -47,6 +49,18 @@ function CartResultThumb({ product, onSelect }) {
           }
         }}
       />
+      <span
+        className="absolute left-0 right-0 bottom-0 text-center font-bold pointer-events-none"
+        style={{
+          fontSize: 8,
+          letterSpacing: "0.04em",
+          padding: "2px 0",
+          color: isRegular ? "rgba(255,255,255,0.85)" : "#633806",
+          background: isRegular ? "rgba(0,0,0,0.65)" : "rgba(239,159,39,0.95)",
+        }}
+      >
+        {isRegular ? "REDOVNA" : "AKCIJA"}
+      </span>
     </button>
   );
 }
