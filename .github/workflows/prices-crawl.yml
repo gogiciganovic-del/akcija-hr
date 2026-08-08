@@ -1,9 +1,9 @@
 name: Regular prices crawl
 
 on:
-  schedule:
-    - cron: '0 5 * * *'
   workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * 1'
 
 jobs:
   crawl-and-import:
