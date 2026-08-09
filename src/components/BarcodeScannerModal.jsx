@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScanBarcode, X } from "lucide-react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 
 /** Gumb istog stila kao na Pretrazi — koristi se na Home i Search. */
 export function ScanBarcodeButton({ onClick, className = "" }) {
@@ -31,11 +33,29 @@ function isPlausibleBarcode(digits) {
   return n === 8 || n === 12 || n === 13;
 }
 
+function vibrateOk() {
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate(40);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function createZxingReader() {
+  const hints = new Map();
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.EAN_8,
+    BarcodeFormat.UPC_A,
+  ]);
+  hints.set(DecodeHintType.TRY_HARDER, true);
+  return new BrowserMultiFormatReader(hints);
+}
+
 /**
- * Full-screen kamera skener + ručni unos EAN-a (fallback).
- * @param {boolean} open
- * @param {() => void} onClose
- * @param {(barcode: string) => void} onDetected
+ * Full-screen kamera skener: native BarcodeDetector → ZXing fallback → ručni EAN.
  */
 export function BarcodeScannerModal({ open, onClose, onDetected }) {
   const [scannerError, setScannerError] = useState(null);
@@ -46,6 +66,7 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
   const streamRef = useRef(null);
   const rafRef = useRef(null);
   const detectorRef = useRef(null);
+  const zxingControlsRef = useRef(null);
   const scannedLockRef = useRef(false);
   const onDetectedRef = useRef(onDetected);
   onDetectedRef.current = onDetected;
@@ -56,6 +77,12 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
       rafRef.current = null;
     }
     detectorRef.current = null;
+    try {
+      zxingControlsRef.current?.stop();
+    } catch {
+      // ignore
+    }
+    zxingControlsRef.current = null;
     const stream = streamRef.current;
     if (stream) {
       stream.getTracks().forEach((t) => t.stop());
@@ -65,6 +92,20 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
       videoRef.current.srcObject = null;
     }
   }, []);
+
+  const emitDetected = useCallback(
+    (raw) => {
+      if (scannedLockRef.current) return;
+      scannedLockRef.current = true;
+      vibrateOk();
+      setScannerStatus("Pronađen barkod...");
+      stopCamera();
+      setScannerError(null);
+      setScannerStatus("");
+      onDetectedRef.current?.(raw);
+    },
+    [stopCamera]
+  );
 
   const handleClose = useCallback(() => {
     scannedLockRef.current = false;
@@ -83,10 +124,8 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
       return;
     }
     setManualHint("");
-    scannedLockRef.current = true;
-    stopCamera();
-    onDetectedRef.current?.(digits);
-  }, [manualCode, stopCamera]);
+    emitDetected(digits);
+  }, [manualCode, emitDetected]);
 
   useEffect(() => {
     if (!open) return;
@@ -97,27 +136,18 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
     setManualCode("");
     setManualHint("");
 
-    if (typeof window === "undefined" || typeof window.BarcodeDetector !== "function") {
-      setScannerError("Skeniranje nije podržano na ovom uređaju");
-      setScannerStatus("");
-      return;
-    }
-
     if (!navigator.mediaDevices?.getUserMedia) {
-      setScannerError("Skeniranje nije podržano na ovom uređaju");
+      setScannerError("Kamera nije dostupna na ovom uređaju");
       setScannerStatus("");
       return;
     }
 
     let cancelled = false;
+    const hasNative =
+      typeof window !== "undefined" && typeof window.BarcodeDetector === "function";
 
     (async () => {
       try {
-        const detector = new window.BarcodeDetector({
-          formats: ["ean_13", "ean_8", "upc_a"],
-        });
-        detectorRef.current = detector;
-
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "environment" } },
           audio: false,
@@ -135,37 +165,64 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
           return;
         }
 
-        video.srcObject = stream;
-        await video.play();
-        setScannerStatus("Usmjeri kameru na barkod");
+        if (hasNative) {
+          const detector = new window.BarcodeDetector({
+            formats: ["ean_13", "ean_8", "upc_a"],
+          });
+          detectorRef.current = detector;
+          video.srcObject = stream;
+          await video.play();
+          if (cancelled) return;
+          setScannerStatus("Usmjeri kameru na barkod");
 
-        const tick = async () => {
-          if (cancelled || scannedLockRef.current) return;
-          const v = videoRef.current;
-          const det = detectorRef.current;
-          if (v && det && v.readyState >= 2) {
-            try {
-              const codes = await det.detect(v);
-              if (codes?.length && !scannedLockRef.current) {
-                const raw = codes[0].rawValue;
-                if (raw) {
-                  scannedLockRef.current = true;
-                  setScannerStatus("Pronađen barkod...");
-                  stopCamera();
-                  setScannerError(null);
-                  setScannerStatus("");
-                  onDetectedRef.current?.(raw);
-                  return;
+          const tick = async () => {
+            if (cancelled || scannedLockRef.current) return;
+            const v = videoRef.current;
+            const det = detectorRef.current;
+            if (v && det && v.readyState >= 2) {
+              try {
+                const codes = await det.detect(v);
+                if (codes?.length && !scannedLockRef.current) {
+                  const raw = codes[0].rawValue;
+                  if (raw) {
+                    emitDetected(raw);
+                    return;
+                  }
                 }
+              } catch {
+                // ignore frame errors
               }
-            } catch {
-              // ignore frame errors
             }
-          }
+            rafRef.current = requestAnimationFrame(tick);
+          };
           rafRef.current = requestAnimationFrame(tick);
-        };
+          return;
+        }
 
-        rafRef.current = requestAnimationFrame(tick);
+        // ZXing fallback (besplatna open-source biblioteka)
+        setScannerStatus("Usmjeri kameru na barkod");
+        const reader = createZxingReader();
+        const controls = await reader.decodeFromStream(stream, video, (result, err) => {
+          if (cancelled || scannedLockRef.current) return;
+          if (result?.getText) {
+            const text = result.getText();
+            if (text) emitDetected(text);
+            return;
+          }
+          // NotFoundException itd. — ignoriraj
+          if (err && err.name && err.name !== "NotFoundException") {
+            // tiho
+          }
+        });
+        if (cancelled) {
+          try {
+            controls?.stop();
+          } catch {
+            // ignore
+          }
+          return;
+        }
+        zxingControlsRef.current = controls;
       } catch (err) {
         if (cancelled) return;
         const denied =
@@ -173,7 +230,7 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
         setScannerError(
           denied
             ? "Dopusti pristup kameri da skeniraš barkod"
-            : "Skeniranje nije podržano na ovom uređaju"
+            : "Kamera nije dostupna — unesi barkod ručno"
         );
         setScannerStatus("");
       }
@@ -183,7 +240,7 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
       cancelled = true;
       stopCamera();
     };
-  }, [open, stopCamera]);
+  }, [open, stopCamera, emitDetected]);
 
   if (!open) return null;
 
@@ -222,7 +279,7 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
               {scannerError}
             </p>
             <p style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
-              Unesi barkod ručno ispod ili otvori app u Chromeu na Androidu.
+              Unesi barkod ručno ispod.
             </p>
           </div>
         ) : (

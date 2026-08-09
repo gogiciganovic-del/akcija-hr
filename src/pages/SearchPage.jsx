@@ -268,6 +268,9 @@ export function SearchPage({ onProductSelect, pendingBarcode = null, onPendingBa
 
   const showingScan = scanResults !== null || scanLoading || scanNotFound;
   const scanSorted = sortProducts(scanResults || [], sortMode === "discount" ? "price_asc" : sortMode);
+  const scanHasSale = (scanResults || []).some((p) => p.priceSource === "sale");
+  const scanOnlyRegular =
+    !scanLoading && !scanNotFound && (scanResults || []).length > 0 && !scanHasSale;
 
   return (
     <div className="flex-1 min-h-0 h-full overflow-y-auto" style={{ scrollbarWidth: "none" }}>
@@ -387,6 +390,21 @@ export function SearchPage({ onProductSelect, pendingBarcode = null, onPendingBa
             </div>
           ) : (
             <div className="flex flex-col gap-2.5 pb-8">
+              {scanOnlyRegular && (
+                <p
+                  className="rounded-xl px-3 py-2"
+                  style={{
+                    fontSize: 12,
+                    lineHeight: 1.45,
+                    color: "rgba(255,255,255,0.45)",
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                  }}
+                >
+                  Prikazane su redovne cijene. Akcija nije potvrđena po nazivu u bazi — može i dalje
+                  biti na polici.
+                </p>
+              )}
               {scanSorted.map((p) => (
                 <ProductResultCard key={p.id} p={p} onSelect={onProductSelect} />
               ))}

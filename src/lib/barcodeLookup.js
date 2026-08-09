@@ -3,28 +3,78 @@ import { adaptDeal, adaptRegularPrice } from "./adapters";
 import { chainFromStoreName } from "./constants";
 import { productPlaceholderDataUri } from "./productImage";
 
-async function findSaleExactForChain(name, chain) {
-  const { data, error } = await supabase
+/** Normalizacija naziva za usporedbu (trim, lower, bez dijakritika, bez suvišne interpunkcije). */
+export function normalizeProductName(name) {
+  return String(name || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function escapeIlike(s) {
+  return String(s || "").replace(/[%_,]/g, "");
+}
+
+/**
+ * Pronađi akciju za lanac: prvo točan naziv, zatim soft match (ista normalizirana vrijednost).
+ * Ne dira cartCompare — samo skener lookup.
+ */
+async function findSaleForChain(name, chain) {
+  const exactName = (name || "").trim();
+  if (!exactName) return null;
+
+  const { data: exactRows, error: exactErr } = await supabase
     .from("active_deals")
     .select(
       "deal_id, product_id, name, store_name, price, original_price, discount_pct, image_url, category"
     )
-    .eq("name", name)
+    .eq("name", exactName)
     .order("price", { ascending: true })
     .limit(40);
 
-  if (error) throw error;
+  if (exactErr) throw exactErr;
 
-  for (const row of data || []) {
+  for (const row of exactRows || []) {
     if (chainFromStoreName(row.store_name) !== chain) continue;
     const price = parseFloat(row.price);
     if (Number.isNaN(price)) continue;
-    return row;
+    return { row, match: "exact" };
   }
+
+  const normTarget = normalizeProductName(exactName);
+  if (normTarget.length < 4) return null;
+
+  // Kandidati: prve 2–3 riječi (dovoljno usko da ne raznese free tier)
+  const words = normTarget.split(" ").filter(Boolean).slice(0, 3);
+  const needle = escapeIlike(words.join(" "));
+  if (needle.length < 3) return null;
+
+  const { data: softRows, error: softErr } = await supabase
+    .from("active_deals")
+    .select(
+      "deal_id, product_id, name, store_name, price, original_price, discount_pct, image_url, category"
+    )
+    .ilike("name", `%${needle}%`)
+    .order("price", { ascending: true })
+    .limit(40);
+
+  if (softErr) throw softErr;
+
+  for (const row of softRows || []) {
+    if (chainFromStoreName(row.store_name) !== chain) continue;
+    if (normalizeProductName(row.name) !== normTarget) continue;
+    const price = parseFloat(row.price);
+    if (Number.isNaN(price)) continue;
+    return { row, match: "soft" };
+  }
+
   return null;
 }
 
-/** Lookup cijena po točnom barkodu: regular_prices → active_deals po nazivu+lancu. */
+/** Lookup cijena po točnom barkodu: regular_prices → active_deals po nazivu+lancu (exact pa soft). */
 export async function lookupByBarcode(barcode) {
   const code = String(barcode || "").trim();
   if (!code) return [];
@@ -42,15 +92,16 @@ export async function lookupByBarcode(barcode) {
   for (let i = 0; i < regRows.length; i++) {
     const row = regRows[i];
     const exactName = (row.name || "").trim();
-    const saleRow = exactName ? await findSaleExactForChain(exactName, row.chain) : null;
+    const found = exactName ? await findSaleForChain(exactName, row.chain) : null;
 
-    if (saleRow) {
-      const adapted = adaptDeal(saleRow);
+    if (found) {
+      const adapted = adaptDeal(found.row);
       results.push({
         ...adapted,
         id: `scan-sale-${row.chain}-${code}-${i}`,
         chain: row.chain,
         priceSource: "sale",
+        saleMatch: found.match,
         image: adapted.image || productPlaceholderDataUri(adapted.name, 80),
       });
     } else {
@@ -58,6 +109,7 @@ export async function lookupByBarcode(barcode) {
       results.push({
         ...adapted,
         id: `scan-regular-${row.chain}-${code}-${i}`,
+        saleMatch: null,
         image: productPlaceholderDataUri(row.name, 80),
       });
     }

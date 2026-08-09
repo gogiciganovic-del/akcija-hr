@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { BottomNav }     from "./components/BottomNav";
 import { ProductSheet }  from "./components/ProductSheet";
 import { HomePage }      from "./pages/HomePage";
@@ -15,6 +15,7 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [homeResetSignal, setHomeResetSignal] = useState(0);
   const [pendingBarcode, setPendingBarcode] = useState(null);
+  const [scanToast, setScanToast] = useState(null);
 
   const handleProductSelect = useCallback((product) => setSelectedProduct(product), []);
   const handleCloseSheet    = useCallback(() => setSelectedProduct(null), []);
@@ -25,11 +26,18 @@ export default function App() {
   const handleTabChange     = useCallback((tab) => setActiveTab(tab), []);
   const handleBarcodeScanned = useCallback((code) => {
     setPendingBarcode(code);
+    setScanToast("Barkod pronađen — cijene su na Pretrazi");
     setActiveTab("search");
   }, []);
   const handlePendingBarcodeConsumed = useCallback(() => {
     setPendingBarcode(null);
   }, []);
+
+  useEffect(() => {
+    if (!scanToast) return;
+    const t = window.setTimeout(() => setScanToast(null), 2800);
+    return () => window.clearTimeout(t);
+  }, [scanToast]);
 
   if (window.location.pathname === "/admin") return <Admin />;
 
@@ -85,6 +93,24 @@ export default function App() {
         isFavorite={selectedProduct ? isFav(selectedProduct.id) : false}
         onToggleFavorite={toggle}
       />
+      {scanToast && (
+        <div
+          className="fixed left-1/2 z-[90] px-4 py-2.5 rounded-2xl font-semibold text-center"
+          style={{
+            bottom: "calc(72px + env(safe-area-inset-bottom, 0px) + 12px)",
+            transform: "translateX(-50%)",
+            maxWidth: "min(340px, calc(100% - 32px))",
+            background: "rgba(0,255,136,0.14)",
+            border: "1px solid rgba(0,255,136,0.35)",
+            color: "#00ff88",
+            fontSize: 13,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+          }}
+          role="status"
+        >
+          {scanToast}
+        </div>
+      )}
     </div>
   );
 }
