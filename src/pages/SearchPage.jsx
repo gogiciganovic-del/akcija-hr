@@ -70,7 +70,7 @@ function sortProducts(list, sortMode) {
   return copy;
 }
 
-function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta }) {
+function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta, isCheapest }) {
   const isRegular = p.priceSource === "regular";
   const storeLabel = p.chain ?? chainFromStoreName(p.store);
   const imgSrc = isRegular
@@ -86,10 +86,12 @@ function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta 
       onClick={() => onSelect(p)}
       className="flex items-center rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
       style={{
-        background: "rgba(255,255,255,0.03)",
-        border: p.isGlitch
-          ? "1px solid rgba(0,255,136,0.14)"
-          : "1px solid rgba(255,255,255,0.06)",
+        background: isCheapest ? "rgba(0,255,136,0.06)" : "rgba(255,255,255,0.03)",
+        border: isCheapest
+          ? "1px solid rgba(0,255,136,0.45)"
+          : p.isGlitch
+            ? "1px solid rgba(0,255,136,0.14)"
+            : "1px solid rgba(255,255,255,0.06)",
       }}
     >
       <img
@@ -110,6 +112,19 @@ function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta 
           <p className="font-bold text-white text-[12.5px] leading-tight truncate flex-1 min-w-0">
             {highlightQuery ? highlight(p.name, highlightQuery) : p.name}
           </p>
+          {isCheapest && (
+            <span
+              className="flex-shrink-0 font-bold rounded px-1.5 py-0.5"
+              style={{
+                fontSize: 9,
+                letterSpacing: "0.04em",
+                color: "#020617",
+                background: "#00ff88",
+              }}
+            >
+              NAJJEFTINIJE
+            </span>
+          )}
           <SourceBadge source={isRegular ? "regular" : "sale"} />
         </div>
         {storeLabel && (
@@ -273,7 +288,10 @@ export function SearchPage({
         onCartFeedback?.("Nije moguće dodati u košaricu");
         return;
       }
-      onCartFeedback?.(`Dodano u košaricu (${result.selectedChain})`);
+      onCartFeedback?.({
+        message: `Dodano u košaricu (${result.selectedChain})`,
+        actionLabel: "Idi u košaricu i izračunaj",
+      });
     },
     [scanBarcode, onCartFeedback]
   );
@@ -355,9 +373,25 @@ export function SearchPage({
     ? (scanResults || []).filter((p) => p.priceSource === "sale")
     : scanResults || [];
   const scanSorted = sortProducts(scanFiltered, scanSort);
+  const cheapestPrice = scanSorted.reduce((min, p) => {
+    const price = p.salePrice;
+    if (!Number.isFinite(price)) return min;
+    return min == null || price < min ? price : min;
+  }, null);
   const scanHasSale = (scanResults || []).some((p) => p.priceSource === "sale");
   const scanOnlyRegular =
     !scanLoading && !scanNotFound && (scanResults || []).length > 0 && !scanHasSale;
+
+  const cheapestBanner =
+    !scanLoading &&
+    scanSorted.length > 1 &&
+    cheapestPrice != null
+      ? (() => {
+          const best = scanSorted.find((p) => p.salePrice === cheapestPrice);
+          const label = best?.chain ?? chainFromStoreName(best?.store);
+          return label ? `Najjeftinije: ${label} · ${fmt(cheapestPrice)}` : null;
+        })()
+      : null;
 
   return (
     <div className="flex-1 min-h-0 h-full overflow-y-auto" style={{ scrollbarWidth: "none" }}>
@@ -566,6 +600,20 @@ export function SearchPage({
                   Nema potvrđenih akcija za ovaj barkod. Isključi „Samo akcije“.
                 </p>
               )}
+              {cheapestBanner && (
+                <p
+                  className="rounded-xl px-3 py-2 mb-1"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#00ff88",
+                    background: "rgba(0,255,136,0.08)",
+                    border: "1px solid rgba(0,255,136,0.22)",
+                  }}
+                >
+                  {cheapestBanner}
+                </p>
+              )}
               {scanSorted.map((p) => (
                 <ProductResultCard
                   key={p.id}
@@ -573,6 +621,11 @@ export function SearchPage({
                   onSelect={onProductSelect}
                   onAddToCart={handleAddToCart}
                   showMeta
+                  isCheapest={
+                    cheapestPrice != null &&
+                    Number.isFinite(p.salePrice) &&
+                    p.salePrice === cheapestPrice
+                  }
                 />
               ))}
               {!scanLoading && scanSorted.length > 0 && (
@@ -581,14 +634,14 @@ export function SearchPage({
                   onClick={() => onGoCart?.()}
                   className="mt-1 w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2"
                   style={{
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    color: "rgba(255,255,255,0.7)",
+                    background: "rgba(0,255,136,0.1)",
+                    border: "1px solid rgba(0,255,136,0.28)",
+                    color: "#00ff88",
                     fontSize: 13,
                   }}
                 >
                   <ShoppingCart size={15} />
-                  Otvori košaricu
+                  Idi u košaricu i izračunaj
                 </button>
               )}
             </div>

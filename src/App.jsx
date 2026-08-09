@@ -26,19 +26,24 @@ export default function App() {
   const handleTabChange     = useCallback((tab) => setActiveTab(tab), []);
   const handleBarcodeScanned = useCallback((code) => {
     setPendingBarcode(code);
-    setScanToast("Barkod pronađen — cijene su na Pretrazi");
+    setScanToast({ message: "Barkod pronađen — cijene su na Pretrazi" });
     setActiveTab("search");
   }, []);
   const handlePendingBarcodeConsumed = useCallback(() => {
     setPendingBarcode(null);
   }, []);
-  const handleCartFeedback = useCallback((msg) => {
-    setScanToast(msg);
+  const handleCartFeedback = useCallback((payload) => {
+    if (typeof payload === "string") {
+      setScanToast({ message: payload });
+      return;
+    }
+    setScanToast(payload && payload.message ? payload : null);
   }, []);
 
   useEffect(() => {
     if (!scanToast) return;
-    const t = window.setTimeout(() => setScanToast(null), 2800);
+    const ms = scanToast.actionLabel ? 6000 : 2800;
+    const t = window.setTimeout(() => setScanToast(null), ms);
     return () => window.clearTimeout(t);
   }, [scanToast]);
 
@@ -98,9 +103,9 @@ export default function App() {
         isFavorite={selectedProduct ? isFav(selectedProduct.id) : false}
         onToggleFavorite={toggle}
       />
-      {scanToast && (
+      {scanToast?.message && (
         <div
-          className="fixed left-1/2 z-[90] px-4 py-2.5 rounded-2xl font-semibold text-center"
+          className="fixed left-1/2 z-[90] px-4 py-2.5 rounded-2xl font-semibold text-center flex flex-col items-center gap-2"
           style={{
             bottom: "calc(72px + env(safe-area-inset-bottom, 0px) + 12px)",
             transform: "translateX(-50%)",
@@ -113,7 +118,25 @@ export default function App() {
           }}
           role="status"
         >
-          {scanToast}
+          <span>{scanToast.message}</span>
+          {scanToast.actionLabel && (
+            <button
+              type="button"
+              onClick={() => {
+                setScanToast(null);
+                setActiveTab("cart");
+              }}
+              className="w-full py-2 rounded-xl font-bold"
+              style={{
+                background: "rgba(0,255,136,0.2)",
+                border: "1px solid rgba(0,255,136,0.45)",
+                color: "#00ff88",
+                fontSize: 12,
+              }}
+            >
+              {scanToast.actionLabel}
+            </button>
+          )}
         </div>
       )}
     </div>
