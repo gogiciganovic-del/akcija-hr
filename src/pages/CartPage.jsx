@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Plus, X, Trash2, Loader2, ChevronDown } from "lucide-react";
+import { Plus, X, Trash2, Loader2, ChevronDown, Share2 } from "lucide-react";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { analyzeChainCart, REGULAR_PRICE_CHAINS } from "../lib/cartCompare";
 import { useProductSuggestions } from "../hooks/useProductSuggestions";
@@ -36,6 +36,7 @@ export function CartPage() {
   const [error, setError] = useState(null);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [chainMenuOpen, setChainMenuOpen] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState(null);
   const inputRef = useRef(null);
   const inputWrapRef = useRef(null);
   const chainWrapRef = useRef(null);
@@ -105,6 +106,7 @@ export function CartPage() {
     setLoading(true);
     setError(null);
     setResults(null);
+    setShareFeedback(null);
     setSuggestionsOpen(false);
     try {
       const data = await analyzeChainCart(selectedChain, items);
@@ -115,6 +117,47 @@ export function CartPage() {
       setLoading(false);
     }
   }, [selectedChain, items]);
+
+  const handleShareSavings = useCallback(async () => {
+    const primary = results?.primary;
+    if (!primary || !(primary.savings > 0)) return;
+
+    const text =
+      `Uštedio sam ${fmtEur(primary.savings)} kupujući u ${primary.label} uz Cjenko Akcije! 🛒\n` +
+      `https://cjenko.app`;
+
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        await navigator.share({
+          title: "Cjenko Akcije",
+          text,
+          url: "https://cjenko.app",
+        });
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setShareFeedback("Kopirano!");
+      window.setTimeout(() => setShareFeedback(null), 2000);
+    } catch (e) {
+      // Korisnik otkazao share — tiho ignoriraj
+      if (e?.name === "AbortError") return;
+      setShareFeedback("Kopiranje nije uspjelo");
+      window.setTimeout(() => setShareFeedback(null), 2000);
+    }
+  }, [results]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
@@ -470,6 +513,24 @@ export function CartPage() {
                 ? `Ušteda na akcijama: ${fmtEur(results.primary.savings)}`
                 : "Nema dodatne uštede na akcijama u ovoj košarici"}
             </p>
+            {results.primary.savings > 0 && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={handleShareSavings}
+                  className="w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2"
+                  style={{
+                    background: "rgba(0,255,136,0.1)",
+                    border: "1px solid rgba(0,255,136,0.28)",
+                    color: "#00ff88",
+                    fontSize: 13,
+                  }}
+                >
+                  <Share2 size={15} />
+                  {shareFeedback || "Podijeli uštedu"}
+                </button>
+              </div>
+            )}
             <ul className="mt-3 space-y-2">
               {results.primary.lines.map((line, idx) => (
                 <li
