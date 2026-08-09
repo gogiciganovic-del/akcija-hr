@@ -1,3 +1,5 @@
+import { resolveUniqueBarcode } from "./resolveCartBarcode";
+
 const DRAFT_KEY = "cjenko_cart_draft_v1";
 
 function safeParse(raw, fallback) {
@@ -38,9 +40,10 @@ export function saveCartDraft({ selectedChain, items }) {
 /**
  * Dodaj stavku iz skena/pretrage.
  * Oblik kompatibilan s CartPage (isti kao addFromSuggestion).
+ * Ako nema barkoda — strogi lookup u regular_prices (točan naziv + lanac, 1 EAN).
  * Ne dira analyzeChainCart / cartCompare.
  */
-export function enqueueCartAdd(entry) {
+export async function enqueueCartAdd(entry) {
   if (!entry?.name) return { ok: false, reason: "missing_name" };
   const draft = loadCartDraft();
   const chain = entry.chain || null;
@@ -54,10 +57,16 @@ export function enqueueCartAdd(entry) {
     };
   }
 
+  const name = String(entry.name).trim();
+  let barcode = entry.barcode || null;
+  if (!barcode && chain) {
+    barcode = await resolveUniqueBarcode(name, chain);
+  }
+
   const item = {
     id: crypto.randomUUID(),
-    name: String(entry.name).trim(),
-    barcode: entry.barcode || null,
+    name,
+    barcode,
     price: entry.price,
     originalPrice: entry.originalPrice ?? entry.price,
     priceSource: entry.priceSource === "sale" ? "sale" : "regular",

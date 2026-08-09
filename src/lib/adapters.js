@@ -10,6 +10,7 @@ export function adaptDealRow(row) {
     product_id: row.product_id,
     name: product.name,
     brand: product.brand,
+    barcode: product.barcode || null,
     store_name: store.name,
     category: product.category,
     original_price: row.original_price,
@@ -27,6 +28,7 @@ export function adaptDeal(deal) {
   return {
     id:            deal.deal_id,
     product_id:    deal.product_id,
+    barcode:       deal.barcode || null,
     name:          deal.name,
     store:         deal.store_name,
     chain:         chainFromStoreName(deal.store_name),
@@ -58,6 +60,7 @@ export function adaptRegularPrice(row) {
   return {
     id:            row.barcode,
     product_id:    row.barcode,
+    barcode:       row.barcode || null,
     name:          row.name,
     store:         row.chain,
     chain:         row.chain,

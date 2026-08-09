@@ -16,7 +16,8 @@ const DEALS_SELECT = `
     name,
     brand,
     category,
-    image_url
+    image_url,
+    barcode
   ),
   stores!inner (
     name

@@ -268,10 +268,17 @@ export function SearchPage({
   );
 
   const handleAddToCart = useCallback(
-    (p) => {
-      const result = enqueueCartAdd({
+    async (p) => {
+      // product_id (UUID) nije barkod — samo pravi EAN / sken.
+      const rawCode = scanBarcode || p.barcode || null;
+      const barcode =
+        rawCode && String(rawCode).length >= 8 && !String(rawCode).includes("-")
+          ? String(rawCode)
+          : null;
+
+      const result = await enqueueCartAdd({
         name: p.name,
-        barcode: scanBarcode || p.product_id || null,
+        barcode,
         price: p.salePrice,
         originalPrice: p.originalPrice ?? p.salePrice,
         priceSource: p.priceSource,

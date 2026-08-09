@@ -6,6 +6,7 @@ import { useProductSuggestions } from "../hooks/useProductSuggestions";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { STORES } from "../lib/constants";
 import { loadCartDraft, saveCartDraft } from "../lib/cartDraft";
+import { enrichItemsWithBarcodes, resolveUniqueBarcode } from "../lib/resolveCartBarcode";
 import { PRICE_DISCLAIMER } from "../lib/priceTrust";
 
 const fmtEur = (v) =>
@@ -129,25 +130,34 @@ export function CartPage() {
     [selectedChain, items.length, clearCartState]
   );
 
-  const addFromSuggestion = useCallback((s) => {
-    if (!s?.name) return;
-    setItems((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        name: s.name.trim(),
-        barcode: s.barcode || null,
-        price: s.price,
-        originalPrice: s.originalPrice ?? s.price,
-        priceSource: s.source,
-      },
-    ]);
-    setInput("");
-    setSuggestionsOpen(false);
-    setResults(null);
-    setError(null);
-    inputRef.current?.focus();
-  }, []);
+  const addFromSuggestion = useCallback(
+    async (s) => {
+      if (!s?.name) return;
+      const name = s.name.trim();
+      let barcode = s.barcode || null;
+      // Strogi lookup samo ako barkod fali — ne dira cijene ni soft match.
+      if (!barcode && selectedChain) {
+        barcode = await resolveUniqueBarcode(name, selectedChain);
+      }
+      setItems((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          name,
+          barcode,
+          price: s.price,
+          originalPrice: s.originalPrice ?? s.price,
+          priceSource: s.source,
+        },
+      ]);
+      setInput("");
+      setSuggestionsOpen(false);
+      setResults(null);
+      setError(null);
+      inputRef.current?.focus();
+    },
+    [selectedChain]
+  );
 
   const removeItem = useCallback((id) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
@@ -166,7 +176,10 @@ export function CartPage() {
     setShareFeedback(null);
     setSuggestionsOpen(false);
     try {
-      const data = await analyzeChainCart(selectedChain, items);
+      // Prije izračuna dopuni barkode (točan naziv+lanac) — bez soft matcha.
+      const enriched = await enrichItemsWithBarcodes(items, selectedChain);
+      setItems(enriched);
+      const data = await analyzeChainCart(selectedChain, enriched);
       setResults(data);
     } catch (e) {
       setError(e.message || "Greška pri izračunu košarice.");

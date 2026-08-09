@@ -37,7 +37,7 @@ export function useProductSuggestions(query, chain = null) {
           supabase
             .from('active_deals')
             .select(
-              'name, price, original_price, discount_pct, store_name, image_url, product_id, brand, category'
+              'name, price, original_price, discount_pct, store_name, image_url, product_id, brand, category, barcode'
             )
             .ilike('name', pattern)
             .order('price', { ascending: true })
@@ -70,7 +70,7 @@ export function useProductSuggestions(query, chain = null) {
             source: 'sale',
             price,
             originalPrice: Number.isNaN(originalPrice) ? price : originalPrice,
-            barcode: null,
+            barcode: row.barcode || null,
             brand: row.brand || null,
             category: row.category || null,
             image_url: row.image_url || null,
