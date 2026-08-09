@@ -32,6 +32,9 @@ export default function App() {
   const handlePendingBarcodeConsumed = useCallback(() => {
     setPendingBarcode(null);
   }, []);
+  const handleCartFeedback = useCallback((msg) => {
+    setScanToast(msg);
+  }, []);
 
   useEffect(() => {
     if (!scanToast) return;
@@ -57,6 +60,8 @@ export default function App() {
         onProductSelect={handleProductSelect}
         pendingBarcode={pendingBarcode}
         onPendingBarcodeConsumed={handlePendingBarcodeConsumed}
+        onCartFeedback={handleCartFeedback}
+        onGoCart={() => setActiveTab("cart")}
       />
     ),
     cart: <CartPage onProductSelect={handleProductSelect} />,

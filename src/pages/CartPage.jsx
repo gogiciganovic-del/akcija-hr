@@ -5,6 +5,7 @@ import { analyzeChainCart, REGULAR_PRICE_CHAINS } from "../lib/cartCompare";
 import { useProductSuggestions } from "../hooks/useProductSuggestions";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { STORES } from "../lib/constants";
+import { loadCartDraft, saveCartDraft } from "../lib/cartDraft";
 
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -70,8 +71,9 @@ function SourceBadge({ source }) {
 }
 
 export function CartPage() {
-  const [selectedChain, setSelectedChain] = useState(null);
-  const [items, setItems] = useState([]);
+  const initialDraft = loadCartDraft();
+  const [selectedChain, setSelectedChain] = useState(initialDraft.selectedChain);
+  const [items, setItems] = useState(initialDraft.items);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
@@ -87,6 +89,11 @@ export function CartPage() {
   const mapsCity = cityFromLocationLabel(locationLabel, locationLoading);
 
   const { suggestions } = useProductSuggestions(input, selectedChain);
+
+  // Persist draft (tab switch / sken → košarica). Ne dira izračun.
+  useEffect(() => {
+    saveCartDraft({ selectedChain, items });
+  }, [selectedChain, items]);
 
   const clearCartState = useCallback(() => {
     setItems([]);
