@@ -14,6 +14,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("home");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [homeResetSignal, setHomeResetSignal] = useState(0);
+  const [pendingBarcode, setPendingBarcode] = useState(null);
 
   const handleProductSelect = useCallback((product) => setSelectedProduct(product), []);
   const handleCloseSheet    = useCallback(() => setSelectedProduct(null), []);
@@ -22,6 +23,13 @@ export default function App() {
     setHomeResetSignal((n) => n + 1);
   }, []);
   const handleTabChange     = useCallback((tab) => setActiveTab(tab), []);
+  const handleBarcodeScanned = useCallback((code) => {
+    setPendingBarcode(code);
+    setActiveTab("search");
+  }, []);
+  const handlePendingBarcodeConsumed = useCallback(() => {
+    setPendingBarcode(null);
+  }, []);
 
   if (window.location.pathname === "/admin") return <Admin />;
 
@@ -30,12 +38,19 @@ export default function App() {
       <HomePage
         onProductSelect={handleProductSelect}
         onSearchFocus={() => setActiveTab("search")}
+        onBarcodeScanned={handleBarcodeScanned}
         isFav={isFav}
         onToggleFav={toggle}
         homeResetSignal={homeResetSignal}
       />
     ),
-    search: <SearchPage onProductSelect={handleProductSelect} />,
+    search: (
+      <SearchPage
+        onProductSelect={handleProductSelect}
+        pendingBarcode={pendingBarcode}
+        onPendingBarcodeConsumed={handlePendingBarcodeConsumed}
+      />
+    ),
     cart: <CartPage onProductSelect={handleProductSelect} />,
     fav: (
       <FavoritesPage

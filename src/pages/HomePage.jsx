@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { CjenkoLogo } from "../components/CjenkoLogo";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { ProductCard } from "../components/ProductCard";
+import { BarcodeScannerModal, ScanBarcodeButton } from "../components/BarcodeScannerModal";
 import { useProducts } from "../hooks/useProducts";
 import { useStoreStats } from "../hooks/useStoreStats";
 import { useUserLocation } from "../hooks/useUserLocation";
@@ -159,7 +160,14 @@ const SPECIAL_FILTERS = [
 const EXPIRING_PREVIEW = 4;
 const NOVO_PREVIEW = 4;
 
-export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, homeResetSignal = 0 }) {
+export function HomePage({
+  onProductSelect,
+  onSearchFocus,
+  onBarcodeScanned,
+  isFav,
+  onToggleFav,
+  homeResetSignal = 0,
+}) {
   const scrollRef = useRef(null);
   const [activeCat, setActiveCat] = useState(null);
   const [specialFilter, setSpecialFilter] = useState(null);
@@ -167,6 +175,7 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
   const [hotExpanded, setHotExpanded] = useState(false);
   const [expiringExpanded, setExpiringExpanded] = useState(false);
   const [novoExpanded, setNovoExpanded] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
     if (!homeResetSignal) return;
@@ -236,6 +245,14 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
     setNovoExpanded((prev) => !prev);
   }, []);
 
+  const handleBarcodeDetected = useCallback(
+    (code) => {
+      setScannerOpen(false);
+      onBarcodeScanned?.(code);
+    },
+    [onBarcodeScanned]
+  );
+
   const isNovoMode = specialFilter === "novo";
   const isExpiringMode = specialFilter === "expiring";
 
@@ -287,15 +304,32 @@ export function HomePage({ onProductSelect, onSearchFocus, isFav, onToggleFav, h
           </p>
         </div>
 
-        <div
-          onClick={onSearchFocus}
-          className="mx-4 mb-3 flex items-center gap-3 rounded-2xl px-4 py-3 cursor-pointer"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
-        >
-          <CjenkoFace size={22} />
-          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>Traži akcije, proizvode, trgovine…</span>
+        <div className="mx-4 mb-1 flex items-center gap-2">
+          <div
+            onClick={onSearchFocus}
+            className="flex-1 min-w-0 flex items-center gap-3 rounded-2xl px-4 py-3 cursor-pointer"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+          >
+            <CjenkoFace size={22} />
+            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>
+              Traži akcije, proizvode, trgovine…
+            </span>
+          </div>
+          <ScanBarcodeButton onClick={() => setScannerOpen(true)} />
         </div>
+        <p
+          className="mx-4 mb-3"
+          style={{ color: "rgba(255,255,255,0.28)", fontSize: 11, lineHeight: 1.4 }}
+        >
+          Skeniraj proizvod u trgovini i vidi cijenu u svim lancima
+        </p>
       </header>
+
+      <BarcodeScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={handleBarcodeDetected}
+      />
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: "none" }}>
       <StoreFilterRow selectedStore={selectedStore} onSelect={handleStoreSelect} />

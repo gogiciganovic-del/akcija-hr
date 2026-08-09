@@ -1,9 +1,11 @@
 ﻿import { useState, useRef, useEffect, useCallback } from "react";
-import { X, ScanBarcode } from "lucide-react";
+import { X } from "lucide-react";
 import { CjenkoFace } from "../components/CjenkoFace";
+import { BarcodeScannerModal, ScanBarcodeButton } from "../components/BarcodeScannerModal";
 import { useProducts } from "../hooks/useProducts";
 import { supabase } from "../lib/supabase";
-import { adaptDeal, adaptRegularPrice } from "../lib/adapters";
+import { adaptRegularPrice } from "../lib/adapters";
+import { lookupByBarcode } from "../lib/barcodeLookup";
 import { chainFromStoreName } from "../lib/constants";
 import { productPlaceholderDataUri } from "../lib/productImage";
 
@@ -55,67 +57,6 @@ function sortProducts(list, sortMode) {
     copy.sort((a, b) => (b.discount ?? 0) - (a.discount ?? 0));
   }
   return copy;
-}
-
-async function findSaleExactForChain(name, chain) {
-  const { data, error } = await supabase
-    .from("active_deals")
-    .select(
-      "deal_id, product_id, name, store_name, price, original_price, discount_pct, image_url, category"
-    )
-    .eq("name", name)
-    .order("price", { ascending: true })
-    .limit(40);
-
-  if (error) throw error;
-
-  for (const row of data || []) {
-    if (chainFromStoreName(row.store_name) !== chain) continue;
-    const price = parseFloat(row.price);
-    if (Number.isNaN(price)) continue;
-    return row;
-  }
-  return null;
-}
-
-async function lookupByBarcode(barcode) {
-  const code = String(barcode || "").trim();
-  if (!code) return [];
-
-  const { data: regRows, error } = await supabase
-    .from("regular_prices")
-    .select("barcode, name, brand, chain, price, category, special_price")
-    .eq("barcode", code)
-    .order("price", { ascending: true });
-
-  if (error) throw error;
-  if (!regRows?.length) return [];
-
-  const results = [];
-  for (let i = 0; i < regRows.length; i++) {
-    const row = regRows[i];
-    const exactName = (row.name || "").trim();
-    const saleRow = exactName ? await findSaleExactForChain(exactName, row.chain) : null;
-
-    if (saleRow) {
-      const adapted = adaptDeal(saleRow);
-      results.push({
-        ...adapted,
-        id: `scan-sale-${row.chain}-${code}-${i}`,
-        chain: row.chain,
-        priceSource: "sale",
-        image: adapted.image || productPlaceholderDataUri(adapted.name, 80),
-      });
-    } else {
-      const adapted = adaptRegularPrice(row);
-      results.push({
-        ...adapted,
-        id: `scan-regular-${row.chain}-${code}-${i}`,
-        image: productPlaceholderDataUri(row.name, 80),
-      });
-    }
-  }
-  return results;
 }
 
 function ProductResultCard({ p, highlightQuery, onSelect }) {
@@ -203,7 +144,7 @@ function ProductResultCard({ p, highlightQuery, onSelect }) {
   );
 }
 
-export function SearchPage({ onProductSelect }) {
+export function SearchPage({ onProductSelect, pendingBarcode = null, onPendingBarcodeConsumed }) {
   const [query, setQuery] = useState("");
   const [sortMode, setSort] = useState("discount");
   const [catFilter, setCat] = useState("Sve");
@@ -212,48 +153,16 @@ export function SearchPage({ onProductSelect }) {
   const inputRef = useRef(null);
 
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [scannerError, setScannerError] = useState(null);
-  const [scannerStatus, setScannerStatus] = useState("");
   const [scanResults, setScanResults] = useState(null);
   const [scanBarcode, setScanBarcode] = useState(null);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanNotFound, setScanNotFound] = useState(false);
-
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const rafRef = useRef(null);
-  const detectorRef = useRef(null);
-  const scannedLockRef = useRef(false);
 
   const searchTerm = query.trim();
   const { products: saleProducts, loading: saleLoading } = useProducts({
     search: searchTerm || undefined,
     sortBy: sortMode,
   });
-
-  const stopCamera = useCallback(() => {
-    if (rafRef.current != null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    detectorRef.current = null;
-    const stream = streamRef.current;
-    if (stream) {
-      stream.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-  }, []);
-
-  const closeScanner = useCallback(() => {
-    scannedLockRef.current = false;
-    stopCamera();
-    setScannerOpen(false);
-    setScannerError(null);
-    setScannerStatus("");
-  }, [stopCamera]);
 
   const runBarcodeLookup = useCallback(async (code) => {
     setScanLoading(true);
@@ -278,101 +187,19 @@ export function SearchPage({ onProductSelect }) {
     }
   }, []);
 
+  const handleDetected = useCallback(
+    (code) => {
+      setScannerOpen(false);
+      runBarcodeLookup(code);
+    },
+    [runBarcodeLookup]
+  );
+
   useEffect(() => {
-    if (!scannerOpen) return;
-
-    scannedLockRef.current = false;
-    setScannerError(null);
-    setScannerStatus("Pokrećem kameru...");
-
-    if (typeof window === "undefined" || typeof window.BarcodeDetector !== "function") {
-      setScannerError("Skeniranje nije podržano na ovom uređaju");
-      setScannerStatus("");
-      return;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setScannerError("Skeniranje nije podržano na ovom uređaju");
-      setScannerStatus("");
-      return;
-    }
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const detector = new window.BarcodeDetector({
-          formats: ["ean_13", "ean_8", "upc_a"],
-        });
-        detectorRef.current = detector;
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
-          audio: false,
-        });
-
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-
-        streamRef.current = stream;
-        const video = videoRef.current;
-        if (!video) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-
-        video.srcObject = stream;
-        await video.play();
-        setScannerStatus("Usmjeri kameru na barkod");
-
-        const tick = async () => {
-          if (cancelled || scannedLockRef.current) return;
-          const v = videoRef.current;
-          const det = detectorRef.current;
-          if (v && det && v.readyState >= 2) {
-            try {
-              const codes = await det.detect(v);
-              if (codes?.length && !scannedLockRef.current) {
-                const raw = codes[0].rawValue;
-                if (raw) {
-                  scannedLockRef.current = true;
-                  setScannerStatus("Pronađen barkod...");
-                  stopCamera();
-                  setScannerOpen(false);
-                  setScannerError(null);
-                  setScannerStatus("");
-                  await runBarcodeLookup(raw);
-                  return;
-                }
-              }
-            } catch {
-              // ignore frame errors
-            }
-          }
-          rafRef.current = requestAnimationFrame(tick);
-        };
-
-        rafRef.current = requestAnimationFrame(tick);
-      } catch (err) {
-        if (cancelled) return;
-        const denied =
-          err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError";
-        setScannerError(
-          denied
-            ? "Dopusti pristup kameri da skeniraš barkod"
-            : "Skeniranje nije podržano na ovom uređaju"
-        );
-        setScannerStatus("");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      stopCamera();
-    };
-  }, [scannerOpen, stopCamera, runBarcodeLookup]);
+    if (!pendingBarcode) return;
+    runBarcodeLookup(pendingBarcode);
+    onPendingBarcodeConsumed?.();
+  }, [pendingBarcode, runBarcodeLookup, onPendingBarcodeConsumed]);
 
   useEffect(() => {
     if (searchTerm.length < 2) {
@@ -484,21 +311,7 @@ export function SearchPage({ onProductSelect }) {
               </button>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => setScannerOpen(true)}
-            className="flex-shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-2xl px-3"
-            style={{
-              minWidth: 72,
-              background: "rgba(0,255,136,0.08)",
-              border: "1px solid rgba(0,255,136,0.25)",
-              color: "#00ff88",
-            }}
-            aria-label="Skeniraj barkod"
-          >
-            <ScanBarcode size={20} strokeWidth={2} />
-            <span style={{ fontSize: 10, fontWeight: 700 }}>Skeniraj</span>
-          </button>
+          <ScanBarcodeButton onClick={() => setScannerOpen(true)} />
         </div>
 
         <div className="flex gap-2 overflow-x-auto mb-2" style={{ scrollbarWidth: "none" }}>
@@ -645,67 +458,11 @@ export function SearchPage({ onProductSelect }) {
         </div>
       )}
 
-      {scannerOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex flex-col"
-          style={{ background: "#020617" }}
-        >
-          <div className="flex items-center justify-between px-4 pt-4 pb-3">
-            <p className="font-bold text-white" style={{ fontSize: 16 }}>
-              Skeniraj barkod
-            </p>
-            <button
-              type="button"
-              onClick={closeScanner}
-              className="w-9 h-9 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.08)" }}
-              aria-label="Zatvori skener"
-            >
-              <X size={18} style={{ color: "rgba(255,255,255,0.7)" }} />
-            </button>
-          </div>
-
-          <div className="flex-1 relative mx-4 mb-4 rounded-2xl overflow-hidden" style={{ background: "#000" }}>
-            {!scannerError && (
-              <video
-                ref={videoRef}
-                playsInline
-                muted
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-            )}
-            {scannerError ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-                <p className="font-black mb-2" style={{ fontSize: 18, color: "rgba(255,255,255,0.7)" }}>
-                  {scannerError}
-                </p>
-                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
-                  Koristi tekstualnu pretragu ili otvori aplikaciju u Chromeu na Androidu.
-                </p>
-              </div>
-            ) : (
-              <div
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                style={{
-                  width: "72%",
-                  maxWidth: 280,
-                  aspectRatio: "3 / 1.2",
-                  border: "2px solid rgba(0,255,136,0.65)",
-                  borderRadius: 12,
-                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)",
-                }}
-              />
-            )}
-          </div>
-
-          <p
-            className="text-center pb-8 px-4"
-            style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}
-          >
-            {scannerError ? " " : scannerStatus || " "}
-          </p>
-        </div>
-      )}
+      <BarcodeScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={handleDetected}
+      />
     </div>
   );
 }
