@@ -334,6 +334,9 @@ export function HomePage({
             <li style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.35 }}>
               3. Dodaj u košaricu i vidi uštedu
             </li>
+            <li style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.35 }}>
+              4. Favoriti — vidi uštedu na spremljenim akcijama
+            </li>
           </ol>
         </div>
       </header>
