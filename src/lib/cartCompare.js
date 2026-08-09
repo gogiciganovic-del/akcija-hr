@@ -1,175 +1,290 @@
 import { supabase } from './supabase'
 import { STORES, chainFromStoreName } from './constants'
-import { normalizeImageUrl } from './productImage'
-import { adaptDeal, adaptRegularPrice } from './adapters'
 
-function safeSearchTerm(term) {
-  return term.replace(/[%_]/g, '').trim()
+function round2(n) {
+  return Math.round(n * 100) / 100
 }
 
-/** Rang: kompletna košarica → više stavki → niža ukupna cijena */
-function compareRankings(a, b) {
-  if (a.complete !== b.complete) return a.complete ? -1 : 1
-  if (a.found !== b.found) return b.found - a.found
-  return a.total - b.total
+function parsePrice(v) {
+  const n = parseFloat(v)
+  return Number.isNaN(n) ? null : n
 }
 
-function updateCheapestForChain(cheapestPerChain, chain, deal, price, priceSource) {
-  const prev = cheapestPerChain[chain]
+/** Lanci s redovnim cijenama (v1 crawl). */
+export const REGULAR_PRICE_CHAINS = [
+  'Lidl',
+  'Kaufland',
+  'Konzum',
+  'Spar',
+  'Plodine',
+  'Eurospin',
+  'Tommy',
+  'Studenac',
+  'Dm',
+]
 
-  if (!prev || price < prev.price) {
-    cheapestPerChain[chain] = { price, deal, priceSource }
-    return
+/**
+ * Nađi cijenu artikla kod jednog lanca.
+ * Prioritet: barkod → točan naziv; unutar toga akcija pa redovna.
+ */
+async function resolveItemAtChain(item, chain) {
+  const name = (item.name || '').trim()
+  const barcode = (item.barcode || '').trim() || null
+
+  if (barcode) {
+    const { data: byBarcode, error: bcErr } = await supabase
+      .from('regular_prices')
+      .select('barcode, name, brand, chain, price, category, special_price')
+      .eq('chain', chain)
+      .eq('barcode', barcode)
+      .limit(1)
+
+    if (bcErr) throw bcErr
+    const reg = byBarcode?.[0]
+    if (reg) {
+      const exactName = (reg.name || name).trim()
+      const sale = await findSaleExact(exactName, chain)
+      const regularPrice = parsePrice(reg.price)
+      if (sale) {
+        return {
+          available: true,
+          price: sale.price,
+          originalPrice: sale.originalPrice ?? regularPrice,
+          priceSource: 'sale',
+          name: sale.name,
+          barcode: reg.barcode,
+          matchedBy: 'barcode',
+        }
+      }
+      return {
+        available: true,
+        price: regularPrice,
+        originalPrice: regularPrice,
+        priceSource: 'regular',
+        name: reg.name,
+        barcode: reg.barcode,
+        matchedBy: 'barcode',
+      }
+    }
   }
 
-  if (
-    price === prev.price &&
-    priceSource === 'sale' &&
-    !normalizeImageUrl(prev.deal?.image_url) &&
-    normalizeImageUrl(deal.image_url)
-  ) {
-    prev.deal = deal
-    prev.priceSource = priceSource
-  }
-}
-
-function enrichChainImages(cheapestPerChain, data) {
-  for (const [chain, entry] of Object.entries(cheapestPerChain)) {
-    if (normalizeImageUrl(entry.deal?.image_url)) continue
-    const withImage = data.find(
-      (d) => chainFromStoreName(d.store_name) === chain && normalizeImageUrl(d.image_url)
-    )
-    if (!withImage) continue
-    entry.deal = withImage
-  }
-}
-
-async function searchSalePerChain(term) {
-  const { data, error } = await supabase
-    .from('active_deals')
-    .select('deal_id, product_id, name, store_name, price, original_price, discount_pct, image_url, category, valid_until')
-    .ilike('name', `%${term}%`)
-    .order('price', { ascending: true })
-    .limit(1000)
-
-  if (error) throw error
-  if (!data?.length) return null
-
-  const cheapestPerChain = {}
-  for (const deal of data) {
-    const chain = chainFromStoreName(deal.store_name)
-    if (!chain) continue
-
-    const price = parseFloat(deal.price)
-    if (Number.isNaN(price)) continue
-
-    updateCheapestForChain(cheapestPerChain, chain, deal, price, 'sale')
+  if (!name) {
+    return { available: false, price: null, originalPrice: null, priceSource: null, name, barcode, matchedBy: null }
   }
 
-  enrichChainImages(cheapestPerChain, data)
+  const sale = await findSaleExact(name, chain)
+  if (sale) {
+    return {
+      available: true,
+      price: sale.price,
+      originalPrice: sale.originalPrice,
+      priceSource: 'sale',
+      name: sale.name,
+      barcode,
+      matchedBy: 'name',
+    }
+  }
 
-  return Object.keys(cheapestPerChain).length ? cheapestPerChain : null
-}
-
-/** Najjeftiniji regular match samo unutar jednog lanca (bez globalnog limita). */
-async function searchRegularForChain(term, chain) {
-  const { data, error } = await supabase
+  const { data: regRows, error: regErr } = await supabase
     .from('regular_prices')
     .select('barcode, name, brand, chain, price, category, special_price')
-    .ilike('name', `%${term}%`)
     .eq('chain', chain)
+    .eq('name', name)
     .order('price', { ascending: true })
     .limit(1)
 
-  if (error) throw error
-  const row = data?.[0]
-  if (!row) return null
-
-  const price = parseFloat(row.price)
-  if (Number.isNaN(price)) return null
-
-  return { price, deal: row, priceSource: 'regular' }
-}
-
-/** Po lancu: akcija ako postoji; inače regular upit filtriran na taj lanac. */
-async function searchCheapestPerChain(term) {
-  const sale = (await searchSalePerChain(term)) || {}
-  const missing = STORES.map((s) => s.id).filter((id) => !sale[id])
-
-  const regularEntries = await Promise.all(
-    missing.map(async (chain) => {
-      const match = await searchRegularForChain(term, chain)
-      return match ? [chain, match] : null
-    })
-  )
-
-  const result = { ...sale }
-  for (const entry of regularEntries) {
-    if (!entry) continue
-    const [chain, match] = entry
-    result[chain] = match
+  if (regErr) throw regErr
+  const reg = regRows?.[0]
+  if (reg) {
+    const regularPrice = parsePrice(reg.price)
+    return {
+      available: true,
+      price: regularPrice,
+      originalPrice: regularPrice,
+      priceSource: 'regular',
+      name: reg.name,
+      barcode: reg.barcode || barcode,
+      matchedBy: 'name',
+    }
   }
 
-  return Object.keys(result).length ? result : null
+  return {
+    available: false,
+    price: null,
+    originalPrice: null,
+    priceSource: null,
+    name,
+    barcode,
+    matchedBy: null,
+  }
+}
+
+async function findSaleExact(name, chain) {
+  const { data, error } = await supabase
+    .from('active_deals')
+    .select(
+      'deal_id, product_id, name, store_name, price, original_price, discount_pct, image_url, category'
+    )
+    .eq('name', name)
+    .order('price', { ascending: true })
+    .limit(40)
+
+  if (error) throw error
+  for (const row of data || []) {
+    if (chainFromStoreName(row.store_name) !== chain) continue
+    const price = parsePrice(row.price)
+    if (price == null) continue
+    const originalPrice = parsePrice(row.original_price)
+    return {
+      name: row.name,
+      price,
+      originalPrice: originalPrice ?? price,
+      deal: row,
+    }
+  }
+  return null
 }
 
 /**
- * Košarica: za svaku stavku ILIKE '%riječ%', po trgovini najjeftiniji match, zbroj ukupno.
+ * Primarni lanac: ukupna cijena + ušteda na akcijskim stavkama.
+ * Ostali lanci: ista košarica po barkodu/točnom nazivu, ili "nedostupno".
+ *
+ * @param {string} selectedChain
+ * @param {Array<{ id?: string, name: string, barcode?: string|null, price?: number, originalPrice?: number, priceSource?: string }>} items
  */
-export async function compareCart(cartItems) {
-  if (!cartItems.length) return { rankings: [], unmatched: [], itemCount: 0 }
-
-  const itemCount = cartItems.length
-  const chainTotals = Object.fromEntries(
-    STORES.map((s) => [s.id, { total: 0, found: 0, label: s.label, items: [] }])
-  )
-  const unmatched = []
-
-  const searches = await Promise.all(
-    cartItems.map(async (item) => {
-      const term = safeSearchTerm(item.name)
-      if (!term) return { term: item.name.trim(), matches: null }
-      const matches = await searchCheapestPerChain(term)
-      return { term, matches }
-    })
-  )
-
-  for (const { term, matches } of searches) {
-    if (!matches) {
-      unmatched.push(term)
-      continue
-    }
-
-    for (const [chain, match] of Object.entries(matches)) {
-      if (!chainTotals[chain]) continue
-
-      chainTotals[chain].total += match.price
-      chainTotals[chain].found += 1
-
-      const adapted =
-        match.priceSource === 'regular'
-          ? adaptRegularPrice(match.deal)
-          : adaptDeal(match.deal)
-
-      chainTotals[chain].items.push({
-        cartName: term,
-        priceSource: match.priceSource,
-        ...adapted,
-      })
+export async function analyzeChainCart(selectedChain, items) {
+  if (!selectedChain) {
+    return {
+      selectedChain: null,
+      primary: null,
+      others: [],
+      itemCount: 0,
     }
   }
 
-  const rankings = STORES.map((s) => ({
-    chain: s.id,
-    label: s.label,
-    total: Math.round(chainTotals[s.id].total * 100) / 100,
-    found: chainTotals[s.id].found,
-    complete: chainTotals[s.id].found === itemCount,
-    items: chainTotals[s.id].items,
-  }))
-    .filter((r) => r.found > 0)
-    .sort(compareRankings)
-    .map((r, i) => ({ ...r, isBest: i === 0 }))
+  if (!items?.length) {
+    return {
+      selectedChain,
+      primary: {
+        chain: selectedChain,
+        label: STORES.find((s) => s.id === selectedChain)?.label || selectedChain,
+        total: 0,
+        savings: 0,
+        lines: [],
+        complete: true,
+      },
+      others: [],
+      itemCount: 0,
+    }
+  }
 
-  return { rankings, unmatched, itemCount }
+  const primaryLines = await Promise.all(
+    items.map(async (item) => {
+      const resolved = await resolveItemAtChain(item, selectedChain)
+      // Ako resolve ne nađe, a stavka već ima cijenu s autocompletea — koristi ju
+      if (!resolved.available && item.price != null) {
+        const price = parsePrice(item.price)
+        const originalPrice = parsePrice(item.originalPrice) ?? price
+        return {
+          cartName: item.name,
+          available: true,
+          price,
+          originalPrice,
+          priceSource: item.priceSource || 'regular',
+          name: item.name,
+          barcode: item.barcode || null,
+          matchedBy: 'cart',
+          savings: 0,
+        }
+      }
+
+      const price = resolved.price
+      const originalPrice = resolved.originalPrice ?? price
+      let savings = 0
+      if (
+        resolved.available &&
+        resolved.priceSource === 'sale' &&
+        originalPrice != null &&
+        price != null &&
+        originalPrice > price
+      ) {
+        savings = round2(originalPrice - price)
+      }
+
+      return {
+        cartName: item.name,
+        ...resolved,
+        savings,
+      }
+    })
+  )
+
+  const primaryTotal = round2(
+    primaryLines.reduce((sum, line) => sum + (line.available && line.price != null ? line.price : 0), 0)
+  )
+  const primarySavings = round2(
+    primaryLines.reduce((sum, line) => sum + (line.savings || 0), 0)
+  )
+  const primaryComplete = primaryLines.every((l) => l.available)
+
+  const otherChainIds = REGULAR_PRICE_CHAINS.filter((id) => id !== selectedChain)
+
+  const others = await Promise.all(
+    otherChainIds.map(async (chain) => {
+      const lines = await Promise.all(
+        items.map(async (item) => {
+          const resolved = await resolveItemAtChain(item, chain)
+          return {
+            cartName: item.name,
+            ...resolved,
+            status: resolved.available ? 'ok' : 'unavailable',
+          }
+        })
+      )
+
+      const availableLines = lines.filter((l) => l.available && l.price != null)
+      const total = round2(availableLines.reduce((sum, l) => sum + l.price, 0))
+      const missing = lines.filter((l) => !l.available).length
+
+      return {
+        chain,
+        label: STORES.find((s) => s.id === chain)?.label || chain,
+        total,
+        missing,
+        complete: missing === 0,
+        lines,
+      }
+    })
+  )
+
+  others.sort((a, b) => {
+    if (a.complete !== b.complete) return a.complete ? -1 : 1
+    if (a.missing !== b.missing) return a.missing - b.missing
+    return a.total - b.total
+  })
+
+  return {
+    selectedChain,
+    primary: {
+      chain: selectedChain,
+      label: STORES.find((s) => s.id === selectedChain)?.label || selectedChain,
+      total: primaryTotal,
+      savings: primarySavings,
+      lines: primaryLines,
+      complete: primaryComplete,
+    },
+    others,
+    itemCount: items.length,
+  }
+}
+
+/**
+ * @deprecated Stari fuzzy multi-chain tok. Koristi analyzeChainCart.
+ * Ostaje da CartPage ne pukne dok se UI ne preradi — vraća prazan rezultat.
+ */
+export async function compareCart() {
+  console.warn(
+    'compareCart() je zastario. Koristi analyzeChainCart(selectedChain, items).'
+  )
+  return { rankings: [], unmatched: [], itemCount: 0 }
 }

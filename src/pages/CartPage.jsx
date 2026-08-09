@@ -1,86 +1,89 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Plus, X, Trash2, Loader2 } from "lucide-react";
+import { Plus, X, Trash2, Loader2, ChevronDown } from "lucide-react";
 import { CjenkoFace } from "../components/CjenkoFace";
-import { compareCart } from "../lib/cartCompare";
+import { analyzeChainCart, REGULAR_PRICE_CHAINS } from "../lib/cartCompare";
 import { useProductSuggestions } from "../hooks/useProductSuggestions";
-import { resolveProductImage, productPlaceholderDataUri } from "../lib/productImage";
+import { STORES } from "../lib/constants";
 
 const fmtEur = (v) =>
-  v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
+  (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
 
-function newItem(name) {
-  return { id: crypto.randomUUID(), name: name.trim() };
-}
+const CHAIN_OPTIONS = STORES.filter((s) => REGULAR_PRICE_CHAINS.includes(s.id));
 
-function CartResultThumb({ product, onSelect }) {
-  const src = product.image || resolveProductImage(product.name, product.image_url, 64);
-  const fallback = productPlaceholderDataUri(product.name, 64);
-  const price = product.salePrice ?? product.price;
-  const isRegular = product.priceSource === "regular";
-  const sourceLabel = isRegular ? "redovna" : "akcija";
-
+function SourceBadge({ source }) {
+  const isRegular = source === "regular";
   return (
-    <button
-      type="button"
-      onClick={() => onSelect?.(product)}
-      className="flex-shrink-0 rounded-xl overflow-hidden cursor-pointer transition-transform hover:scale-[1.03] active:scale-[0.98] relative"
+    <span
+      className="flex-shrink-0 font-bold rounded px-1.5 py-0.5"
       style={{
-        width: 64,
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        fontSize: 9,
+        letterSpacing: "0.04em",
+        color: isRegular ? "rgba(255,255,255,0.85)" : "#633806",
+        background: isRegular ? "rgba(255,255,255,0.12)" : "rgba(239,159,39,0.95)",
       }}
-      title={`${product.name} — ${fmtEur(price)} (${sourceLabel})`}
-      aria-label={`Detalji: ${product.name} (${sourceLabel})`}
     >
-      <img
-        src={src}
-        alt={product.name}
-        width={64}
-        height={64}
-        loading="eager"
-        decoding="async"
-        referrerPolicy="no-referrer"
-        className="block w-full object-cover pointer-events-none"
-        style={{ height: 64, minHeight: 64, background: product.imageBg || "#0d1f3a" }}
-        onError={(e) => {
-          if (e.currentTarget.src !== fallback) {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = fallback;
-          }
-        }}
-      />
-      <span
-        className="absolute left-0 right-0 bottom-0 text-center font-bold pointer-events-none"
-        style={{
-          fontSize: 8,
-          letterSpacing: "0.04em",
-          padding: "2px 0",
-          color: isRegular ? "rgba(255,255,255,0.85)" : "#633806",
-          background: isRegular ? "rgba(0,0,0,0.65)" : "rgba(239,159,39,0.95)",
-        }}
-      >
-        {isRegular ? "REDOVNA" : "AKCIJA"}
-      </span>
-    </button>
+      {isRegular ? "REDOVNA" : "AKCIJA"}
+    </span>
   );
 }
 
-export function CartPage({ onProductSelect }) {
+export function CartPage() {
+  const [selectedChain, setSelectedChain] = useState(null);
   const [items, setItems] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [chainMenuOpen, setChainMenuOpen] = useState(false);
   const inputRef = useRef(null);
   const inputWrapRef = useRef(null);
+  const chainWrapRef = useRef(null);
 
-  const { suggestions } = useProductSuggestions(input);
+  const { suggestions } = useProductSuggestions(input, selectedChain);
 
-  const addByName = useCallback((name) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setItems((prev) => [...prev, newItem(trimmed)]);
+  const clearCartState = useCallback(() => {
+    setItems([]);
+    setResults(null);
+    setError(null);
+    setInput("");
+  }, []);
+
+  const handleSelectChain = useCallback(
+    (chainId) => {
+      if (chainId === selectedChain) {
+        setChainMenuOpen(false);
+        return;
+      }
+      if (items.length > 0) {
+        const ok = window.confirm(
+          "Promjena trgovine briše trenutnu košaricu. Nastaviti?"
+        );
+        if (!ok) {
+          setChainMenuOpen(false);
+          return;
+        }
+      }
+      setSelectedChain(chainId);
+      clearCartState();
+      setChainMenuOpen(false);
+    },
+    [selectedChain, items.length, clearCartState]
+  );
+
+  const addFromSuggestion = useCallback((s) => {
+    if (!s?.name) return;
+    setItems((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        name: s.name.trim(),
+        barcode: s.barcode || null,
+        price: s.price,
+        originalPrice: s.originalPrice ?? s.price,
+        priceSource: s.source,
+      },
+    ]);
     setInput("");
     setSuggestionsOpen(false);
     setResults(null);
@@ -88,62 +91,65 @@ export function CartPage({ onProductSelect }) {
     inputRef.current?.focus();
   }, []);
 
-  const addItem = useCallback(() => {
-    addByName(input);
-  }, [input, addByName]);
-
   const removeItem = useCallback((id) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
     setResults(null);
   }, []);
 
   const clearAll = useCallback(() => {
-    setItems([]);
-    setResults(null);
-    setError(null);
-  }, []);
+    clearCartState();
+  }, [clearCartState]);
 
-  const handleCompare = useCallback(async () => {
-    if (items.length === 0) return;
+  const handleAnalyze = useCallback(async () => {
+    if (!selectedChain || items.length === 0) return;
     setLoading(true);
     setError(null);
     setResults(null);
     setSuggestionsOpen(false);
     try {
-      const data = await compareCart(items);
+      const data = await analyzeChainCart(selectedChain, items);
       setResults(data);
     } catch (e) {
-      setError(e.message || "Greška pri pretrazi.");
+      setError(e.message || "Greška pri izračunu košarice.");
     } finally {
       setLoading(false);
     }
-  }, [items]);
+  }, [selectedChain, items]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       if (suggestionsOpen && suggestions.length > 0) {
-        addByName(suggestions[0].name);
-      } else {
-        addItem();
+        addFromSuggestion(suggestions[0]);
       }
     }
-    if (e.key === "Escape") setSuggestionsOpen(false);
+    if (e.key === "Escape") {
+      setSuggestionsOpen(false);
+      setChainMenuOpen(false);
+    }
   };
 
   useEffect(() => {
-    setSuggestionsOpen(input.trim().length >= 2 && suggestions.length > 0);
-  }, [input, suggestions]);
+    setSuggestionsOpen(
+      Boolean(selectedChain) && input.trim().length >= 2 && suggestions.length > 0
+    );
+  }, [input, suggestions, selectedChain]);
 
   useEffect(() => {
     function onPointerDown(e) {
       if (inputWrapRef.current && !inputWrapRef.current.contains(e.target)) {
         setSuggestionsOpen(false);
       }
+      if (chainWrapRef.current && !chainWrapRef.current.contains(e.target)) {
+        setChainMenuOpen(false);
+      }
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, []);
+
+  const selectedMeta = CHAIN_OPTIONS.find((s) => s.id === selectedChain);
+  const canType = Boolean(selectedChain);
 
   return (
     <div className="flex-1 min-h-0 h-full overflow-y-auto" style={{ scrollbarWidth: "none" }}>
@@ -154,6 +160,7 @@ export function CartPage({ onProductSelect }) {
           </h1>
           {items.length > 0 && (
             <button
+              type="button"
               onClick={clearAll}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold"
               style={{
@@ -167,10 +174,99 @@ export function CartPage({ onProductSelect }) {
           )}
         </div>
         <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 13 }}>
-          {items.length} {items.length === 1 ? "proizvod" : "proizvoda"} na listi
+          {selectedChain
+            ? `${items.length} ${items.length === 1 ? "proizvod" : "proizvoda"} u ${selectedMeta?.label || selectedChain}`
+            : "Prvo odaberi trgovinu"}
         </p>
       </div>
 
+      {/* Korak 1: odabir lanca */}
+      <div className="px-4 mb-3" ref={chainWrapRef}>
+        <p className="mb-1.5 font-semibold" style={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>
+          Odaberi trgovinu
+        </p>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setChainMenuOpen((o) => !o)}
+            className="w-full flex items-center justify-between rounded-2xl px-4 py-3 text-left"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              border: chainMenuOpen
+                ? "1px solid rgba(239,159,39,0.45)"
+                : "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <span className="flex items-center gap-2.5 min-w-0">
+              {selectedMeta ? (
+                <>
+                  <img
+                    src={selectedMeta.logo}
+                    alt=""
+                    width={22}
+                    height={22}
+                    className="rounded-md object-contain flex-shrink-0"
+                    style={{ background: "#fff" }}
+                  />
+                  <span className="text-white font-bold truncate" style={{ fontSize: 15 }}>
+                    {selectedMeta.label}
+                  </span>
+                </>
+              ) : (
+                <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 15 }}>
+                  Npr. Lidl, Konzum, Spar…
+                </span>
+              )}
+            </span>
+            <ChevronDown
+              size={18}
+              style={{
+                color: "rgba(255,255,255,0.45)",
+                transform: chainMenuOpen ? "rotate(180deg)" : "none",
+                transition: "transform 0.15s",
+              }}
+            />
+          </button>
+          {chainMenuOpen && (
+            <ul
+              className="absolute left-0 right-0 top-full mt-1.5 rounded-2xl overflow-hidden z-50 max-h-64 overflow-y-auto"
+              style={{
+                background: "#0f172a",
+                border: "1px solid rgba(255,255,255,0.1)",
+                boxShadow: "0 12px 32px rgba(0,0,0,0.45)",
+              }}
+            >
+              {CHAIN_OPTIONS.map((s) => (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectChain(s.id)}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-white/5"
+                    style={{
+                      background:
+                        s.id === selectedChain ? "rgba(239,159,39,0.12)" : "transparent",
+                    }}
+                  >
+                    <img
+                      src={s.logo}
+                      alt=""
+                      width={20}
+                      height={20}
+                      className="rounded object-contain"
+                      style={{ background: "#fff" }}
+                    />
+                    <span className="text-white font-medium" style={{ fontSize: 14 }}>
+                      {s.label}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* Korak 2: unos proizvoda */}
       <div className="px-4 mb-4">
         <div className="flex gap-2">
           <div ref={inputWrapRef} className="relative flex-1">
@@ -183,10 +279,17 @@ export function CartPage({ onProductSelect }) {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               onFocus={() => {
-                if (input.trim().length >= 2 && suggestions.length > 0) setSuggestionsOpen(true);
+                if (canType && input.trim().length >= 2 && suggestions.length > 0) {
+                  setSuggestionsOpen(true);
+                }
               }}
-              placeholder="Npr. Nutella, mlijeko, kruh..."
-              className="w-full rounded-2xl pl-11 pr-4 py-3 text-white text-[15px] outline-none"
+              disabled={!canType}
+              placeholder={
+                canType
+                  ? `Traži u ${selectedMeta?.label}…`
+                  : "Prvo odaberi trgovinu"
+              }
+              className="w-full rounded-2xl pl-11 pr-4 py-3 text-white text-[15px] outline-none disabled:opacity-45"
               style={{
                 background: "rgba(255,255,255,0.05)",
                 border: suggestionsOpen
@@ -205,46 +308,43 @@ export function CartPage({ onProductSelect }) {
                   boxShadow: "0 12px 32px rgba(0,0,0,0.45)",
                 }}
               >
-                {suggestions.map((s) => {
-                  const isRegular = s.source === "regular";
-                  return (
-                    <li key={`${s.source}-${s.name}`}>
-                      <button
-                        type="button"
-                        onClick={() => addByName(s.name)}
-                        className="w-full text-left px-4 py-2.5 text-white transition-colors hover:bg-white/5 flex items-center gap-2"
-                        style={{ fontSize: 14 }}
+                {suggestions.map((s) => (
+                  <li key={`${s.source}-${s.name}-${s.barcode || ""}`}>
+                    <button
+                      type="button"
+                      onClick={() => addFromSuggestion(s)}
+                      className="w-full text-left px-4 py-2.5 text-white transition-colors hover:bg-white/5 flex items-center gap-2"
+                      style={{ fontSize: 14 }}
+                    >
+                      <span className="truncate flex-1 min-w-0">{s.name}</span>
+                      <span
+                        className="flex-shrink-0 tabular-nums"
+                        style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}
                       >
-                        <span className="truncate flex-1 min-w-0">{s.name}</span>
-                        <span
-                          className="flex-shrink-0 font-bold rounded px-1.5 py-0.5"
-                          style={{
-                            fontSize: 9,
-                            letterSpacing: "0.04em",
-                            color: isRegular ? "rgba(255,255,255,0.85)" : "#633806",
-                            background: isRegular
-                              ? "rgba(255,255,255,0.12)"
-                              : "rgba(239,159,39,0.95)",
-                          }}
-                        >
-                          {isRegular ? "REDOVNA" : "AKCIJA"}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}              </ul>
+                        {fmtEur(s.price)}
+                      </span>
+                      <SourceBadge source={s.source} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
           <button
             type="button"
-            onClick={addItem}
-            disabled={!input.trim()}
+            onClick={() => {
+              if (suggestionsOpen && suggestions.length > 0) {
+                addFromSuggestion(suggestions[0]);
+              }
+            }}
+            disabled={!canType || !suggestions.length}
             className="flex-shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center transition-opacity"
             style={{
-              background: input.trim() ? "#EF9F27" : "rgba(255,255,255,0.06)",
+              background: canType && suggestions.length ? "#EF9F27" : "rgba(255,255,255,0.06)",
               color: "#633806",
-              opacity: input.trim() ? 1 : 0.4,
+              opacity: canType && suggestions.length ? 1 : 0.4,
             }}
+            aria-label="Dodaj prijedlog"
           >
             <Plus size={22} strokeWidth={2.5} />
           </button>
@@ -256,15 +356,23 @@ export function CartPage({ onProductSelect }) {
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex items-center justify-between rounded-xl px-3.5 py-2.5"
+              className="flex items-center justify-between gap-2 rounded-xl px-3.5 py-2.5"
               style={{
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.07)",
               }}
             >
-              <span className="text-white font-medium truncate pr-2" style={{ fontSize: 14 }}>
-                {item.name}
-              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-white font-medium truncate" style={{ fontSize: 14 }}>
+                  {item.name}
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
+                    {fmtEur(item.price)}
+                  </span>
+                  <SourceBadge source={item.priceSource} />
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => removeItem(item.id)}
@@ -279,9 +387,15 @@ export function CartPage({ onProductSelect }) {
         </ul>
       )}
 
-      {items.length === 0 && (
+      {!selectedChain && (
         <p className="px-4 text-center py-8" style={{ color: "rgba(255,255,255,0.25)", fontSize: 13 }}>
-          Dodaj proizvode koje želiš kupiti — Cjenko će pronaći najjeftiniju košaricu po trgovinama.
+          Odaberi trgovinu da kreneš sastavljati košaricu.
+        </p>
+      )}
+
+      {selectedChain && items.length === 0 && (
+        <p className="px-4 text-center py-8" style={{ color: "rgba(255,255,255,0.25)", fontSize: 13 }}>
+          Dodaj proizvode iz {selectedMeta?.label} — Cjenko će izračunati ukupno, uštedu i usporedbu s drugim lancima.
         </p>
       )}
 
@@ -289,7 +403,7 @@ export function CartPage({ onProductSelect }) {
         <div className="px-4 mb-4">
           <button
             type="button"
-            onClick={handleCompare}
+            onClick={handleAnalyze}
             disabled={loading}
             className="w-full py-3.5 rounded-2xl font-black flex items-center justify-center gap-2 transition-opacity"
             style={{
@@ -302,10 +416,10 @@ export function CartPage({ onProductSelect }) {
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                Cjenko pretražuje...
+                Cjenko računa...
               </>
             ) : (
-              "Pronađi najjeftinije"
+              "Izračunaj košaricu"
             )}
           </button>
         </div>
@@ -317,92 +431,135 @@ export function CartPage({ onProductSelect }) {
         </p>
       )}
 
-      {results && results.rankings.length > 0 && (
+      {/* Korak 3 + 4: sažetak i druga mjesta */}
+      {results?.primary && (
         <div className="px-4 pb-8">
           <div
             className="rounded-2xl p-4 mb-4 flex items-center gap-3"
             style={{ background: "#EF9F27", border: "1px solid rgba(99,56,6,0.15)" }}
           >
             <CjenkoFace size={48} showTag />
-            <p className="font-black" style={{ color: "#633806", fontSize: 14, lineHeight: 1.35 }}>
-              Pronašao sam ti najjeftiniju košaricu!
-            </p>
+            <div>
+              <p className="font-black" style={{ color: "#633806", fontSize: 14, lineHeight: 1.35 }}>
+                Košarica u {results.primary.label}
+              </p>
+              <p style={{ color: "rgba(99,56,6,0.75)", fontSize: 12, marginTop: 2 }}>
+                Ukupno {fmtEur(results.primary.total)}
+                {results.primary.savings > 0
+                  ? ` · ušteda ${fmtEur(results.primary.savings)}`
+                  : ""}
+              </p>
+            </div>
           </div>
 
           <div
-            className="rounded-2xl overflow-hidden"
-            style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+            className="rounded-2xl p-4 mb-4"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
           >
-            {results.rankings.map((row) => {
-              const best = row.isBest;
-              const totalItems = results.itemCount ?? items.length;
-              return (
-                <div
-                  key={row.chain}
-                  className="px-4 py-3.5"
-                  style={{
-                    background: best ? "rgba(0,255,136,0.1)" : "rgba(255,255,255,0.03)",
-                    borderTop: best ? "none" : "1px solid rgba(255,255,255,0.06)",
-                    boxShadow: best ? "inset 0 0 0 1px rgba(0,255,136,0.35)" : "none",
-                  }}
+            <p className="font-bold mb-2" style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
+              TVOJA KOŠARICA
+            </p>
+            <p className="font-black text-white" style={{ fontSize: 22 }}>
+              {fmtEur(results.primary.total)}
+            </p>
+            <p style={{ color: "rgba(0,255,136,0.9)", fontSize: 13, marginTop: 4 }}>
+              {results.primary.savings > 0
+                ? `Ušteda na akcijama: ${fmtEur(results.primary.savings)}`
+                : "Nema dodatne uštede na akcijama u ovoj košarici"}
+            </p>
+            <ul className="mt-3 space-y-2">
+              {results.primary.lines.map((line, idx) => (
+                <li
+                  key={`primary-${idx}-${line.cartName}`}
+                  className="flex items-center justify-between gap-2"
+                  style={{ fontSize: 13 }}
                 >
-                  {best && (
-                    <p
-                      className="font-bold mb-1.5"
-                      style={{ fontSize: 9, color: "#00ff88", letterSpacing: "0.08em" }}
-                    >
-                      NAJBOLJA PONUDA
-                    </p>
+                  <span className="text-white/80 truncate min-w-0 flex-1">
+                    {line.name || line.cartName}
+                  </span>
+                  {line.available ? (
+                    <span className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-white/70 tabular-nums">{fmtEur(line.price)}</span>
+                      <SourceBadge source={line.priceSource} />
+                    </span>
+                  ) : (
+                    <span style={{ color: "#ff6b6b", fontSize: 12 }}>nedostupno</span>
                   )}
-                  <p
-                    className="font-black"
-                    style={{
-                      fontSize: 15,
-                      color: best ? "#00ff88" : "rgba(255,255,255,0.9)",
-                    }}
-                  >
-                    {row.label} — {fmtEur(row.total)}
-                  </p>
-                  <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
-                    {row.found} od {totalItems} stavki
-                    {row.complete ? " · kompletna košarica" : ""}
-                  </p>
-                  {row.items?.length > 0 && (
-                    <div className="flex gap-2 mt-3 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
-                      {row.items.map((product, idx) => (
-                        <CartResultThumb
-                          key={`${row.chain}-${idx}-${product.cartName || ""}-${product.id || product.name}`}
-                          product={product}
-                          onSelect={onProductSelect}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                </li>
+              ))}
+            </ul>
           </div>
 
-          {results.unmatched.length > 0 && (
-            <p className="mt-3 text-center" style={{ color: "rgba(255,255,255,0.35)", fontSize: 11 }}>
-              Nije pronađeno u bazi: {results.unmatched.join(", ")}
-            </p>
-          )}
-        </div>
-      )}
-
-      {results && results.rankings.length === 0 && (
-        <div
-          className="mx-4 mb-8 rounded-2xl p-5 text-center"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
-        >
-          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>
-            Nema podataka za proizvode na listi. Pokušaj drugačije nazive.
-          </p>
-          {results.unmatched.length > 0 && (
-            <p className="mt-2" style={{ color: "rgba(255,255,255,0.3)", fontSize: 12 }}>
-              Nije pronađeno: {results.unmatched.join(", ")}
-            </p>
+          {results.others?.length > 0 && (
+            <div>
+              <p className="font-bold mb-2 px-0.5" style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
+                ISTA KOŠARICA DRUGDJE
+              </p>
+              <div
+                className="rounded-2xl overflow-hidden"
+                style={{ border: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                {results.others.map((row, i) => (
+                  <div
+                    key={row.chain}
+                    className="px-4 py-3.5"
+                    style={{
+                      background: row.complete
+                        ? "rgba(0,255,136,0.06)"
+                        : "rgba(255,255,255,0.03)",
+                      borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)",
+                    }}
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="font-black text-white" style={{ fontSize: 15 }}>
+                        {row.label}
+                      </p>
+                      <p
+                        className="font-bold tabular-nums"
+                        style={{
+                          fontSize: 14,
+                          color: row.complete ? "#00ff88" : "rgba(255,255,255,0.75)",
+                        }}
+                      >
+                        {row.complete || row.missing < results.itemCount
+                          ? fmtEur(row.total)
+                          : "—"}
+                      </p>
+                    </div>
+                    <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                      {row.complete
+                        ? "kompletna košarica"
+                        : `${row.missing} ${row.missing === 1 ? "stavka nedostupna" : "stavke nedostupne"}`}
+                    </p>
+                    <ul className="mt-2 space-y-1">
+                      {row.lines.map((line, idx) => (
+                        <li
+                          key={`${row.chain}-${idx}`}
+                          className="flex justify-between gap-2"
+                          style={{ fontSize: 12 }}
+                        >
+                          <span className="truncate text-white/55 min-w-0">
+                            {line.cartName}
+                          </span>
+                          {line.available ? (
+                            <span className="tabular-nums text-white/70 flex-shrink-0">
+                              {fmtEur(line.price)}
+                            </span>
+                          ) : (
+                            <span className="flex-shrink-0" style={{ color: "#ff6b6b" }}>
+                              nedostupno
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}
