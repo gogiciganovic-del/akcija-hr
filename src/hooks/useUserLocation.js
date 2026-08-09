@@ -23,21 +23,25 @@ function formatLocation(address) {
 
 export function useUserLocation() {
   const [locationLabel, setLocationLabel] = useState(LOADING)
+  const [coords, setCoords] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!navigator.geolocation) {
       setLocationLabel(FALLBACK)
+      setCoords(null)
       setLoading(false)
       return
     }
 
     navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
+      async ({ coords: c }) => {
+        const next = { lat: c.latitude, lng: c.longitude }
+        setCoords(next)
         try {
           const params = new URLSearchParams({
-            lat: String(coords.latitude),
-            lon: String(coords.longitude),
+            lat: String(c.latitude),
+            lon: String(c.longitude),
             format: 'json',
           })
 
@@ -64,11 +68,12 @@ export function useUserLocation() {
       },
       () => {
         setLocationLabel(FALLBACK)
+        setCoords(null)
         setLoading(false)
       },
       { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 }
     )
   }, [])
 
-  return { locationLabel, loading }
+  return { locationLabel, coords, loading }
 }

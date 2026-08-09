@@ -16,24 +16,29 @@ const MIN_SAVINGS_HIGHLIGHT = 0.1;
 
 const CHAIN_OPTIONS = STORES.filter((s) => REGULAR_PRICE_CHAINS.includes(s.id));
 
-/** Grad iz labela tipa "Zagreb, HR". Null ako nema pouzdane lokacije (bez Zagreb/Hrvatska fallbacka). */
-function cityFromLocationLabel(locationLabel, locationLoading) {
-  if (locationLoading) return null;
-  if (!locationLabel) return null;
-  const label = locationLabel.trim();
-  if (!label || label === "Dohvaćam lokaciju..." || label === "Hrvatska") return null;
-  const city = label.split(",")[0]?.trim();
-  if (!city || city === "Hrvatska") return null;
-  return city;
+/**
+ * Google Maps pretraga SAMO za taj lanac.
+ * S GPS: centrira mapu na korisnika (bliže lokacije).
+ * Bez GPS: samo ime lanca — bez grada u queryju (izbjegava "sve u Zagrebu").
+ * Ne prikazuje adresu u app UI.
+ */
+function googleMapsChainUrl(chainLabel, coords) {
+  const chain = String(chainLabel || "").trim();
+  if (!chain) return "https://www.google.com/maps";
+
+  if (
+    coords &&
+    Number.isFinite(coords.lat) &&
+    Number.isFinite(coords.lng)
+  ) {
+    return `https://www.google.com/maps/search/${encodeURIComponent(chain)}/@${coords.lat},${coords.lng},14z`;
+  }
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(chain)}`;
 }
 
-function googleMapsSearchUrl(chainLabel, city) {
-  const query = city ? `${chainLabel} ${city}` : chainLabel;
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-}
-
-function OpenInMapsButton({ chainLabel, city }) {
-  const href = googleMapsSearchUrl(chainLabel, city);
+function OpenInMapsButton({ chainLabel, coords }) {
+  const href = googleMapsChainUrl(chainLabel, coords);
   return (
     <a
       href={href}
@@ -86,8 +91,7 @@ export function CartPage() {
   const inputWrapRef = useRef(null);
   const chainWrapRef = useRef(null);
 
-  const { locationLabel, loading: locationLoading } = useUserLocation();
-  const mapsCity = cityFromLocationLabel(locationLabel, locationLoading);
+  const { coords } = useUserLocation();
 
   const { suggestions } = useProductSuggestions(input, selectedChain);
 
@@ -627,7 +631,7 @@ export function CartPage() {
               ))}
             </ul>
             <div className="mt-3">
-              <OpenInMapsButton chainLabel={results.primary.label} city={mapsCity} />
+              <OpenInMapsButton chainLabel={results.primary.label} coords={coords} />
             </div>
           </div>
 
@@ -672,9 +676,6 @@ export function CartPage() {
                         ? "kompletna košarica"
                         : `${row.missing} ${row.missing === 1 ? "stavka nedostupna" : "stavke nedostupne"}`}
                     </p>
-                    <div className="mt-2">
-                      <OpenInMapsButton chainLabel={row.label} city={mapsCity} />
-                    </div>
                     <ul className="mt-2 space-y-1">
                       {row.lines.map((line, idx) => (
                         <li key={`${row.chain}-${idx}`} className="py-0.5" style={{ fontSize: 12 }}>
