@@ -22,8 +22,17 @@ export function ScanBarcodeButton({ onClick, className = "" }) {
   );
 }
 
+function normalizeBarcodeInput(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function isPlausibleBarcode(digits) {
+  const n = digits.length;
+  return n === 8 || n === 12 || n === 13;
+}
+
 /**
- * Full-screen kamera skener.
+ * Full-screen kamera skener + ručni unos EAN-a (fallback).
  * @param {boolean} open
  * @param {() => void} onClose
  * @param {(barcode: string) => void} onDetected
@@ -31,6 +40,8 @@ export function ScanBarcodeButton({ onClick, className = "" }) {
 export function BarcodeScannerModal({ open, onClose, onDetected }) {
   const [scannerError, setScannerError] = useState(null);
   const [scannerStatus, setScannerStatus] = useState("");
+  const [manualCode, setManualCode] = useState("");
+  const [manualHint, setManualHint] = useState("");
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const rafRef = useRef(null);
@@ -60,8 +71,22 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
     stopCamera();
     setScannerError(null);
     setScannerStatus("");
+    setManualCode("");
+    setManualHint("");
     onClose?.();
   }, [onClose, stopCamera]);
+
+  const submitManual = useCallback(() => {
+    const digits = normalizeBarcodeInput(manualCode);
+    if (!isPlausibleBarcode(digits)) {
+      setManualHint("Unesi EAN-8, UPC (12) ili EAN-13");
+      return;
+    }
+    setManualHint("");
+    scannedLockRef.current = true;
+    stopCamera();
+    onDetectedRef.current?.(digits);
+  }, [manualCode, stopCamera]);
 
   useEffect(() => {
     if (!open) return;
@@ -69,6 +94,8 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
     scannedLockRef.current = false;
     setScannerError(null);
     setScannerStatus("Pokrećem kameru...");
+    setManualCode("");
+    setManualHint("");
 
     if (typeof window === "undefined" || typeof window.BarcodeDetector !== "function") {
       setScannerError("Skeniranje nije podržano na ovom uređaju");
@@ -178,7 +205,7 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
       </div>
 
       <div
-        className="flex-1 relative mx-4 mb-4 rounded-2xl overflow-hidden"
+        className="flex-1 relative mx-4 mb-3 rounded-2xl overflow-hidden min-h-[200px]"
         style={{ background: "#000" }}
       >
         {!scannerError && (
@@ -195,7 +222,7 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
               {scannerError}
             </p>
             <p style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
-              Koristi tekstualnu pretragu ili otvori aplikaciju u Chromeu na Androidu.
+              Unesi barkod ručno ispod ili otvori app u Chromeu na Androidu.
             </p>
           </div>
         ) : (
@@ -213,9 +240,60 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
         )}
       </div>
 
-      <p className="text-center pb-8 px-4" style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>
-        {scannerError ? " " : scannerStatus || " "}
-      </p>
+      {!scannerError && (
+        <p className="text-center px-4 mb-2" style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>
+          {scannerStatus || " "}
+        </p>
+      )}
+
+      <div className="px-4 pb-8">
+        <p className="mb-2" style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
+          Ili unesi barkod ručno
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            value={manualCode}
+            onChange={(e) => {
+              setManualCode(normalizeBarcodeInput(e.target.value).slice(0, 13));
+              setManualHint("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submitManual();
+              }
+            }}
+            placeholder="npr. 3850104012345"
+            className="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-white text-[15px] outline-none tabular-nums"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              fontFamily: "'DM Sans',sans-serif",
+            }}
+          />
+          <button
+            type="button"
+            onClick={submitManual}
+            className="flex-shrink-0 px-4 rounded-xl font-bold"
+            style={{
+              background: "rgba(0,255,136,0.12)",
+              border: "1px solid rgba(0,255,136,0.3)",
+              color: "#00ff88",
+              fontSize: 13,
+            }}
+          >
+            Traži
+          </button>
+        </div>
+        {manualHint ? (
+          <p className="mt-2" style={{ fontSize: 12, color: "rgba(255,107,107,0.9)" }}>
+            {manualHint}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

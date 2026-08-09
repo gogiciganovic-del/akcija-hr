@@ -9,6 +9,9 @@ import { STORES } from "../lib/constants";
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
 
+/** Ispod ovoga ušteda nije hero (izbjegava 0,01 € spektakl) — samo UI, ne dira izračun. */
+const MIN_SAVINGS_HIGHLIGHT = 0.1;
+
 const CHAIN_OPTIONS = STORES.filter((s) => REGULAR_PRICE_CHAINS.includes(s.id));
 
 /** Grad iz labela tipa "Zagreb, HR". Null ako nema pouzdane lokacije (bez Zagreb/Hrvatska fallbacka). */
@@ -162,7 +165,7 @@ export function CartPage() {
 
   const handleShareSavings = useCallback(async () => {
     const primary = results?.primary;
-    if (!primary || !(primary.savings > 0)) return;
+    if (!primary || !((primary.savings ?? 0) >= MIN_SAVINGS_HIGHLIGHT)) return;
 
     const text =
       `Uštedio sam ${fmtEur(primary.savings)} kupujući u ${primary.label} uz Cjenko Akcije! 🛒\n` +
@@ -530,9 +533,6 @@ export function CartPage() {
               </p>
               <p style={{ color: "rgba(99,56,6,0.75)", fontSize: 12, marginTop: 2 }}>
                 Ukupno {fmtEur(results.primary.total)}
-                {results.primary.savings > 0
-                  ? ` · ušteda ${fmtEur(results.primary.savings)}`
-                  : ""}
               </p>
             </div>
           </div>
@@ -547,7 +547,7 @@ export function CartPage() {
             <p className="font-bold mb-2" style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
               TVOJA KOŠARICA
             </p>
-            {results.primary.savings > 0 ? (
+            {(results.primary.savings ?? 0) >= MIN_SAVINGS_HIGHLIGHT ? (
               <>
                 <p style={{ color: "rgba(0,255,136,0.75)", fontSize: 13, marginBottom: 4 }}>
                   Uštedio si!
