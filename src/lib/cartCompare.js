@@ -245,12 +245,14 @@ export async function analyzeChainCart(selectedChain, items) {
       const availableLines = lines.filter((l) => l.available && l.price != null)
       const total = round2(availableLines.reduce((sum, l) => sum + l.price, 0))
       const missing = lines.filter((l) => !l.available).length
+      const found = lines.length - missing
 
       return {
         chain,
         label: STORES.find((s) => s.id === chain)?.label || chain,
         total,
         missing,
+        found,
         complete: missing === 0,
         lines,
       }
@@ -263,6 +265,8 @@ export async function analyzeChainCart(selectedChain, items) {
     return a.total - b.total
   })
 
+  const primaryFound = primaryLines.filter((l) => l.available).length
+
   return {
     selectedChain,
     primary: {
@@ -272,6 +276,7 @@ export async function analyzeChainCart(selectedChain, items) {
       savings: primarySavings,
       lines: primaryLines,
       complete: primaryComplete,
+      found: primaryFound,
     },
     others,
     itemCount: items.length,

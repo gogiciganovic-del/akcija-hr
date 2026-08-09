@@ -15,6 +15,19 @@ const fmtEur = (v) =>
 /** Ispod ovoga ušteda nije hero (izbjegava 0,01 € spektakl) — samo UI, ne dira izračun. */
 const MIN_SAVINGS_HIGHLIGHT = 0.1;
 
+/** Koliko linija ima cijenu — samo za prikaz X od Y. */
+function countFound(lines) {
+  if (!Array.isArray(lines)) return 0;
+  return lines.filter((l) => l?.available && l.price != null).length;
+}
+
+function foundLabel(found, total) {
+  if (!total) return null;
+  if (found >= total) return `Pronađeno ${total} od ${total} · kompletna košarica`;
+  if (found === 0) return `Pronađeno 0 od ${total} · nema pogodaka`;
+  return `Pronađeno ${found} od ${total} · djelomična usporedba`;
+}
+
 const CHAIN_OPTIONS = STORES.filter((s) => REGULAR_PRICE_CHAINS.includes(s.id));
 
 /**
@@ -559,6 +572,16 @@ export function CartPage() {
               <p style={{ color: "rgba(99,56,6,0.75)", fontSize: 12, marginTop: 2 }}>
                 Ukupno {fmtEur(results.primary.total)}
               </p>
+              {(() => {
+                const y = results.itemCount || results.primary.lines?.length || 0;
+                const x = countFound(results.primary.lines);
+                if (!y || x >= y) return null;
+                return (
+                  <p style={{ color: "rgba(99,56,6,0.65)", fontSize: 11, marginTop: 4 }}>
+                    Pronađeno {x} od {y} artikala
+                  </p>
+                );
+              })()}
             </div>
           </div>
 
@@ -650,79 +673,94 @@ export function CartPage() {
 
           {results.others?.length > 0 && (
             <div>
-              <p className="font-bold mb-2 px-0.5" style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
+              <p className="font-bold mb-1 px-0.5" style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
                 ISTA KOŠARICA DRUGDJE
+              </p>
+              <p
+                className="mb-2 px-0.5"
+                style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", lineHeight: 1.4 }}
+              >
+                Zbroj je samo za pronađene artikle (X od {results.itemCount}). Nije cijela košarica
+                ako fali stavka.
               </p>
               <div
                 className="rounded-2xl overflow-hidden"
                 style={{ border: "1px solid rgba(255,255,255,0.08)" }}
               >
-                {results.others.map((row, i) => (
-                  <div
-                    key={row.chain}
-                    className="px-4 py-3.5"
-                    style={{
-                      background: row.complete
-                        ? "rgba(0,255,136,0.06)"
-                        : "rgba(255,255,255,0.03)",
-                      borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)",
-                    }}
-                  >
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className="font-black text-white" style={{ fontSize: 15 }}>
-                        {row.label}
+                {results.others.map((row, i) => {
+                  const y = results.itemCount || row.lines?.length || 0;
+                  const x = countFound(row.lines);
+                  const complete = x >= y && y > 0;
+                  const none = x === 0;
+                  return (
+                    <div
+                      key={row.chain}
+                      className="px-4 py-3.5"
+                      style={{
+                        background: complete
+                          ? "rgba(0,255,136,0.06)"
+                          : "rgba(255,255,255,0.03)",
+                        borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)",
+                      }}
+                    >
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="font-black text-white" style={{ fontSize: 15 }}>
+                          {row.label}
+                        </p>
+                        <p
+                          className="font-bold tabular-nums"
+                          style={{
+                            fontSize: 14,
+                            color: complete
+                              ? "#00ff88"
+                              : none
+                                ? "rgba(255,255,255,0.35)"
+                                : "rgba(255,255,255,0.65)",
+                          }}
+                        >
+                          {none ? "—" : fmtEur(row.total)}
+                        </p>
+                      </div>
+                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                        {foundLabel(x, y)}
+                        {!complete && !none ? " · zbroj pronađenih" : ""}
                       </p>
-                      <p
-                        className="font-bold tabular-nums"
-                        style={{
-                          fontSize: 14,
-                          color: row.complete ? "#00ff88" : "rgba(255,255,255,0.75)",
-                        }}
-                      >
-                        {row.complete || row.missing < results.itemCount
-                          ? fmtEur(row.total)
-                          : "—"}
-                      </p>
-                    </div>
-                    <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
-                      {row.complete
-                        ? "kompletna košarica"
-                        : `${row.missing} ${row.missing === 1 ? "stavka nedostupna" : "stavke nedostupne"}`}
-                    </p>
-                    <ul className="mt-2 space-y-1">
-                      {row.lines.map((line, idx) => (
-                        <li key={`${row.chain}-${idx}`} className="py-0.5" style={{ fontSize: 12 }}>
-                          <div className="flex justify-between gap-2">
-                            <span className="truncate text-white/55 min-w-0">
-                              {line.cartName}
-                            </span>
-                            {line.available ? (
-                              <span className="tabular-nums text-white/70 flex-shrink-0">
-                                {fmtEur(line.price)}
+                      <ul className="mt-2 space-y-1">
+                        {row.lines.map((line, idx) => (
+                          <li key={`${row.chain}-${idx}`} className="py-0.5" style={{ fontSize: 12 }}>
+                            <div className="flex justify-between gap-2">
+                              <span className="truncate text-white/55 min-w-0">
+                                {line.cartName}
                               </span>
-                            ) : (
-                              <span className="flex-shrink-0" style={{ color: "#ff6b6b" }}>
-                                nedostupno
-                              </span>
+                              {line.available ? (
+                                <span className="tabular-nums text-white/70 flex-shrink-0">
+                                  {fmtEur(line.price)}
+                                </span>
+                              ) : (
+                                <span className="flex-shrink-0" style={{ color: "#ff6b6b" }}>
+                                  nedostupno
+                                </span>
+                              )}
+                            </div>
+                            {!line.available && (
+                              <p
+                                className="mt-0.5 pr-1"
+                                style={{
+                                  color: "rgba(255,255,255,0.28)",
+                                  fontSize: 10,
+                                  lineHeight: 1.35,
+                                }}
+                              >
+                                Vlastita marka ili drugačije pakiranje — nema izravne zamjene kod ovog
+                                lanca
+                              </p>
                             )}
-                          </div>
-                          {!line.available && (
-                            <p
-                              className="mt-0.5 pr-1"
-                              style={{
-                                color: "rgba(255,255,255,0.28)",
-                                fontSize: 10,
-                                lineHeight: 1.35,
-                              }}
-                            >
-                              Vlastita marka ili drugačije pakiranje — nema izravne zamjene kod ovog lanca
-                            </p>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
