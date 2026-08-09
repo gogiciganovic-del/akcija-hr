@@ -1,14 +1,53 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Plus, X, Trash2, Loader2, ChevronDown, Share2 } from "lucide-react";
+import { Plus, X, Trash2, Loader2, ChevronDown, Share2, MapPin } from "lucide-react";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { analyzeChainCart, REGULAR_PRICE_CHAINS } from "../lib/cartCompare";
 import { useProductSuggestions } from "../hooks/useProductSuggestions";
+import { useUserLocation } from "../hooks/useUserLocation";
 import { STORES } from "../lib/constants";
 
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
 
 const CHAIN_OPTIONS = STORES.filter((s) => REGULAR_PRICE_CHAINS.includes(s.id));
+
+/** Grad iz labela tipa "Zagreb, HR". Null ako nema pouzdane lokacije (bez Zagreb/Hrvatska fallbacka). */
+function cityFromLocationLabel(locationLabel, locationLoading) {
+  if (locationLoading) return null;
+  if (!locationLabel) return null;
+  const label = locationLabel.trim();
+  if (!label || label === "Dohvaćam lokaciju..." || label === "Hrvatska") return null;
+  const city = label.split(",")[0]?.trim();
+  if (!city || city === "Hrvatska") return null;
+  return city;
+}
+
+function googleMapsSearchUrl(chainLabel, city) {
+  const query = city ? `${chainLabel} ${city}` : chainLabel;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function OpenInMapsButton({ chainLabel, city }) {
+  const href = googleMapsSearchUrl(chainLabel, city);
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold"
+      style={{
+        background: "rgba(255,255,255,0.06)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        color: "rgba(255,255,255,0.85)",
+        fontSize: 12,
+        textDecoration: "none",
+      }}
+    >
+      <MapPin size={13} />
+      Otvori u Google Maps
+    </a>
+  );
+}
 
 function SourceBadge({ source }) {
   const isRegular = source === "regular";
@@ -40,6 +79,9 @@ export function CartPage() {
   const inputRef = useRef(null);
   const inputWrapRef = useRef(null);
   const chainWrapRef = useRef(null);
+
+  const { locationLabel, loading: locationLoading } = useUserLocation();
+  const mapsCity = cityFromLocationLabel(locationLabel, locationLoading);
 
   const { suggestions } = useProductSuggestions(input, selectedChain);
 
@@ -552,6 +594,9 @@ export function CartPage() {
                 </li>
               ))}
             </ul>
+            <div className="mt-3">
+              <OpenInMapsButton chainLabel={results.primary.label} city={mapsCity} />
+            </div>
           </div>
 
           {results.others?.length > 0 && (
@@ -595,6 +640,9 @@ export function CartPage() {
                         ? "kompletna košarica"
                         : `${row.missing} ${row.missing === 1 ? "stavka nedostupna" : "stavke nedostupne"}`}
                     </p>
+                    <div className="mt-2">
+                      <OpenInMapsButton chainLabel={row.label} city={mapsCity} />
+                    </div>
                     <ul className="mt-2 space-y-1">
                       {row.lines.map((line, idx) => (
                         <li key={`${row.chain}-${idx}`} className="py-0.5" style={{ fontSize: 12 }}>
