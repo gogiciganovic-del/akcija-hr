@@ -3,6 +3,7 @@ import { Trash2, Share2 } from "lucide-react";
 import { ProductCard } from "../components/ProductCard";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { CjenkoShrug } from "../components/CjenkoShrug";
+import { isExpiringTodayProduct } from "../lib/dealDates";
 
 const fmtEur = (v) =>
   (Number.isFinite(v) ? v : 0).toLocaleString("hr-HR", {
@@ -130,6 +131,14 @@ export function FavoritesPage({
   const items = [...favorites.values()];
   const hasItems = items.length > 0;
   const [shareFeedback, setShareFeedback] = useState(null);
+  const expiringToday = items.filter((p) => isExpiringTodayProduct(p));
+  const expiringCount = expiringToday.length;
+  const expiringHint =
+    expiringCount === 0
+      ? null
+      : expiringCount === 1
+        ? "1 favorit ističe danas"
+        : `${expiringCount} favorita ističu danas`;
 
   const handleShareSavings = useCallback(async () => {
     const saved = totalSavings(items);
@@ -200,6 +209,20 @@ export function FavoritesPage({
               : `${items.length} spremljenih akcija`
             : "Nema spremljenih akcija"}
         </p>
+        {expiringHint && (
+          <p
+            className="mt-2 px-3 py-1.5 rounded-xl"
+            style={{
+              fontSize: 11,
+              color: "rgba(239,159,39,0.9)",
+              background: "rgba(239,159,39,0.08)",
+              border: "1px solid rgba(239,159,39,0.18)",
+              lineHeight: 1.35,
+            }}
+          >
+            {expiringHint}
+          </p>
+        )}
       </div>
 
       {hasItems ? (
@@ -214,15 +237,33 @@ export function FavoritesPage({
 
       {hasItems ? (
         <div className="grid grid-cols-2 gap-2.5 px-4 pb-8">
-          {items.map((p) => (
-            <ProductCard
-              key={p.id}
-              product={p}
-              isFavorite
-              onToggleFavorite={onToggleFavorite}
-              onClick={() => onProductSelect(p)}
-            />
-          ))}
+          {items.map((p) => {
+            const expiring = isExpiringTodayProduct(p);
+            return (
+              <div key={p.id} className="relative">
+                {expiring && (
+                  <span
+                    className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded font-semibold"
+                    style={{
+                      fontSize: 8,
+                      letterSpacing: "0.04em",
+                      color: "rgba(239,159,39,0.95)",
+                      background: "rgba(2,6,23,0.72)",
+                      border: "1px solid rgba(239,159,39,0.25)",
+                    }}
+                  >
+                    Danas
+                  </span>
+                )}
+                <ProductCard
+                  product={p}
+                  isFavorite
+                  onToggleFavorite={onToggleFavorite}
+                  onClick={() => onProductSelect(p)}
+                />
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="px-6 pb-8 text-center">
