@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS products (
   brand       text,
   category    text NOT NULL,
   image_url   text,
+  barcode     text,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS deals (
   valid_from      timestamptz NOT NULL DEFAULT now(),
   valid_until     timestamptz NOT NULL,
   is_active       boolean NOT NULL DEFAULT true,
+  scraped_at      timestamptz,
   created_at      timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT deals_price_lt_original CHECK (price <= original_price)
 );
@@ -72,6 +74,7 @@ SELECT
   p.id              AS product_id,
   p.name,
   p.brand,
+  p.barcode,
   s.name            AS store_name,
   p.category,
   d.original_price,
@@ -80,7 +83,8 @@ SELECT
   p.image_url,
   d.valid_from,
   d.valid_until,
-  d.created_at
+  d.created_at,
+  d.scraped_at
 FROM deals d
 JOIN products p ON p.id = d.product_id
 JOIN stores s   ON s.id = d.store_id
