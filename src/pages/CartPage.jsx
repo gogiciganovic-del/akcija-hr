@@ -547,31 +547,49 @@ export function CartPage() {
             <p className="font-bold mb-2" style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
               TVOJA KOŠARICA
             </p>
-            <p className="font-black text-white" style={{ fontSize: 22 }}>
-              {fmtEur(results.primary.total)}
-            </p>
-            <p style={{ color: "rgba(0,255,136,0.9)", fontSize: 13, marginTop: 4 }}>
-              {results.primary.savings > 0
-                ? `Ušteda na akcijama: ${fmtEur(results.primary.savings)}`
-                : "Nema dodatne uštede na akcijama u ovoj košarici"}
-            </p>
-            {results.primary.savings > 0 && (
-              <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={handleShareSavings}
-                  className="w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2"
-                  style={{
-                    background: "rgba(0,255,136,0.1)",
-                    border: "1px solid rgba(0,255,136,0.28)",
-                    color: "#00ff88",
-                    fontSize: 13,
-                  }}
+            {results.primary.savings > 0 ? (
+              <>
+                <p style={{ color: "rgba(0,255,136,0.75)", fontSize: 13, marginBottom: 4 }}>
+                  Uštedio si!
+                </p>
+                <p
+                  className="font-black tabular-nums"
+                  style={{ color: "#00ff88", fontSize: 34, letterSpacing: "-0.03em", lineHeight: 1.1 }}
                 >
-                  <Share2 size={15} />
-                  {shareFeedback || "Podijeli uštedu"}
-                </button>
-              </div>
+                  {fmtEur(results.primary.savings)}
+                </p>
+                <p
+                  className="tabular-nums"
+                  style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginTop: 6 }}
+                >
+                  Ukupno {fmtEur(results.primary.total)}
+                </p>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={handleShareSavings}
+                    className="w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2"
+                    style={{
+                      background: "rgba(0,255,136,0.1)",
+                      border: "1px solid rgba(0,255,136,0.28)",
+                      color: "#00ff88",
+                      fontSize: 13,
+                    }}
+                  >
+                    <Share2 size={15} />
+                    {shareFeedback || "Podijeli uštedu"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="font-black text-white tabular-nums" style={{ fontSize: 22 }}>
+                  {fmtEur(results.primary.total)}
+                </p>
+                <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, marginTop: 4 }}>
+                  Nema dodatne uštede na akcijama u ovoj košarici
+                </p>
+              </>
             )}
             <ul className="mt-3 space-y-2">
               {results.primary.lines.map((line, idx) => (
