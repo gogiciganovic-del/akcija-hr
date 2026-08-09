@@ -1,10 +1,12 @@
 import { X, Heart } from "lucide-react";
 import { usePriceHistory } from "../hooks/usePriceHistory";
+import { PRICE_DISCLAIMER, productDateLabel } from "../lib/priceTrust";
 
 const fmt = (v) => v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
 
 export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFavorite }) {
   const { history, loading } = usePriceHistory(product?.product_id);
+  const dateLabel = productDateLabel(product);
 
   if (!isOpen || !product) return null;
 
@@ -74,6 +76,15 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
               -{product.discount}%
             </div>
           </div>
+
+          {dateLabel && (
+            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginBottom: 8 }}>
+              {dateLabel}
+            </p>
+          )}
+          <p style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.45, marginBottom: 16 }}>
+            {PRICE_DISCLAIMER}
+          </p>
 
           {product.description && (
             <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6, marginBottom: 20 }}>

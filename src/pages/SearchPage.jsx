@@ -10,6 +10,7 @@ import { enqueueCartAdd } from "../lib/cartDraft";
 import { loadScanHistory, pushScanHistory, clearScanHistory } from "../lib/scanHistory";
 import { chainFromStoreName } from "../lib/constants";
 import { productPlaceholderDataUri } from "../lib/productImage";
+import { PRICE_DISCLAIMER, productDateLabel } from "../lib/priceTrust";
 
 function highlight(text, query) {
   if (!query) return text;
@@ -26,17 +27,11 @@ function highlight(text, query) {
   );
 }
 
-const fmt = (v) =>
-  (Number.isFinite(v) ? v : 0).toLocaleString("hr-HR", {
+function fmt(v) {
+  return (Number.isFinite(v) ? v : 0).toLocaleString("hr-HR", {
     style: "currency",
     currency: "EUR",
   });
-
-function formatDateLabel(iso) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("hr-HR", { day: "numeric", month: "short" });
 }
 
 function SourceBadge({ source }) {
@@ -84,8 +79,7 @@ function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta 
   const showStrike =
     !isRegular && Number.isFinite(p.originalPrice) && p.originalPrice > p.salePrice;
   const showDiscount = !isRegular && (p.discount ?? 0) > 0;
-  const until = formatDateLabel(p.validUntil);
-  const scraped = formatDateLabel(p.scrapedAt);
+  const dateLabel = showMeta ? productDateLabel(p) : null;
 
   return (
     <div
@@ -126,15 +120,9 @@ function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta 
             {storeLabel}
           </p>
         )}
-        {showMeta && (until || scraped || p.expiresIn) && (
+        {dateLabel && (
           <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 9, marginBottom: 4 }}>
-            {until
-              ? `Akcija do ${until}`
-              : p.expiresIn
-                ? `Još ${p.expiresIn}`
-                : scraped
-                  ? `Ažurirano ${scraped}`
-                  : null}
+            {dateLabel}
           </p>
         )}
         <div className="flex items-center gap-2">
@@ -471,7 +459,7 @@ export function SearchPage({
                 className="mb-2"
                 style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", lineHeight: 1.45 }}
               >
-                Cijene iz baze — provjeri na polici. Akcije mogu ovisiti o trgovini i roku.
+                {PRICE_DISCLAIMER} Akcije mogu ovisiti o trgovini i roku.
               </p>
               <div className="flex gap-2 mb-3 flex-wrap">
                 <button
@@ -675,6 +663,15 @@ export function SearchPage({
             </button>
           </div>
 
+          {!loading && results.length > 0 && (
+            <p
+              className="mb-3"
+              style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", lineHeight: 1.45 }}
+            >
+              {PRICE_DISCLAIMER}
+            </p>
+          )}
+
           {!loading && results.length === 0 ? (
             <div className="py-10 text-center">
               <div className="text-5xl mb-4 opacity-40">🔍</div>
@@ -705,6 +702,7 @@ export function SearchPage({
                   p={p}
                   highlightQuery={query}
                   onSelect={onProductSelect}
+                  showMeta
                 />
               ))}
             </div>

@@ -6,6 +6,7 @@ import { useProductSuggestions } from "../hooks/useProductSuggestions";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { STORES } from "../lib/constants";
 import { loadCartDraft, saveCartDraft } from "../lib/cartDraft";
+import { PRICE_DISCLAIMER } from "../lib/priceTrust";
 
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -553,6 +554,12 @@ export function CartPage() {
           >
             <p className="font-bold mb-2" style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
               TVOJA KOŠARICA
+            </p>
+            <p
+              className="mb-3"
+              style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", lineHeight: 1.45 }}
+            >
+              {PRICE_DISCLAIMER} Ušteda ovisi o trenutnim akcijama u bazi.
             </p>
             {(results.primary.savings ?? 0) >= MIN_SAVINGS_HIGHLIGHT ? (
               <>
