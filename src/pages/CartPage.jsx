@@ -536,22 +536,32 @@ export function CartPage() {
                     </p>
                     <ul className="mt-2 space-y-1">
                       {row.lines.map((line, idx) => (
-                        <li
-                          key={`${row.chain}-${idx}`}
-                          className="flex justify-between gap-2"
-                          style={{ fontSize: 12 }}
-                        >
-                          <span className="truncate text-white/55 min-w-0">
-                            {line.cartName}
-                          </span>
-                          {line.available ? (
-                            <span className="tabular-nums text-white/70 flex-shrink-0">
-                              {fmtEur(line.price)}
+                        <li key={`${row.chain}-${idx}`} className="py-0.5" style={{ fontSize: 12 }}>
+                          <div className="flex justify-between gap-2">
+                            <span className="truncate text-white/55 min-w-0">
+                              {line.cartName}
                             </span>
-                          ) : (
-                            <span className="flex-shrink-0" style={{ color: "#ff6b6b" }}>
-                              nedostupno
-                            </span>
+                            {line.available ? (
+                              <span className="tabular-nums text-white/70 flex-shrink-0">
+                                {fmtEur(line.price)}
+                              </span>
+                            ) : (
+                              <span className="flex-shrink-0" style={{ color: "#ff6b6b" }}>
+                                nedostupno
+                              </span>
+                            )}
+                          </div>
+                          {!line.available && (
+                            <p
+                              className="mt-0.5 pr-1"
+                              style={{
+                                color: "rgba(255,255,255,0.28)",
+                                fontSize: 10,
+                                lineHeight: 1.35,
+                              }}
+                            >
+                              Vlastita marka ili drugačije pakiranje — nema izravne zamjene kod ovog lanca
+                            </p>
                           )}
                         </li>
                       ))}
