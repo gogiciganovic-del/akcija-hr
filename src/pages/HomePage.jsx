@@ -317,12 +317,25 @@ export function HomePage({
           </div>
           <ScanBarcodeButton onClick={() => setScannerOpen(true)} />
         </div>
-        <p
-          className="mx-4 mb-3"
-          style={{ color: "rgba(255,255,255,0.28)", fontSize: 11, lineHeight: 1.4 }}
-        >
-          Skeniraj proizvod u trgovini i vidi cijenu u svim lancima
-        </p>
+        <div className="mx-4 mb-3">
+          <p
+            className="font-bold mb-1.5"
+            style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, letterSpacing: "0.06em" }}
+          >
+            KAKO RADI CJENKO
+          </p>
+          <ol className="m-0 p-0 list-none flex flex-col gap-1">
+            <li style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.35 }}>
+              1. Skeniraj ili potraži proizvod
+            </li>
+            <li style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.35 }}>
+              2. Usporedi cijene u lancima
+            </li>
+            <li style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.35 }}>
+              3. Dodaj u košaricu i vidi uštedu
+            </li>
+          </ol>
+        </div>
       </header>
 
       <BarcodeScannerModal
