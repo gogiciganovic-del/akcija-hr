@@ -1,7 +1,8 @@
 import { supabase } from "./supabase";
 import { adaptDeal, adaptRegularPrice } from "./adapters";
-import { chainFromStoreName } from "./constants";
+import { chainFromStoreName, CHAINS } from "./constants";
 import { productPlaceholderDataUri } from "./productImage";
+import { fetchOpenFoodFactsProduct } from "./openFoodFacts";
 
 /** Normalizacija naziva za usporedbu (trim, lower, bez dijakritika, bez suvišne interpunkcije). */
 export function normalizeProductName(name) {
@@ -78,6 +79,7 @@ function pushSaleResult(results, found, chain, code, i) {
     ...adapted,
     id: `scan-sale-${chain}-${code}-${i}`,
     chain,
+    barcode: code,
     priceSource: "sale",
     saleMatch: found.match,
     image: adapted.image || productPlaceholderDataUri(adapted.name, 80),
@@ -85,15 +87,104 @@ function pushSaleResult(results, found, chain, code, i) {
 }
 
 /**
- * Lookup po barkodu:
- * 1) active_deals po točnom barkodu (kad je povezan u bazi)
- * 2) regular_prices po barkodu
- * 3) za lance bez akcijskog barkoda — stari fallback (naziv exact/soft)
- * Ako nema ništa — [].
+ * Pretraga naših cijena po nazivu (OFF identifikacija → naše cijene).
+ * Cijene isključivo iz active_deals / regular_prices.
+ */
+async function searchPricesByName(offName, barcode) {
+  const name = String(offName || "").trim();
+  if (name.length < 3) return [];
+
+  const norm = normalizeProductName(name);
+  const words = norm.split(" ").filter((w) => w.length >= 2).slice(0, 4);
+  const needle = escapeIlike(words.join(" ") || name.slice(0, 40));
+  if (needle.length < 3) return [];
+
+  const pattern = `%${needle}%`;
+  const code = String(barcode || "").trim();
+
+  const [saleRes, regRes] = await Promise.all([
+    supabase
+      .from("active_deals")
+      .select(DEAL_COLS)
+      .ilike("name", pattern)
+      .order("price", { ascending: true })
+      .limit(80),
+    supabase
+      .from("regular_prices")
+      .select("barcode, name, brand, chain, price, category, special_price")
+      .ilike("name", pattern)
+      .order("price", { ascending: true })
+      .limit(80),
+  ]);
+
+  if (saleRes.error) throw saleRes.error;
+  if (regRes.error) throw regRes.error;
+
+  /** @type {Map<string, object>} */
+  const bestByChain = new Map();
+  let i = 0;
+
+  for (const row of saleRes.data || []) {
+    const chain = chainFromStoreName(row.store_name);
+    if (!chain || !CHAINS.includes(chain)) continue;
+    const price = parseFloat(row.price);
+    if (Number.isNaN(price)) continue;
+    // Zahtijevaj da barem 2 riječi iz OFF naziva postoje u našem nazivu (manje lažnih pogodaka)
+    const rowNorm = normalizeProductName(row.name);
+    const hitWords = words.filter((w) => rowNorm.includes(w));
+    if (words.length >= 2 && hitWords.length < 2) continue;
+    if (words.length === 1 && hitWords.length < 1) continue;
+
+    if (bestByChain.has(chain)) continue;
+    const adapted = adaptDeal(row);
+    bestByChain.set(chain, {
+      ...adapted,
+      id: `scan-off-sale-${chain}-${code}-${i++}`,
+      chain,
+      barcode: code || adapted.barcode || null,
+      priceSource: "sale",
+      saleMatch: "off_name",
+      image: adapted.image || productPlaceholderDataUri(adapted.name, 80),
+    });
+  }
+
+  for (const row of regRes.data || []) {
+    const chain = row.chain;
+    if (!chain || !CHAINS.includes(chain)) continue;
+    if (bestByChain.has(chain)) continue;
+    const price = parseFloat(row.price);
+    if (Number.isNaN(price)) continue;
+
+    const rowNorm = normalizeProductName(row.name);
+    const hitWords = words.filter((w) => rowNorm.includes(w));
+    if (words.length >= 2 && hitWords.length < 2) continue;
+    if (words.length === 1 && hitWords.length < 1) continue;
+
+    const adapted = adaptRegularPrice(row);
+    bestByChain.set(chain, {
+      ...adapted,
+      id: `scan-off-regular-${chain}-${code}-${i++}`,
+      chain,
+      barcode: code || row.barcode || null,
+      priceSource: "regular",
+      saleMatch: null,
+      image: productPlaceholderDataUri(row.name, 80),
+    });
+  }
+
+  return [...bestByChain.values()];
+}
+
+/**
+ * Lookup po barkodu.
+ * 1) Naša baza (active_deals + regular_prices po EAN)
+ * 2) Ako nema — Open Food Facts (samo ime/brand/slika) + pretraga naših cijena po imenu
+ *
+ * @returns {Promise<{ prices: object[], offIdentity: { name: string, brand: string|null, imageUrl: string|null } | null }>}
  */
 export async function lookupByBarcode(barcode) {
   const code = String(barcode || "").trim();
-  if (!code) return [];
+  if (!code) return { prices: [], offIdentity: null };
 
   const [saleRes, regRes] = await Promise.all([
     supabase
@@ -124,43 +215,56 @@ export async function lookupByBarcode(barcode) {
   }
 
   const regRows = regRes.data || [];
-  if (!saleByBarcodeChain.size && !regRows.length) return [];
 
-  const results = [];
-  const seenChains = new Set();
-  let i = 0;
+  if (saleByBarcodeChain.size || regRows.length) {
+    const results = [];
+    const seenChains = new Set();
+    let i = 0;
 
-  for (const row of regRows) {
-    const chain = row.chain;
-    seenChains.add(chain);
-    const byBarcode = saleByBarcodeChain.get(chain);
+    for (const row of regRows) {
+      const chain = row.chain;
+      seenChains.add(chain);
+      const byBarcode = saleByBarcodeChain.get(chain);
 
-    if (byBarcode) {
-      pushSaleResult(results, byBarcode, chain, code, i++);
-      continue;
+      if (byBarcode) {
+        pushSaleResult(results, byBarcode, chain, code, i++);
+        continue;
+      }
+
+      const exactName = (row.name || "").trim();
+      const found = exactName ? await findSaleForChain(exactName, chain) : null;
+
+      if (found) {
+        pushSaleResult(results, found, chain, code, i++);
+      } else {
+        const adapted = adaptRegularPrice(row);
+        results.push({
+          ...adapted,
+          id: `scan-regular-${chain}-${code}-${i++}`,
+          barcode: code,
+          saleMatch: null,
+          image: productPlaceholderDataUri(row.name, 80),
+        });
+      }
     }
 
-    const exactName = (row.name || "").trim();
-    const found = exactName ? await findSaleForChain(exactName, chain) : null;
-
-    if (found) {
+    for (const [chain, found] of saleByBarcodeChain) {
+      if (seenChains.has(chain)) continue;
       pushSaleResult(results, found, chain, code, i++);
-    } else {
-      const adapted = adaptRegularPrice(row);
-      results.push({
-        ...adapted,
-        id: `scan-regular-${chain}-${code}-${i++}`,
-        saleMatch: null,
-        image: productPlaceholderDataUri(row.name, 80),
-      });
     }
+
+    return { prices: results, offIdentity: null };
   }
 
-  // Akcije povezane barkodom u lancima bez retka u regular_prices
-  for (const [chain, found] of saleByBarcodeChain) {
-    if (seenChains.has(chain)) continue;
-    pushSaleResult(results, found, chain, code, i++);
-  }
+  // Lokalni EAN miss → OFF identifikacija (bez cijena iz OFF-a)
+  const off = await fetchOpenFoodFactsProduct(code);
+  if (!off) return { prices: [], offIdentity: null };
 
-  return results;
+  try {
+    const prices = await searchPricesByName(off.name, code);
+    return { prices, offIdentity: off };
+  } catch {
+    // Naša pretraga pala — barem pokaži OFF identitet
+    return { prices: [], offIdentity: off };
+  }
 }

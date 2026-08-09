@@ -215,6 +215,8 @@ export function SearchPage({
   const [scanBarcode, setScanBarcode] = useState(null);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanNotFound, setScanNotFound] = useState(false);
+  /** OFF identifikacija (naziv/brand/slika) — nikad cijena iz OFF-a */
+  const [scanOffIdentity, setScanOffIdentity] = useState(null);
   const [scanSort, setScanSort] = useState("price_asc");
   const [scanSaleOnly, setScanSaleOnly] = useState(false);
   const [history, setHistory] = useState(() => loadScanHistory());
@@ -229,29 +231,44 @@ export function SearchPage({
     setScanLoading(true);
     setScanNotFound(false);
     setScanResults(null);
+    setScanOffIdentity(null);
     setScanBarcode(code);
     setQuery("");
     setScanSaleOnly(false);
     setScanSort("price_asc");
     try {
-      const list = await lookupByBarcode(code);
-      if (!list.length) {
-        setScanNotFound(true);
-        setScanResults([]);
-        setHistory(pushScanHistory({ barcode: code, found: false }));
-      } else {
+      const { prices, offIdentity } = await lookupByBarcode(code);
+      setScanOffIdentity(offIdentity || null);
+
+      if (prices.length) {
         setScanNotFound(false);
-        setScanResults(list);
+        setScanResults(prices);
         setHistory(
           pushScanHistory({
             barcode: code,
-            name: list[0]?.name || null,
+            name: offIdentity?.name || prices[0]?.name || null,
             found: true,
           })
         );
+      } else if (offIdentity) {
+        // Znamo proizvod (OFF), nemamo naše cijene
+        setScanNotFound(false);
+        setScanResults([]);
+        setHistory(
+          pushScanHistory({
+            barcode: code,
+            name: offIdentity.name,
+            found: false,
+          })
+        );
+      } else {
+        setScanNotFound(true);
+        setScanResults([]);
+        setHistory(pushScanHistory({ barcode: code, found: false }));
       }
     } catch {
       setScanNotFound(true);
+      setScanOffIdentity(null);
       setScanResults([]);
       setHistory(pushScanHistory({ barcode: code, found: false }));
     } finally {
@@ -356,8 +373,18 @@ export function SearchPage({
     setScanResults(null);
     setScanBarcode(null);
     setScanNotFound(false);
+    setScanOffIdentity(null);
     setScanLoading(false);
     setScanSaleOnly(false);
+  };
+
+  const searchOffName = () => {
+    const name = scanOffIdentity?.name || "";
+    clearScan();
+    if (name) {
+      setQuery(name);
+      inputRef.current?.focus();
+    }
   };
 
   const loading = saleLoading || regularLoading;
@@ -375,7 +402,10 @@ export function SearchPage({
   const results =
     catFilter !== "Sve" ? merged.filter((p) => p.category === catFilter) : merged;
 
-  const showingScan = scanResults !== null || scanLoading || scanNotFound;
+  const showingScan =
+    scanResults !== null || scanLoading || scanNotFound || !!scanOffIdentity;
+  const scanIdentifiedNoPrice =
+    !scanLoading && !!scanOffIdentity && (scanResults || []).length === 0 && !scanNotFound;
   const scanFiltered = scanSaleOnly
     ? (scanResults || []).filter((p) => p.priceSource === "sale")
     : scanResults || [];
@@ -494,6 +524,45 @@ export function SearchPage({
             </button>
           </div>
 
+          {!scanLoading && scanOffIdentity && (
+            <div
+              className="flex items-center gap-3 mb-3 rounded-2xl px-3 py-2.5"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              {scanOffIdentity.imageUrl ? (
+                <img
+                  src={scanOffIdentity.imageUrl}
+                  alt=""
+                  className="w-12 h-12 rounded-xl object-contain flex-shrink-0"
+                  style={{ background: "rgba(255,255,255,0.06)" }}
+                />
+              ) : (
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-xl opacity-40"
+                  style={{ background: "rgba(255,255,255,0.06)" }}
+                >
+                  📦
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-white truncate" style={{ fontSize: 14 }}>
+                  {scanOffIdentity.name}
+                </p>
+                {scanOffIdentity.brand && (
+                  <p className="truncate" style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+                    {scanOffIdentity.brand}
+                  </p>
+                )}
+                <p style={{ fontSize: 10, color: "rgba(255,255,255,0.28)", marginTop: 2 }}>
+                  Identificirano (Open Food Facts) · cijene samo iz Cjenka
+                </p>
+              </div>
+            </div>
+          )}
+
           {!scanLoading && !scanNotFound && (scanResults || []).length > 0 && (
             <>
               <p
@@ -582,6 +651,51 @@ export function SearchPage({
                   }}
                 >
                   Traži po nazivu
+                </button>
+              </div>
+            </div>
+          ) : scanIdentifiedNoPrice ? (
+            <div className="py-6 text-center">
+              <p
+                className="font-bold mb-2 px-2"
+                style={{ fontSize: 15, color: "rgba(255,255,255,0.55)", lineHeight: 1.45 }}
+              >
+                {scanOffIdentity.name} — nemamo cijene za ovaj proizvod
+              </p>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.28)",
+                  lineHeight: 1.6,
+                  marginBottom: 16,
+                }}
+              >
+                Znamo što je skenirano, ali u našoj bazi nema cijene za taj artikl.
+              </p>
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  type="button"
+                  onClick={searchOffName}
+                  className="px-5 py-2.5 rounded-2xl font-bold text-sm"
+                  style={{
+                    background: "rgba(0,255,136,0.1)",
+                    border: "1px solid rgba(0,255,136,0.2)",
+                    color: "#00ff88",
+                  }}
+                >
+                  Potraži po imenu
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScannerOpen(true)}
+                  className="px-5 py-2.5 rounded-2xl font-bold text-sm"
+                  style={{
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "rgba(255,255,255,0.55)",
+                  }}
+                >
+                  Skeniraj / unesi ponovo
                 </button>
               </div>
             </div>
