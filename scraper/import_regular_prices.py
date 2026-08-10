@@ -21,6 +21,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
 
+from quantity_parse import enrich_from_name
+
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT.parent / ".env")
 load_dotenv(ROOT / ".env")
@@ -126,6 +128,7 @@ def aggregate_chain(chain_slug: str, chain_dir: Path) -> list[dict]:
     rows = []
     for item in best.values():
         item.pop("_price", None)
+        item.update(enrich_from_name(item.get("name")))
         rows.append(item)
     return rows
 
