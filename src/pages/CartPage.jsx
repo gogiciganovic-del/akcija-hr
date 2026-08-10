@@ -34,7 +34,7 @@ function foundLabel(found, total) {
 }
 
 /** Diskretna oznaka pouzdanosti uparivanja — samo UI. */
-function MatchByHint({ matchedBy, productTypeLabel }) {
+function MatchByHint({ matchedBy, productTypeLabel, unitLabel }) {
   if (matchedBy === "barcode") {
     return (
       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)", flexShrink: 0 }}>
@@ -50,9 +50,10 @@ function MatchByHint({ matchedBy, productTypeLabel }) {
     );
   }
   if (matchedBy === "type_unit") {
+    const u = unitLabel === "L" ? "€/L" : "€/kg";
     return (
       <span style={{ fontSize: 10, color: "rgba(239,159,39,0.75)", flexShrink: 0 }}>
-        sličan {productTypeLabel || "tip"} · €/kg
+        sličan {productTypeLabel || "tip"} · {u}
       </span>
     );
   }
