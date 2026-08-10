@@ -11,6 +11,11 @@ import { loadScanHistory, pushScanHistory, clearScanHistory } from "../lib/scanH
 import { chainFromStoreName } from "../lib/constants";
 import { productPlaceholderDataUri } from "../lib/productImage";
 import { PRICE_DISCLAIMER, productDateLabel } from "../lib/priceTrust";
+import {
+  parseQuantityFromName,
+  pricePerBaseUnit,
+  formatPricePerUnit,
+} from "../lib/quantityParse";
 
 function highlight(text, query) {
   if (!query) return text;
@@ -70,6 +75,22 @@ function sortProducts(list, sortMode) {
   return copy;
 }
 
+function unitPriceLabel(p) {
+  const price = p.salePrice ?? p.price;
+  let qv = p.quantity_value ?? p.quantityValue;
+  let qu = p.quantity_unit ?? p.quantityUnit;
+  if (qv == null || !qu) {
+    const parsed = parseQuantityFromName(p.name);
+    if (parsed) {
+      qv = parsed.value;
+      qu = parsed.unit;
+    }
+  }
+  const per = pricePerBaseUnit(price, qv, qu);
+  if (!per) return null;
+  return formatPricePerUnit(per.perUnit, per.unitLabel);
+}
+
 function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta, isCheapest }) {
   const isRegular = p.priceSource === "regular";
   const storeLabel = p.chain ?? chainFromStoreName(p.store);
@@ -80,6 +101,7 @@ function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta,
     !isRegular && Number.isFinite(p.originalPrice) && p.originalPrice > p.salePrice;
   const showDiscount = !isRegular && (p.discount ?? 0) > 0;
   const dateLabel = showMeta ? productDateLabel(p) : null;
+  const perUnit = unitPriceLabel(p);
 
   return (
     <div
@@ -156,6 +178,11 @@ function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta,
             <p className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>
               {fmt(p.salePrice)}
             </p>
+            {perUnit && (
+              <p style={{ color: "rgba(255,255,255,0.38)", fontSize: 10, marginTop: 1 }}>
+                {perUnit}
+              </p>
+            )}
           </div>
           {showDiscount && (
             <div

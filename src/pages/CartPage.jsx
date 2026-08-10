@@ -8,6 +8,11 @@ import { STORES } from "../lib/constants";
 import { loadCartDraft, saveCartDraft } from "../lib/cartDraft";
 import { enrichItemsWithBarcodes, resolveUniqueBarcode } from "../lib/resolveCartBarcode";
 import { PRICE_DISCLAIMER } from "../lib/priceTrust";
+import {
+  parseQuantityFromName,
+  pricePerBaseUnit,
+  formatPricePerUnit,
+} from "../lib/quantityParse";
 
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -45,6 +50,22 @@ function MatchByHint({ matchedBy }) {
     );
   }
   return null;
+}
+
+/** Diskretni €/kg ili €/L uz cijenu — samo UI. */
+function unitPriceHint(name, price, quantityValue, quantityUnit) {
+  let qv = quantityValue;
+  let qu = quantityUnit;
+  if (qv == null || !qu) {
+    const parsed = parseQuantityFromName(name);
+    if (parsed) {
+      qv = parsed.value;
+      qu = parsed.unit;
+    }
+  }
+  const per = pricePerBaseUnit(price, qv, qu);
+  if (!per) return null;
+  return formatPricePerUnit(per.perUnit, per.unitLabel);
 }
 
 const CHAIN_OPTIONS = STORES.filter((s) => REGULAR_PRICE_CHAINS.includes(s.id));
@@ -498,7 +519,9 @@ export function CartPage() {
 
       {items.length > 0 && (
         <ul className="px-4 mb-4 space-y-2">
-          {items.map((item) => (
+          {items.map((item) => {
+            const perHint = unitPriceHint(item.name, item.price);
+            return (
             <li
               key={item.id}
               className="flex items-center justify-between gap-2 rounded-xl px-3.5 py-2.5"
@@ -511,10 +534,15 @@ export function CartPage() {
                 <p className="text-white font-medium truncate" style={{ fontSize: 14 }}>
                   {item.name}
                 </p>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
                     {fmtEur(item.price)}
                   </span>
+                  {perHint && (
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.32)" }}>
+                      {perHint}
+                    </span>
+                  )}
                   <SourceBadge source={item.priceSource} />
                 </div>
               </div>
@@ -528,7 +556,8 @@ export function CartPage() {
                 <X size={14} style={{ color: "rgba(255,255,255,0.5)" }} />
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
@@ -665,7 +694,11 @@ export function CartPage() {
               </>
             )}
             <ul className="mt-3 space-y-2">
-              {results.primary.lines.map((line, idx) => (
+              {results.primary.lines.map((line, idx) => {
+                const perHint = line.available
+                  ? unitPriceHint(line.name || line.cartName, line.price)
+                  : null;
+                return (
                 <li
                   key={`primary-${idx}-${line.cartName}`}
                   className="flex items-center justify-between gap-2"
@@ -675,15 +708,23 @@ export function CartPage() {
                     {line.name || line.cartName}
                   </span>
                   {line.available ? (
-                    <span className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-white/70 tabular-nums">{fmtEur(line.price)}</span>
-                      <SourceBadge source={line.priceSource} />
+                    <span className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                      <span className="flex items-center gap-2">
+                        <span className="text-white/70 tabular-nums">{fmtEur(line.price)}</span>
+                        <SourceBadge source={line.priceSource} />
+                      </span>
+                      {perHint && (
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.32)" }}>
+                          {perHint}
+                        </span>
+                      )}
                     </span>
                   ) : (
                     <span style={{ color: "#ff6b6b", fontSize: 12 }}>nedostupno</span>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
             <div className="mt-3">
               <OpenInMapsButton chainLabel={results.primary.label} coords={coords} />
@@ -771,18 +812,29 @@ export function CartPage() {
                         {!complete && !none ? " · zbroj pronađenih" : ""}
                       </p>
                       <ul className="mt-2 space-y-1">
-                        {row.lines.map((line, idx) => (
+                        {row.lines.map((line, idx) => {
+                          const perHint = line.available
+                            ? unitPriceHint(line.name || line.cartName, line.price)
+                            : null;
+                          return (
                           <li key={`${row.chain}-${idx}`} className="py-0.5" style={{ fontSize: 12 }}>
                             <div className="flex justify-between gap-2 items-center">
                               <span className="truncate text-white/55 min-w-0">
                                 {line.cartName}
                               </span>
                               {line.available ? (
-                                <span className="flex items-center gap-1.5 flex-shrink-0">
-                                  <MatchByHint matchedBy={line.matchedBy} />
-                                  <span className="tabular-nums text-white/70">
-                                    {fmtEur(line.price)}
+                                <span className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                                  <span className="flex items-center gap-1.5">
+                                    <MatchByHint matchedBy={line.matchedBy} />
+                                    <span className="tabular-nums text-white/70">
+                                      {fmtEur(line.price)}
+                                    </span>
                                   </span>
+                                  {perHint && (
+                                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)" }}>
+                                      {perHint}
+                                    </span>
+                                  )}
                                 </span>
                               ) : (
                                 <span className="flex-shrink-0" style={{ color: "#ff6b6b" }}>
@@ -804,7 +856,8 @@ export function CartPage() {
                               </p>
                             )}
                           </li>
-                        ))}
+                          );
+                        })}
                       </ul>
                     </div>
                   );
