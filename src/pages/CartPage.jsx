@@ -28,6 +28,25 @@ function foundLabel(found, total) {
   return `Pronađeno ${found} od ${total} · djelomična usporedba`;
 }
 
+/** Diskretna oznaka pouzdanosti uparivanja — samo UI. */
+function MatchByHint({ matchedBy }) {
+  if (matchedBy === "barcode") {
+    return (
+      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)", flexShrink: 0 }}>
+        isti barkod
+      </span>
+    );
+  }
+  if (matchedBy === "name") {
+    return (
+      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)", flexShrink: 0 }}>
+        po nazivu
+      </span>
+    );
+  }
+  return null;
+}
+
 const CHAIN_OPTIONS = STORES.filter((s) => REGULAR_PRICE_CHAINS.includes(s.id));
 
 /**
@@ -681,13 +700,25 @@ export function CartPage() {
                 style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", lineHeight: 1.4 }}
               >
                 Zbroj je samo za pronađene artikle (X od {results.itemCount}). Nije cijela košarica
-                ako fali stavka.
+                ako fali stavka. Kompletne košarice su prikazane prve.
               </p>
               <div
                 className="rounded-2xl overflow-hidden"
                 style={{ border: "1px solid rgba(255,255,255,0.08)" }}
               >
-                {results.others.map((row, i) => {
+                {[...results.others]
+                  .sort((a, b) => {
+                    const ya = results.itemCount || a.lines?.length || 0;
+                    const yb = results.itemCount || b.lines?.length || 0;
+                    const xa = countFound(a.lines);
+                    const xb = countFound(b.lines);
+                    const ca = ya > 0 && xa >= ya;
+                    const cb = yb > 0 && xb >= yb;
+                    if (ca !== cb) return ca ? -1 : 1;
+                    if (xa !== xb) return xb - xa;
+                    return (a.total ?? 0) - (b.total ?? 0);
+                  })
+                  .map((row, i) => {
                   const y = results.itemCount || row.lines?.length || 0;
                   const x = countFound(row.lines);
                   const complete = x >= y && y > 0;
@@ -707,19 +738,33 @@ export function CartPage() {
                         <p className="font-black text-white" style={{ fontSize: 15 }}>
                           {row.label}
                         </p>
-                        <p
-                          className="font-bold tabular-nums"
-                          style={{
-                            fontSize: 14,
-                            color: complete
-                              ? "#00ff88"
-                              : none
-                                ? "rgba(255,255,255,0.35)"
-                                : "rgba(255,255,255,0.65)",
-                          }}
-                        >
-                          {none ? "—" : fmtEur(row.total)}
-                        </p>
+                        <div className="flex items-baseline gap-2 flex-shrink-0">
+                          {!complete && !none && (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: "rgba(255,255,255,0.4)",
+                              }}
+                            >
+                              {x} od {y} stavke
+                            </span>
+                          )}
+                          <p
+                            className="tabular-nums"
+                            style={{
+                              fontSize: complete ? 14 : 12,
+                              fontWeight: complete ? 700 : 500,
+                              color: complete
+                                ? "#00ff88"
+                                : none
+                                  ? "rgba(255,255,255,0.28)"
+                                  : "rgba(255,255,255,0.38)",
+                            }}
+                          >
+                            {none ? "—" : fmtEur(row.total)}
+                          </p>
+                        </div>
                       </div>
                       <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
                         {foundLabel(x, y)}
@@ -728,13 +773,16 @@ export function CartPage() {
                       <ul className="mt-2 space-y-1">
                         {row.lines.map((line, idx) => (
                           <li key={`${row.chain}-${idx}`} className="py-0.5" style={{ fontSize: 12 }}>
-                            <div className="flex justify-between gap-2">
+                            <div className="flex justify-between gap-2 items-center">
                               <span className="truncate text-white/55 min-w-0">
                                 {line.cartName}
                               </span>
                               {line.available ? (
-                                <span className="tabular-nums text-white/70 flex-shrink-0">
-                                  {fmtEur(line.price)}
+                                <span className="flex items-center gap-1.5 flex-shrink-0">
+                                  <MatchByHint matchedBy={line.matchedBy} />
+                                  <span className="tabular-nums text-white/70">
+                                    {fmtEur(line.price)}
+                                  </span>
                                 </span>
                               ) : (
                                 <span className="flex-shrink-0" style={{ color: "#ff6b6b" }}>
