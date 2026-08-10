@@ -34,7 +34,7 @@ function foundLabel(found, total) {
 }
 
 /** Diskretna oznaka pouzdanosti uparivanja — samo UI. */
-function MatchByHint({ matchedBy }) {
+function MatchByHint({ matchedBy, productTypeLabel }) {
   if (matchedBy === "barcode") {
     return (
       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)", flexShrink: 0 }}>
@@ -46,6 +46,13 @@ function MatchByHint({ matchedBy }) {
     return (
       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)", flexShrink: 0 }}>
         po nazivu
+      </span>
+    );
+  }
+  if (matchedBy === "type_unit") {
+    return (
+      <span style={{ fontSize: 10, color: "rgba(239,159,39,0.75)", flexShrink: 0 }}>
+        sličan {productTypeLabel || "tip"} · €/kg
       </span>
     );
   }
@@ -741,7 +748,8 @@ export function CartPage() {
                 style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", lineHeight: 1.4 }}
               >
                 Zbroj je samo za pronađene artikle (X od {results.itemCount}). Nije cijela košarica
-                ako fali stavka. Kompletne košarice su prikazane prve.
+                ako fali stavka. Kompletne košarice su prikazane prve. Ako nema točnog artikla,
+                može se pokazati sličan tip (npr. Kruh) po €/kg — to nije nužno isti proizvod.
               </p>
               <div
                 className="rounded-2xl overflow-hidden"
@@ -825,7 +833,10 @@ export function CartPage() {
                               {line.available ? (
                                 <span className="flex flex-col items-end gap-0.5 flex-shrink-0">
                                   <span className="flex items-center gap-1.5">
-                                    <MatchByHint matchedBy={line.matchedBy} />
+                                    <MatchByHint
+                                      matchedBy={line.matchedBy}
+                                      productTypeLabel={line.productTypeLabel}
+                                    />
                                     <span className="tabular-nums text-white/70">
                                       {fmtEur(line.price)}
                                     </span>
@@ -833,6 +844,15 @@ export function CartPage() {
                                   {perHint && (
                                     <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)" }}>
                                       {perHint}
+                                    </span>
+                                  )}
+                                  {line.matchedBy === "type_unit" && line.name && (
+                                    <span
+                                      className="truncate max-w-[180px]"
+                                      style={{ fontSize: 9, color: "rgba(239,159,39,0.55)" }}
+                                      title={line.name}
+                                    >
+                                      {line.name}
                                     </span>
                                   )}
                                 </span>

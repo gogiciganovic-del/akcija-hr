@@ -1,5 +1,7 @@
 import { supabase } from './supabase'
 import { STORES, chainFromStoreName } from './constants'
+import { matchProductType, getProductType } from './productTypes'
+import { parseQuantityFromName, pricePerBaseUnit } from './quantityParse'
 
 function round2(n) {
   return Math.round(n * 100) / 100
@@ -23,9 +25,130 @@ export const REGULAR_PRICE_CHAINS = [
   'Dm',
 ]
 
+function baseUnitOf(unit) {
+  if (unit === 'g' || unit === 'kg') return 'kg'
+  if (unit === 'ml' || unit === 'L') return 'L'
+  return null
+}
+
+function median(nums) {
+  if (!nums.length) return null
+  const s = [...nums].sort((a, b) => a - b)
+  const m = Math.floor(s.length / 2)
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
+}
+
+/**
+ * Fallback: najniži €/kg (ili €/L) unutar product_type u lancu.
+ * Samo ako točan barkod/naziv nije pronađen.
+ * Outlieri: €/jedinica > 5× medijana tipa → isključeni.
+ */
+async function resolveByTypeUnitPrice(item, chain) {
+  const name = (item.name || '').trim()
+  const typeKey = matchProductType(name)
+  const qty = parseQuantityFromName(name)
+  if (!typeKey || !qty) return null
+
+  const wantedBase = baseUnitOf(qty.unit)
+  if (!wantedBase) return null
+
+  const typeMeta = getProductType(typeKey)
+  if (!typeMeta) return null
+
+  const cols =
+    'barcode, name, brand, chain, price, special_price, product_type, quantity_value, quantity_unit'
+
+  let rows = []
+  const byType = await supabase
+    .from('regular_prices')
+    .select(cols)
+    .eq('chain', chain)
+    .eq('product_type', typeKey)
+    .limit(100)
+
+  if (!byType.error && byType.data?.length) {
+    rows = byType.data
+  } else {
+    const tokens = typeMeta.matches
+      .filter((m) => /^[\p{L}\p{N}]+$/u.test(m) && m.length >= 3)
+      .slice(0, 5)
+    if (!tokens.length) return null
+    const orFilter = tokens.map((t) => `name.ilike.${t}%`).join(',')
+    const byName = await supabase
+      .from('regular_prices')
+      .select(cols)
+      .eq('chain', chain)
+      .or(orFilter)
+      .limit(100)
+    if (byName.error) return null
+    rows = byName.data || []
+  }
+
+  /** @type {{ row: object, perUnit: number, unitLabel: string }[]} */
+  const cands = []
+  for (const row of rows) {
+    if (matchProductType(row.name) !== typeKey) continue
+    let qv = row.quantity_value != null ? Number(row.quantity_value) : null
+    let qu = row.quantity_unit || null
+    if (qv == null || !qu) {
+      const parsed = parseQuantityFromName(row.name)
+      if (!parsed) continue
+      qv = parsed.value
+      qu = parsed.unit
+    }
+    if (baseUnitOf(qu) !== wantedBase) continue
+    const price = parsePrice(row.special_price) ?? parsePrice(row.price)
+    const per = pricePerBaseUnit(price, qv, qu)
+    if (!per) continue
+    cands.push({ row, perUnit: per.perUnit, unitLabel: per.unitLabel, price })
+  }
+
+  if (!cands.length) return null
+
+  const med = median(cands.map((c) => c.perUnit))
+  const filtered =
+    med != null && med > 0
+      ? cands.filter((c) => c.perUnit <= 5 * med)
+      : cands
+  const pool = filtered.length ? filtered : cands
+  pool.sort((a, b) => a.perUnit - b.perUnit)
+  const best = pool[0]
+
+  const sale = await findSaleExact((best.row.name || '').trim(), chain)
+  if (sale) {
+    return {
+      available: true,
+      price: sale.price,
+      originalPrice: sale.originalPrice ?? best.price,
+      priceSource: 'sale',
+      name: sale.name,
+      barcode: best.row.barcode || null,
+      matchedBy: 'type_unit',
+      productType: typeKey,
+      productTypeLabel: typeMeta.label,
+      unitPrice: best.perUnit,
+      unitLabel: best.unitLabel,
+    }
+  }
+
+  return {
+    available: true,
+    price: best.price,
+    originalPrice: best.price,
+    priceSource: 'regular',
+    name: best.row.name,
+    barcode: best.row.barcode || null,
+    matchedBy: 'type_unit',
+    productType: typeKey,
+    productTypeLabel: typeMeta.label,
+    unitPrice: best.perUnit,
+    unitLabel: best.unitLabel,
+  }
+}
+
 /**
  * Nađi cijenu artikla kod jednog lanca.
- * Prioritet: barkod → točan naziv; unutar toga akcija pa redovna.
+ * Prioritet: barkod → točan naziv → (€/kg tip kao fallback).
  */
 async function resolveItemAtChain(item, chain) {
   const name = (item.name || '').trim()
@@ -69,7 +192,15 @@ async function resolveItemAtChain(item, chain) {
   }
 
   if (!name) {
-    return { available: false, price: null, originalPrice: null, priceSource: null, name, barcode, matchedBy: null }
+    return {
+      available: false,
+      price: null,
+      originalPrice: null,
+      priceSource: null,
+      name,
+      barcode,
+      matchedBy: null,
+    }
   }
 
   const sale = await findSaleExact(name, chain)
@@ -107,6 +238,10 @@ async function resolveItemAtChain(item, chain) {
       matchedBy: 'name',
     }
   }
+
+  // Fallback: €/kg po tipu (nije isti artikl)
+  const byType = await resolveByTypeUnitPrice(item, chain)
+  if (byType) return byType
 
   return {
     available: false,
@@ -147,7 +282,8 @@ async function findSaleExact(name, chain) {
 
 /**
  * Primarni lanac: ukupna cijena + ušteda na akcijskim stavkama.
- * Ostali lanci: ista košarica po barkodu/točnom nazivu, ili "nedostupno".
+ * Ostali lanci: barkod → točan naziv → fallback najniži €/kg unutar product_type
+ * (s medijan filterom 5×). Tip-fallback nije isti artikl.
  *
  * @param {string} selectedChain
  * @param {Array<{ id?: string, name: string, barcode?: string|null, price?: number, originalPrice?: number, priceSource?: string }>} items
