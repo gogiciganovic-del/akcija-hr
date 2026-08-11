@@ -93,7 +93,8 @@ export const PRODUCT_TYPES = [
   { key: "brasno_glatko", label: "Brašno glatko", matches: ["GLATKO"] },
   { key: "brasno", label: "Brašno", matches: ["BRAŠNO", "BRASNO"] },
 
-  { key: "maslac", label: "Maslac", matches: ["MASLAC", "MARGARIN"] },
+  { key: "maslac", label: "Maslac", matches: ["MASLAC"] },
+  { key: "margarin", label: "Margarin", matches: ["MARGARIN"] },
   { key: "jabuka", label: "Jabuka", matches: ["JABUKA"] },
   { key: "kukuruz", label: "Kukuruz", matches: ["KUKURUZ"] },
   { key: "rum", label: "Rum", matches: ["RUM"] },

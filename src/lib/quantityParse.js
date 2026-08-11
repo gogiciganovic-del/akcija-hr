@@ -23,11 +23,12 @@ const UNIT_MAP = {
 const UNIT_ALT = "kg|g|gr|grama|gram|ml|mililitara|mililitar|l|lit|litara|litra|litre";
 
 /**
- * @typedef {{ value: number, unit: 'g'|'kg'|'ml'|'L' }} ParsedQuantity
+ * @typedef {{ value: number, unit: 'g'|'kg'|'ml'|'L', unitValue?: number }} ParsedQuantity
  */
 
 /**
  * Multipack: "6x1.5L", "6 x 1,5 l", "4×80 g" → ukupna količina.
+ * unitValue = veličina jednog komada (za usporedbu pakiranja).
  * @param {string} s
  * @returns {ParsedQuantity | null}
  */
@@ -44,7 +45,7 @@ function parseMultipack(s) {
     const unit = UNIT_MAP[m[3].toLowerCase()];
     if (!Number.isFinite(count) || count <= 0) continue;
     if (!Number.isFinite(unitVal) || unitVal <= 0 || !unit) continue;
-    best = { value: count * unitVal, unit };
+    best = { value: count * unitVal, unit, unitValue: unitVal };
   }
   return best;
 }

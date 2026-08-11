@@ -41,9 +41,17 @@ function quantityInBase(value, unit) {
 }
 
 /**
+ * Kombinirani proizvodi (šampon 2u1, det+omekšivač…) — ne uspoređuj po tipu.
+ */
+function isComboProduct(name) {
+  return /\b2\s*u\s*1\b|\b2\s*in\s*1\b|\b2\s*&\s*1\b/i.test(String(name || ''))
+}
+
+/**
  * Značajne riječi naziva: bez brojeva/jedinica i bez tokena tipa (SIR, ULJE, KAVA…).
- * Zahtjev za fallback: barem jedna zajednička s kandidatom — osim kad naziv
- * nema druge riječi osim tipa (npr. „Maslinovo ulje”); tada dovoljan tip+pakiranje.
+ * Zahtjev za fallback samo kod generičkih tipova (bez '_'): barem jedna zajednička
+ * s kandidatom — osim kad naziv nema druge riječi osim tipa. Podtipovi (voda_gazirana,
+ * ulje_maslinovo…) već su dovoljno uski; dodatna riječ samo blokira ispravne pogotke.
  */
 function significantNameTokens(name, typeMeta) {
   const typeTokens = new Set(
@@ -66,10 +74,17 @@ function sharesSignificantWord(queryTokens, candidateName, typeMeta) {
   return queryTokens.some((t) => cand.has(t))
 }
 
-function packSizeOk(wantedBaseQty, candValue, candUnit) {
+function requiresSharedSignificantWord(typeKey) {
+  return !String(typeKey || '').includes('_')
+}
+
+function packSizeOk(wantedBaseQty, candValue, candUnit, wantedUnitSizeBase, candUnitSizeBase) {
   const candBase = quantityInBase(candValue, candUnit)
-  if (wantedBaseQty == null || candBase == null) return false
-  return candBase >= wantedBaseQty * 0.5 && candBase <= wantedBaseQty * 2
+  // Za multipack usporedi veličinu jednog komada (1.5 L), ne ukupno (9 L)
+  const wanted = wantedUnitSizeBase ?? wantedBaseQty
+  const cand = candUnitSizeBase ?? candBase
+  if (wanted == null || cand == null) return false
+  return cand >= wanted * 0.5 && cand <= wanted * 2
 }
 
 function median(nums) {
@@ -82,11 +97,13 @@ function median(nums) {
 /**
  * Fallback: najniži €/kg (ili €/L) unutar product_type u lancu.
  * Samo ako točan barkod/naziv nije pronađen.
- * Filtri: cijena > 0, pakiranje 0,5×–2×, barem jedna zajednička značajna riječ,
+ * Filtri: cijena > 0, pakiranje 0,5×–2×, bez 2u1 kombinacija,
+ * zajednička značajna riječ samo za generičke tipove (ne podtipove),
  * €/jedinica u [med/5, 5×med]. Bez kandidata → null (nedostupno).
  */
 async function resolveByTypeUnitPrice(item, chain) {
   const name = (item.name || '').trim()
+  if (isComboProduct(name)) return null
   const typeKey = matchProductType(name)
   const qty = parseQuantityFromName(name)
   if (!typeKey || !qty) return null
@@ -99,6 +116,8 @@ async function resolveByTypeUnitPrice(item, chain) {
 
   const wantedBaseQty = quantityInBase(qty.value, qty.unit)
   if (wantedBaseQty == null) return null
+  const wantedUnitSizeBase =
+    qty.unitValue != null ? quantityInBase(qty.unitValue, qty.unit) : null
 
   const querySig = significantNameTokens(name, typeMeta)
 
@@ -131,22 +150,29 @@ async function resolveByTypeUnitPrice(item, chain) {
     rows = byName.data || []
   }
 
+  const needSharedWord = requiresSharedSignificantWord(typeKey)
+
   /** @type {{ row: object, perUnit: number, unitLabel: string, price: number }[]} */
   const cands = []
   for (const row of rows) {
+    if (isComboProduct(row.name)) continue
     if (matchProductType(row.name) !== typeKey) continue
-    if (!sharesSignificantWord(querySig, row.name, typeMeta)) continue
+    if (needSharedWord && !sharesSignificantWord(querySig, row.name, typeMeta)) continue
 
     let qv = row.quantity_value != null ? Number(row.quantity_value) : null
     let qu = row.quantity_unit || null
+    let candUnitSizeBase = null
+    const parsed = parseQuantityFromName(row.name)
+    if (parsed?.unitValue != null) {
+      candUnitSizeBase = quantityInBase(parsed.unitValue, parsed.unit)
+    }
     if (qv == null || !qu) {
-      const parsed = parseQuantityFromName(row.name)
       if (!parsed) continue
       qv = parsed.value
       qu = parsed.unit
     }
     if (baseUnitOf(qu) !== wantedBase) continue
-    if (!packSizeOk(wantedBaseQty, qv, qu)) continue
+    if (!packSizeOk(wantedBaseQty, qv, qu, wantedUnitSizeBase, candUnitSizeBase)) continue
 
     const price = parsePrice(row.special_price) ?? parsePrice(row.price)
     if (price == null || price <= 0) continue
@@ -335,7 +361,7 @@ async function findSaleExact(name, chain) {
 /**
  * Primarni lanac: ukupna cijena + ušteda na akcijskim stavkama.
  * Ostali lanci: barkod → točan naziv → fallback najniži €/kg unutar product_type
- * (cijena > 0, pakiranje 0,5×–2×, zajednička značajna riječ, medijan [1/5, 5×]).
+ * (cijena > 0, pakiranje 0,5×–2×, bez 2u1; zajednička riječ samo za generičke tipove).
  * Tip-fallback nije isti artikl; bez kandidata → nedostupno.
  *
  * @param {string} selectedChain
