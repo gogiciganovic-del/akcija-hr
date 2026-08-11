@@ -41,7 +41,7 @@ function median(nums) {
 /**
  * Fallback: najniži €/kg (ili €/L) unutar product_type u lancu.
  * Samo ako točan barkod/naziv nije pronađen.
- * Outlieri: €/jedinica > 5× medijana tipa → isključeni.
+ * Isključeno: cijena ≤ 0. Outlieri: €/jedinica izvan [med/5, 5×med].
  */
 async function resolveByTypeUnitPrice(item, chain) {
   const name = (item.name || '').trim()
@@ -84,7 +84,7 @@ async function resolveByTypeUnitPrice(item, chain) {
     rows = byName.data || []
   }
 
-  /** @type {{ row: object, perUnit: number, unitLabel: string }[]} */
+  /** @type {{ row: object, perUnit: number, unitLabel: string, price: number }[]} */
   const cands = []
   for (const row of rows) {
     if (matchProductType(row.name) !== typeKey) continue
@@ -98,8 +98,9 @@ async function resolveByTypeUnitPrice(item, chain) {
     }
     if (baseUnitOf(qu) !== wantedBase) continue
     const price = parsePrice(row.special_price) ?? parsePrice(row.price)
+    if (price == null || price <= 0) continue
     const per = pricePerBaseUnit(price, qv, qu)
-    if (!per) continue
+    if (!per || per.perUnit <= 0) continue
     cands.push({ row, perUnit: per.perUnit, unitLabel: per.unitLabel, price })
   }
 
@@ -108,7 +109,7 @@ async function resolveByTypeUnitPrice(item, chain) {
   const med = median(cands.map((c) => c.perUnit))
   const filtered =
     med != null && med > 0
-      ? cands.filter((c) => c.perUnit <= 5 * med)
+      ? cands.filter((c) => c.perUnit >= med / 5 && c.perUnit <= 5 * med)
       : cands
   const pool = filtered.length ? filtered : cands
   pool.sort((a, b) => a.perUnit - b.perUnit)
@@ -283,7 +284,7 @@ async function findSaleExact(name, chain) {
 /**
  * Primarni lanac: ukupna cijena + ušteda na akcijskim stavkama.
  * Ostali lanci: barkod → točan naziv → fallback najniži €/kg unutar product_type
- * (s medijan filterom 5×). Tip-fallback nije isti artikl.
+ * (cijena > 0, medijan filter [1/5, 5×]). Tip-fallback nije isti artikl.
  *
  * @param {string} selectedChain
  * @param {Array<{ id?: string, name: string, barcode?: string|null, price?: number, originalPrice?: number, priceSource?: string }>} items

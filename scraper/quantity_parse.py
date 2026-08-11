@@ -52,11 +52,38 @@ UNIT_MAP = {
     "litre": "L",
 }
 
+SKIP_TOKENS = {
+    "G",
+    "GR",
+    "GRAM",
+    "GRAMA",
+    "KG",
+    "KILA",
+    "ML",
+    "MILILITAR",
+    "MILILITARA",
+    "L",
+    "LIT",
+    "LITAR",
+    "LITARA",
+    "LITRA",
+    "LITRE",
+    "CCA",
+    "CA",
+    "APPROX",
+    "KOM",
+    "KOMADA",
+    "X",
+}
+
 _QTY_RE = re.compile(
     r"(?:\bcca|\bca|\bapprox\.?)?\s*(\d+(?:[.,]\d+)?)\s*"
     r"(kg|g|gr|grama|gram|ml|mililitara|mililitar|l|lit|litara|litra|litre)\b",
     re.IGNORECASE,
 )
+
+_TOKEN_SPLIT = re.compile(r"[^A-ZČĆŽŠĐ0-9.]+", re.IGNORECASE)
+_NUM_ONLY = re.compile(r"^\d+([.,]\d+)?$")
 
 
 def parse_quantity_from_name(name: str | None) -> tuple[float | None, str | None]:
@@ -80,13 +107,37 @@ def parse_quantity_from_name(name: str | None) -> tuple[float | None, str | None
     return best[0], best[1]
 
 
-def match_product_type(name: str | None) -> str | None:
+def tokenize_name_for_type(name: str | None) -> list[str]:
+    """Sve riječi naziva bez brojeva i jedinica."""
     if not name:
-        return None
-    first = str(name).strip().split()[0] if str(name).strip() else ""
-    if not first:
-        return None
-    return get_match_map().get(first.upper())
+        return []
+    raw = _TOKEN_SPLIT.split(str(name).upper())
+    out: list[str] = []
+    for t in raw:
+        t = t.strip(".")
+        if not t or len(t) < 2:
+            continue
+        if t in SKIP_TOKENS:
+            continue
+        if _NUM_ONLY.match(t):
+            continue
+        out.append(t)
+    return out
+
+
+def match_product_type(name: str | None) -> str | None:
+    """Prođi sve riječi; najduži match; pri istoj duljini — kasnija riječ."""
+    mmap = get_match_map()
+    best_key: str | None = None
+    best_len = -1
+    for token in tokenize_name_for_type(name):
+        key = mmap.get(token)
+        if not key:
+            continue
+        if len(token) >= best_len:
+            best_len = len(token)
+            best_key = key
+    return best_key
 
 
 def enrich_from_name(name: str | None) -> dict:

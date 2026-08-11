@@ -837,6 +837,7 @@ export function CartPage() {
                                     <MatchByHint
                                       matchedBy={line.matchedBy}
                                       productTypeLabel={line.productTypeLabel}
+                                      unitLabel={line.unitLabel}
                                     />
                                     <span className="tabular-nums text-white/70">
                                       {fmtEur(line.price)}

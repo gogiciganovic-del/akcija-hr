@@ -61,7 +61,7 @@ export function parseQuantityFromName(name) {
 export function pricePerBaseUnit(price, quantityValue, quantityUnit) {
   const p = Number(price);
   const q = Number(quantityValue);
-  if (!Number.isFinite(p) || p < 0 || !Number.isFinite(q) || q <= 0) return null;
+  if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(q) || q <= 0) return null;
   const u = String(quantityUnit || "");
 
   if (u === "kg") return { perUnit: p / q, unitLabel: "kg" };

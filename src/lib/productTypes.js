@@ -1,8 +1,8 @@
 /**
- * Tipovi proizvoda za €/kg usporedbu (prva riječ naziva → tip).
- * Izvor: top prve riječi iz regular_prices.name; brendovi/šum izbačeni.
+ * Tipovi proizvoda za €/kg usporedbu (riječi iz naziva → tip).
+ * Izvor: top riječi iz regular_prices.name; brendovi/šum izbačeni.
  *
- * matches: UPPER varijante (parser radi upper(trim)).
+ * matches: UPPER varijante; matchProductType prolazi sve riječi (ne samo prvu).
  */
 
 /**
@@ -17,7 +17,8 @@ export const PRODUCT_TYPES = [
   { key: "keks", label: "Keks", matches: ["KEKS", "KEKSI", "KREKER", "KREKERI", "VAFEL", "VAFL", "BISKVIT", "NAPOLITANKE"] },
   { key: "pivo", label: "Pivo", matches: ["PIVO", "CIDER"] },
   { key: "sok", label: "Sok", matches: ["SOK", "NEKTAR", "SMOOTHIE"] },
-  { key: "kava", label: "Kava", matches: ["KAVA", "CAPPUCCINO", "KAKAO"] },
+  // KAKAO namjerno nije ovdje — često je okus (keks/čokolada), ne tip „kava”
+  { key: "kava", label: "Kava", matches: ["KAVA", "CAPPUCCINO"] },
   { key: "napitak", label: "Napitak", matches: ["NAPITAK", "GAZ.PIĆE", "GAZIRANO"] },
   { key: "caj", label: "Čaj", matches: ["ČAJ", "CAJ"] },
   { key: "sladoled", label: "Sladoled", matches: ["SLADOLED"] },
@@ -117,16 +118,69 @@ for (const t of PRODUCT_TYPES) {
 
 const KEY_TO_TYPE = new Map(PRODUCT_TYPES.map((t) => [t.key, t]));
 
+/** Brojevi i jedinice — ne koriste se za tip. */
+const SKIP_TOKENS = new Set([
+  "G",
+  "GR",
+  "GRAM",
+  "GRAMA",
+  "KG",
+  "KILA",
+  "ML",
+  "MILILITAR",
+  "MILILITARA",
+  "L",
+  "LIT",
+  "LITAR",
+  "LITARA",
+  "LITRA",
+  "LITRE",
+  "CCA",
+  "CA",
+  "APPROX",
+  "KOM",
+  "KOMADA",
+  "X",
+]);
+
 /**
+ * Tokenizacija: sve riječi, bez brojeva i jedinica.
+ * @param {string} name
+ * @returns {string[]}
+ */
+export function tokenizeNameForType(name) {
+  return String(name || "")
+    .toUpperCase()
+    .normalize("NFC")
+    .split(/[^A-ZČĆŽŠĐ0-9.]+/u)
+    .map((t) => t.replace(/^\.+|\.+$/g, ""))
+    .filter((t) => {
+      if (!t || t.length < 2) return false;
+      if (SKIP_TOKENS.has(t)) return false;
+      if (/^\d+([.,]\d+)?$/.test(t)) return false;
+      return true;
+    });
+}
+
+/**
+ * Tip proizvoda: prolazi sve riječi; ako više pogodaka — najduži match token
+ * (npr. PROTEINSKI > PROTEIN); pri istoj duljini — kasnija riječ u nazivu.
  * @param {string | null | undefined} name
  * @returns {string | null} product_type key
  */
 export function matchProductType(name) {
-  const first = String(name || "")
-    .trim()
-    .split(/\s+/)[0];
-  if (!first) return null;
-  return MATCH_TO_KEY.get(first.toUpperCase()) || null;
+  const tokens = tokenizeNameForType(name || "");
+  let bestKey = null;
+  let bestLen = -1;
+  for (const token of tokens) {
+    const key = MATCH_TO_KEY.get(token);
+    if (!key) continue;
+    if (token.length >= bestLen) {
+      bestLen = token.length;
+      bestKey = key;
+    }
+  }
+  return bestKey;
 }
 
 /**
