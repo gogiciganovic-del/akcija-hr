@@ -99,25 +99,37 @@ function googleMapsChainUrl(chainLabel, coords) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(chain)}`;
 }
 
-function OpenInMapsButton({ chainLabel, coords }) {
-  const href = googleMapsChainUrl(chainLabel, coords);
+function OpenInMapsButton({ chainLabel, requestLocation }) {
+  const openMaps = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    let nextCoords = null;
+    try {
+      if (typeof requestLocation === "function") {
+        nextCoords = await requestLocation();
+      }
+    } catch {
+      nextCoords = null;
+    }
+    const href = googleMapsChainUrl(chainLabel, nextCoords);
+    window.open(href, "_blank", "noopener,noreferrer");
+  };
+
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+    <button
+      type="button"
+      onClick={openMaps}
       className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold"
       style={{
         background: "rgba(255,255,255,0.06)",
         border: "1px solid rgba(255,255,255,0.12)",
         color: "rgba(255,255,255,0.85)",
         fontSize: 12,
-        textDecoration: "none",
       }}
     >
       <MapPin size={13} />
       Otvori u Google Maps
-    </a>
+    </button>
   );
 }
 
@@ -153,7 +165,7 @@ export function CartPage() {
   const inputWrapRef = useRef(null);
   const chainWrapRef = useRef(null);
 
-  const { coords } = useUserLocation();
+  const { requestLocation } = useUserLocation();
 
   const { suggestions } = useProductSuggestions(input, selectedChain);
 
@@ -735,7 +747,7 @@ export function CartPage() {
               })}
             </ul>
             <div className="mt-3">
-              <OpenInMapsButton chainLabel={results.primary.label} coords={coords} />
+              <OpenInMapsButton chainLabel={results.primary.label} requestLocation={requestLocation} />
             </div>
           </div>
 

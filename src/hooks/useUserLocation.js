@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 
-const FALLBACK = 'Hrvatska'
-const LOADING = 'Dohvaćam lokaciju...'
+/** Cache nakon uspješnog requesta — bez ponovnog popup-a. */
+let cached = { coords: null, label: null }
 
 function formatLocation(address) {
-  if (!address) return FALLBACK
+  if (!address) return null
 
   const city =
     address.city ||
@@ -18,62 +18,73 @@ function formatLocation(address) {
 
   if (city) return `${city}, ${code}`
   if (address.country) return address.country
-  return FALLBACK
+  return null
 }
 
+/**
+ * Lokacija na zahtjev — NE traži dozvolu pri mountanju.
+ * @returns {{ locationLabel: string|null, coords: {lat:number,lng:number}|null, loading: boolean, requestLocation: () => Promise<{lat:number,lng:number}|null> }}
+ */
 export function useUserLocation() {
-  const [locationLabel, setLocationLabel] = useState(LOADING)
-  const [coords, setCoords] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [locationLabel, setLocationLabel] = useState(cached.label)
+  const [coords, setCoords] = useState(cached.coords)
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setLocationLabel(FALLBACK)
-      setCoords(null)
-      setLoading(false)
-      return
+  const requestLocation = useCallback(() => {
+    if (cached.coords) {
+      setCoords(cached.coords)
+      setLocationLabel(cached.label)
+      return Promise.resolve(cached.coords)
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords: c }) => {
-        const next = { lat: c.latitude, lng: c.longitude }
-        setCoords(next)
-        try {
-          const params = new URLSearchParams({
-            lat: String(c.latitude),
-            lon: String(c.longitude),
-            format: 'json',
-          })
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      return Promise.resolve(null)
+    }
 
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?${params}`,
-            {
-              headers: {
-                Accept: 'application/json',
-                'Accept-Language': 'hr',
-                'User-Agent': 'Cjenko/1.0 (akcije.hr)',
-              },
+    setLoading(true)
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        async ({ coords: c }) => {
+          const next = { lat: c.latitude, lng: c.longitude }
+          let label = null
+          try {
+            const params = new URLSearchParams({
+              lat: String(c.latitude),
+              lon: String(c.longitude),
+              format: 'json',
+            })
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?${params}`,
+              {
+                headers: {
+                  Accept: 'application/json',
+                  'Accept-Language': 'hr',
+                  'User-Agent': 'Cjenko/1.0 (https://cjenko.app)',
+                },
+              }
+            )
+            if (res.ok) {
+              const data = await res.json()
+              label = formatLocation(data.address)
             }
-          )
+          } catch {
+            // reverse geocode optional — Maps radi i bez labela
+          }
 
-          if (!res.ok) throw new Error('Geocoding failed')
-
-          const data = await res.json()
-          setLocationLabel(formatLocation(data.address))
-        } catch {
-          setLocationLabel(FALLBACK)
-        } finally {
+          cached = { coords: next, label }
+          setCoords(next)
+          setLocationLabel(label)
           setLoading(false)
-        }
-      },
-      () => {
-        setLocationLabel(FALLBACK)
-        setCoords(null)
-        setLoading(false)
-      },
-      { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 }
-    )
+          resolve(next)
+        },
+        () => {
+          setLoading(false)
+          resolve(null)
+        },
+        { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 }
+      )
+    })
   }, [])
 
-  return { locationLabel, coords, loading }
+  return { locationLabel, coords, loading, requestLocation }
 }

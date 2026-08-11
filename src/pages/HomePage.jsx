@@ -300,7 +300,9 @@ export function HomePage({
           <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
             {headerFilterParts.length
               ? `Filtar: ${headerFilterParts.join(" · ")}`
-              : `${locationLabel} · Sve trgovine`}
+              : locationLabel
+                ? `${locationLabel} · Sve trgovine`
+                : "Sve trgovine"}
           </p>
         </div>
 
