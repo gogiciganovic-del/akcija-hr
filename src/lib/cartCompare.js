@@ -28,15 +28,16 @@ export const REGULAR_PRICE_CHAINS = [
 function baseUnitOf(unit) {
   if (unit === 'g' || unit === 'kg') return 'kg'
   if (unit === 'ml' || unit === 'L') return 'L'
+  if (unit === 'kom') return 'kom'
   return null
 }
 
-/** Količina u baznoj jedinici (kg ili L) radi usporedbe pakiranja. */
+/** Količina u baznoj jedinici (kg, L ili kom) radi usporedbe pakiranja. */
 function quantityInBase(value, unit) {
   const v = Number(value)
   if (!Number.isFinite(v) || v <= 0) return null
   if (unit === 'g' || unit === 'ml') return v / 1000
-  if (unit === 'kg' || unit === 'L') return v
+  if (unit === 'kg' || unit === 'L' || unit === 'kom') return v
   return null
 }
 

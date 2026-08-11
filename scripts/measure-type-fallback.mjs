@@ -36,12 +36,13 @@ function isComboProduct(name) {
 function baseUnit(u) {
   if (u === "g" || u === "kg") return "kg";
   if (u === "ml" || u === "L") return "L";
+  if (u === "kom") return "kom";
   return null;
 }
 function qtyBase(v, u) {
   if (!(v > 0)) return null;
   if (u === "g" || u === "ml") return v / 1000;
-  if (u === "kg" || u === "L") return v;
+  if (u === "kg" || u === "L" || u === "kom") return v;
   return null;
 }
 

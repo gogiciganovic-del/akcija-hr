@@ -50,7 +50,7 @@ function MatchByHint({ matchedBy, productTypeLabel, unitLabel }) {
     );
   }
   if (matchedBy === "type_unit") {
-    const u = unitLabel === "L" ? "€/L" : "€/kg";
+    const u = unitLabel === "L" ? "€/L" : unitLabel === "kom" ? "€/kom" : "€/kg";
     return (
       <span style={{ fontSize: 10, color: "rgba(239,159,39,0.75)", flexShrink: 0 }}>
         sličan {productTypeLabel || "tip"} · {u}
@@ -60,7 +60,7 @@ function MatchByHint({ matchedBy, productTypeLabel, unitLabel }) {
   return null;
 }
 
-/** Diskretni €/kg ili €/L uz cijenu — samo UI. */
+/** Diskretni €/kg, €/L ili €/kom uz cijenu — samo UI. */
 function unitPriceHint(name, price, quantityValue, quantityUnit) {
   let qv = quantityValue;
   let qu = quantityUnit;

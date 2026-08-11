@@ -88,14 +88,61 @@ _MULTIPACK_RE = re.compile(
     re.IGNORECASE,
 )
 
+_PIECE_WORD_RE = re.compile(
+    r"(\d+)\s*"
+    r"(rola|role|kom|komad|komada|maramica|maramice|"
+    r"vrećica|vrećice|vrecica|vrecice|kapsula|kapsule|tableta|tablete)\b",
+    re.IGNORECASE,
+)
+
+_PIECE_SLASH_RE = re.compile(r"\b(\d+)\s*/\s*1\b", re.IGNORECASE)
+
+_PIECE_X_RE = re.compile(
+    r"(?:^|[^0-9\s])\s*[x×]\s*(\d+)\b"
+    r"(?!\s*(?:kg|g|gr|grama|gram|ml|mililitara|mililitar|"
+    r"l|lit|litara|litra|litre|cm|mm|m)\b)",
+    re.IGNORECASE,
+)
+
 _TOKEN_SPLIT = re.compile(r"[^A-ZČĆŽŠĐ0-9.]+", re.IGNORECASE)
 _NUM_ONLY = re.compile(r"^\d+([.,]\d+)?$")
+
+
+def _parse_piece_count(text: str) -> tuple[float, str] | None:
+    """Komadne jedinice — samo kad uz broj nema g/kg/ml/L."""
+    best: tuple[float, str] | None = None
+    for m in _PIECE_WORD_RE.finditer(text):
+        try:
+            value = int(m.group(1))
+        except ValueError:
+            continue
+        if value <= 0:
+            continue
+        best = (float(value), "kom")
+    for m in _PIECE_SLASH_RE.finditer(text):
+        try:
+            value = int(m.group(1))
+        except ValueError:
+            continue
+        if value <= 0:
+            continue
+        best = (float(value), "kom")
+    for m in _PIECE_X_RE.finditer(text):
+        try:
+            value = int(m.group(1))
+        except ValueError:
+            continue
+        if value <= 0:
+            continue
+        best = (float(value), "kom")
+    return best
 
 
 def parse_quantity_from_name(name: str | None) -> tuple[float | None, str | None]:
     """Vrati (quantity_value, quantity_unit) ili (None, None).
 
-    Multipack (6x1,5L) → ukupna količina. '16 rola' bez kg/L → None.
+    Multipack (6x1,5L) → ukupna količina.
+    Komadno (16 rola, 10 kom) → quantity_unit='kom' samo bez g/kg/ml/L.
     """
     if not name:
         return None, None
@@ -129,9 +176,13 @@ def parse_quantity_from_name(name: str | None) -> tuple[float | None, str | None
         if not unit:
             continue
         best = (value, unit)
-    if not best:
-        return None, None
-    return best[0], best[1]
+    if best:
+        return best[0], best[1]
+
+    piece = _parse_piece_count(text)
+    if piece:
+        return piece[0], piece[1]
+    return None, None
 
 
 def tokenize_name_for_type(name: str | None) -> list[str]:

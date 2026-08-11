@@ -316,6 +316,94 @@ def run_fix_multipack(sb, *, dry_run: bool, batch_size: int) -> int:
     return 0
 
 
+def run_fill_qty_null(sb, *, dry_run: bool, batch_size: int) -> int:
+    """Popuni quantity_* samo gdje quantity_value IS NULL (npr. novi kom parser).
+
+    Ne dira retke koji već imaju težinu/volumen. Skenira tablicu po offsetu.
+    """
+    print("Fill-qty-null: skeniram retke (samo NULL quantity_value) ...")
+    written = 0
+    with_kom = 0
+    with_other = 0
+    scanned = 0
+    null_seen = 0
+    examples: list[str] = []
+    offset = 0
+
+    while True:
+        res = (
+            sb.table("regular_prices")
+            .select("id, name, quantity_value, quantity_unit, product_type")
+            .range(offset, offset + PAGE - 1)
+            .execute()
+        )
+        chunk = res.data or []
+        if not chunk:
+            break
+        scanned += len(chunk)
+        payloads = []
+        for row in chunk:
+            if row.get("quantity_value") is not None:
+                continue
+            null_seen += 1
+            qv, qu = parse_quantity_from_name(row.get("name"))
+            if qv is None or not qu:
+                continue
+            payloads.append(
+                {
+                    "id": row["id"],
+                    "quantity_value": qv,
+                    "quantity_unit": qu,
+                }
+            )
+            if qu == "kom":
+                with_kom += 1
+            else:
+                with_other += 1
+            if len(examples) < 10:
+                examples.append(f"{(row.get('name') or '')[:55]} → {qv} {qu}")
+
+        if dry_run and payloads:
+            print("dry-run sample:", payloads[:5])
+            for e in examples:
+                print(" ", e)
+            print(f"dry-run: stopping after first hits (null_seen={null_seen})")
+            return 0
+
+        for i in range(0, len(payloads), batch_size):
+            batch = payloads[i : i + batch_size]
+            try:
+                rpc_batch_update(sb, batch)
+            except Exception as e:
+                print(f"RPC failed ({e}); per-row", file=sys.stderr)
+                for u in batch:
+                    sb.table("regular_prices").update(
+                        {
+                            "quantity_value": u["quantity_value"],
+                            "quantity_unit": u["quantity_unit"],
+                        }
+                    ).eq("id", u["id"]).execute()
+            written += len(batch)
+
+        offset += PAGE
+        if offset % 20000 == 0 or len(chunk) < PAGE:
+            print(
+                f"fill-qty progress: offset={offset} scanned={scanned} "
+                f"null_seen={null_seen} written={written} "
+                f"kom={with_kom} other={with_other}"
+            )
+        if len(chunk) < PAGE:
+            break
+
+    print(
+        f"Fill-qty-null done. scanned={scanned} null_seen={null_seen} "
+        f"written={written} kom={with_kom} other={with_other}"
+    )
+    for e in examples:
+        print(" ", e)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
@@ -334,6 +422,11 @@ def main() -> int:
         "--fix-multipack",
         action="store_true",
         help="Ispravi quantity_* za Naziv NxM jedinica",
+    )
+    parser.add_argument(
+        "--fill-qty-null",
+        action="store_true",
+        help="Popuni quantity_* samo gdje quantity_value IS NULL (kom parser)",
     )
     parser.add_argument(
         "--sample",
@@ -364,6 +457,9 @@ def main() -> int:
 
     if args.fix_multipack:
         return run_fix_multipack(sb, dry_run=args.dry_run, batch_size=args.batch_size)
+
+    if args.fill_qty_null:
+        return run_fill_qty_null(sb, dry_run=args.dry_run, batch_size=args.batch_size)
 
     types_only = args.types_only
     if types_only:
