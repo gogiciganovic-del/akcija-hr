@@ -26,7 +26,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client
 
-from quantity_parse import enrich_from_name, match_product_type
+from quantity_parse import enrich_from_name, match_product_type, parse_quantity_from_name
+import quantity_parse as qp
+import re
 
 ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT.parent / ".env")
@@ -35,6 +37,10 @@ load_dotenv(ROOT / ".env")
 PAGE = 1000
 BATCH = 800
 DONE_EMPTY_UNIT = ""
+_MULTIPACK_DETECT = re.compile(
+    r"\d+\s*[x×*]\s*\d+(?:[.,]\d+)?\s*(?:kg|g|gr|ml|l)\b",
+    re.IGNORECASE,
+)
 
 
 def fetch_pending_full_page(sb, page_size: int) -> list[dict]:
@@ -183,6 +189,133 @@ def run_sample(sb, n: int) -> int:
     return 0
 
 
+def run_retype_all(sb, *, dry_run: bool, batch_size: int) -> int:
+    """Presloži product_type za SVE retke (novi rječnik / podtipovi)."""
+    qp._PRODUCT_TYPE_MATCHES = {}
+    print("Retype-all: učitavam retke page-by-page ...")
+    written = 0
+    with_type = 0
+    offset = 0
+    while True:
+        res = (
+            sb.table("regular_prices")
+            .select("id, name, quantity_value, quantity_unit")
+            .range(offset, offset + PAGE - 1)
+            .execute()
+        )
+        chunk = res.data or []
+        if not chunk:
+            break
+        payloads = []
+        for row in chunk:
+            pt = match_product_type(row.get("name")) or None
+            if pt:
+                with_type += 1
+            payloads.append(
+                {
+                    "id": row["id"],
+                    "quantity_value": row.get("quantity_value"),
+                    "quantity_unit": row.get("quantity_unit"),
+                    "product_type": pt,
+                }
+            )
+        if dry_run:
+            print("dry-run sample:", payloads[:3])
+            print(f"dry-run: page has {len(payloads)}, stopping")
+            return 0
+        for i in range(0, len(payloads), batch_size):
+            batch = payloads[i : i + batch_size]
+            # null = nema tipa (JSON null uz prisutan key briše stari krivi tip)
+            try:
+                rpc_batch_update(sb, batch)
+            except Exception as e:
+                print(f"RPC failed ({e}); per-row", file=sys.stderr)
+                for u in batch:
+                    sb.table("regular_prices").update(
+                        {"product_type": u["product_type"]}
+                    ).eq("id", u["id"]).execute()
+            written += len(batch)
+        offset += PAGE
+        print(f"retype progress: written={written} with_type={with_type}")
+        if len(chunk) < PAGE:
+            break
+    print(f"Retype-all done. written={written} with_type={with_type}")
+    return 0
+
+
+def run_fix_multipack(sb, *, dry_run: bool, batch_size: int) -> int:
+    """Ažuriraj quantity_* samo za nazive s NxM jedinica."""
+    print("Fix-multipack: skeniram retke ...")
+    fixed = 0
+    scanned = 0
+    offset = 0
+    examples: list[str] = []
+    while True:
+        res = (
+            sb.table("regular_prices")
+            .select("id, name, quantity_value, quantity_unit, product_type")
+            .range(offset, offset + PAGE - 1)
+            .execute()
+        )
+        chunk = res.data or []
+        if not chunk:
+            break
+        payloads = []
+        for row in chunk:
+            scanned += 1
+            name = row.get("name") or ""
+            if not _MULTIPACK_DETECT.search(name):
+                continue
+            qv, qu = parse_quantity_from_name(name)
+            if qv is None or not qu:
+                continue
+            old_qv = row.get("quantity_value")
+            try:
+                old_f = float(old_qv) if old_qv is not None else None
+            except (TypeError, ValueError):
+                old_f = None
+            if old_f is not None and abs(old_f - qv) < 1e-6 and row.get("quantity_unit") == qu:
+                continue
+            payloads.append(
+                {
+                    "id": row["id"],
+                    "quantity_value": qv,
+                    "quantity_unit": qu,
+                    "product_type": row.get("product_type"),
+                }
+            )
+            if len(examples) < 8:
+                examples.append(f"{name[:50]} → {qv} {qu} (was {old_qv})")
+        if dry_run and payloads:
+            print("dry-run multipack sample:", payloads[:3])
+            for e in examples:
+                print(" ", e)
+            return 0
+        for i in range(0, len(payloads), batch_size):
+            batch = payloads[i : i + batch_size]
+            try:
+                rpc_batch_update(sb, batch)
+            except Exception as e:
+                print(f"RPC failed ({e}); per-row", file=sys.stderr)
+                for u in batch:
+                    sb.table("regular_prices").update(
+                        {
+                            "quantity_value": u["quantity_value"],
+                            "quantity_unit": u["quantity_unit"],
+                        }
+                    ).eq("id", u["id"]).execute()
+            fixed += len(batch)
+        offset += PAGE
+        if offset % 10000 == 0:
+            print(f"multipack scan offset={offset} fixed_so_far={fixed}")
+        if len(chunk) < PAGE:
+            break
+    print(f"Fix-multipack done. scanned={scanned} fixed={fixed}")
+    for e in examples:
+        print(" ", e)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
@@ -191,6 +324,16 @@ def main() -> int:
         "--types-only",
         action="store_true",
         help="Samo retci s product_type IS NULL; update samo tip (migracija 012)",
+    )
+    parser.add_argument(
+        "--retype-all",
+        action="store_true",
+        help="Presloži product_type za sve retke (novi rječnik)",
+    )
+    parser.add_argument(
+        "--fix-multipack",
+        action="store_true",
+        help="Ispravi quantity_* za Naziv NxM jedinica",
     )
     parser.add_argument(
         "--sample",
@@ -211,9 +354,16 @@ def main() -> int:
         return 1
 
     sb = create_client(url.strip().strip('"'), key.strip().strip('"'))
+    qp._PRODUCT_TYPE_MATCHES = {}
 
     if args.sample:
         return run_sample(sb, args.sample)
+
+    if args.retype_all:
+        return run_retype_all(sb, dry_run=args.dry_run, batch_size=args.batch_size)
+
+    if args.fix_multipack:
+        return run_fix_multipack(sb, dry_run=args.dry_run, batch_size=args.batch_size)
 
     types_only = args.types_only
     if types_only:

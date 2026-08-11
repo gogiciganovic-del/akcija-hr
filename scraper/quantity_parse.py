@@ -82,16 +82,43 @@ _QTY_RE = re.compile(
     re.IGNORECASE,
 )
 
+_MULTIPACK_RE = re.compile(
+    r"(\d+)\s*[x×*]\s*(\d+(?:[.,]\d+)?)\s*"
+    r"(kg|g|gr|grama|gram|ml|mililitara|mililitar|l|lit|litara|litra|litre)\b",
+    re.IGNORECASE,
+)
+
 _TOKEN_SPLIT = re.compile(r"[^A-ZČĆŽŠĐ0-9.]+", re.IGNORECASE)
 _NUM_ONLY = re.compile(r"^\d+([.,]\d+)?$")
 
 
 def parse_quantity_from_name(name: str | None) -> tuple[float | None, str | None]:
-    """Vrati (quantity_value, quantity_unit) ili (None, None)."""
+    """Vrati (quantity_value, quantity_unit) ili (None, None).
+
+    Multipack (6x1,5L) → ukupna količina. '16 rola' bez kg/L → None.
+    """
     if not name:
         return None, None
+    text = str(name)
+
+    best_multi: tuple[float, str] | None = None
+    for m in _MULTIPACK_RE.finditer(text):
+        try:
+            count = int(m.group(1))
+            unit_val = float(m.group(2).replace(",", "."))
+        except ValueError:
+            continue
+        if count <= 0 or unit_val <= 0:
+            continue
+        unit = UNIT_MAP.get(m.group(3).lower())
+        if not unit:
+            continue
+        best_multi = (count * unit_val, unit)
+    if best_multi:
+        return best_multi[0], best_multi[1]
+
     best: tuple[float, str] | None = None
-    for m in _QTY_RE.finditer(str(name)):
+    for m in _QTY_RE.finditer(text):
         try:
             value = float(m.group(1).replace(",", "."))
         except ValueError:
@@ -126,16 +153,17 @@ def tokenize_name_for_type(name: str | None) -> list[str]:
 
 
 def match_product_type(name: str | None) -> str | None:
-    """Prođi sve riječi; najduži match; pri istoj duljini — kasnija riječ."""
+    """Prođi sve riječi; najduži match; podtipovi (key s '_') imaju prednost."""
     mmap = get_match_map()
     best_key: str | None = None
-    best_len = -1
+    best_score = -1
     for token in tokenize_name_for_type(name):
         key = mmap.get(token)
         if not key:
             continue
-        if len(token) >= best_len:
-            best_len = len(token)
+        score = len(token) + (100 if "_" in key else 0)
+        if score >= best_score:
+            best_score = score
             best_key = key
     return best_key
 

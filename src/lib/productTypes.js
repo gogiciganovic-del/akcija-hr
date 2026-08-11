@@ -1,8 +1,7 @@
 /**
  * Tipovi proizvoda za €/kg usporedbu (riječi iz naziva → tip).
- * Izvor: top riječi iz regular_prices.name; brendovi/šum izbačeni.
- *
- * matches: UPPER varijante; matchProductType prolazi sve riječi (ne samo prvu).
+ * matches: samo generičke riječi vrste — bez brendova.
+ * matchProductType prolazi sve riječi; najduži token pobjeđuje (podtipovi).
  */
 
 /**
@@ -12,24 +11,43 @@
 /** @type {ProductType[]} */
 export const PRODUCT_TYPES = [
   { key: "vino", label: "Vino", matches: ["VINO", "VINA"] },
-  { key: "sir", label: "Sir", matches: ["SIR", "MOZZARELLA", "ENCIAN"] },
-  { key: "kruh", label: "Kruh", matches: ["KRUH", "BAGUETTE", "TOAST", "DVOPEK"] },
+  { key: "sir", label: "Sir", matches: ["SIR", "MOZZARELLA"] },
+  { key: "kruh", label: "Kruh", matches: ["KRUH", "BAGUETTE", "TOAST"] },
+  { key: "dvopek", label: "Dvopek", matches: ["DVOPEK"] },
   { key: "keks", label: "Keks", matches: ["KEKS", "KEKSI", "KREKER", "KREKERI", "VAFEL", "VAFL", "BISKVIT", "NAPOLITANKE"] },
   { key: "pivo", label: "Pivo", matches: ["PIVO", "CIDER"] },
   { key: "sok", label: "Sok", matches: ["SOK", "NEKTAR", "SMOOTHIE"] },
-  // KAKAO namjerno nije ovdje — često je okus (keks/čokolada), ne tip „kava”
-  { key: "kava", label: "Kava", matches: ["KAVA", "CAPPUCCINO"] },
-  { key: "napitak", label: "Napitak", matches: ["NAPITAK", "GAZ.PIĆE", "GAZIRANO"] },
+
+  // Kava — podtipovi (duži token pobjeđuje generički KAVA)
+  { key: "kava_mljevena", label: "Kava mljevena", matches: ["MLJEVENA", "MLJEVE"] },
+  { key: "kava_zrno", label: "Kava u zrnu", matches: ["ZRNO", "ZRNA"] },
+  { key: "kava_instant", label: "Kava instant", matches: ["INSTANT", "3U1"] },
+  { key: "kava_cappuccino", label: "Cappuccino", matches: ["CAPPUCCINO"] },
+  { key: "kava", label: "Kava", matches: ["KAVA"] },
+
+  { key: "napitak", label: "Napitak", matches: ["NAPITAK", "GAZ.PIĆE", "PIĆE"] },
   { key: "caj", label: "Čaj", matches: ["ČAJ", "CAJ"] },
   { key: "sladoled", label: "Sladoled", matches: ["SLADOLED"] },
   { key: "umak", label: "Umak", matches: ["UMAK", "KEČAP", "KETCHUP", "SENF", "MAJONEZA", "PESTO", "PRELJEV", "DRESSING"] },
   { key: "liker", label: "Liker", matches: ["LIKER"] },
   { key: "zacin", label: "Začin", matches: ["ZAČIN", "ZACIN", "PAPAR", "SOL", "AROMA"] },
   { key: "pecivo", label: "Pecivo", matches: ["PECIVO", "CROISSANT", "KROASAN", "KRAFNA", "BUREK", "PITA", "DONUT", "MUFFIN", "PANETTONE"] },
+
+  // Voda — podtipovi
+  { key: "voda_gazirana", label: "Voda gazirana", matches: ["GAZIRANA", "GAZIRANE"] },
+  { key: "voda_negazirana", label: "Voda negazirana", matches: ["NEGAZIRANA", "NEGAZIRANE", "NEGAZ"] },
+  { key: "voda_mineralna", label: "Voda mineralna", matches: ["MINERALNA", "MINERALNE", "MINERAL"] },
   { key: "voda", label: "Voda", matches: ["VODA"] },
+
   { key: "cokolada", label: "Čokolada", matches: ["ČOKOLADA", "COKOLADA", "ČOK.", "ČOK", "PRALINE", "ČOKOLADNI", "ČOKOLADNA", "COKOLADNA", "ČOKOLADNE", "ČOKOL"] },
-  { key: "jogurt", label: "Jogurt", matches: ["JOGURT", "KEFIR"] },
-  { key: "ulje", label: "Ulje", matches: ["ULJE"] },
+  { key: "jogurt", label: "Jogurt", matches: ["JOGURT"] },
+  { key: "kefir", label: "Kefir", matches: ["KEFIR"] },
+
+  // Ulje — podtipovi
+  { key: "ulje_maslinovo", label: "Maslinovo ulje", matches: ["MASLINOVO"] },
+  { key: "ulje_suncokretovo", label: "Suncokretovo ulje", matches: ["SUNCOKRETOVO", "SUNCOKRET"] },
+  { key: "ulje", label: "Ulje", matches: ["ULJE", "KIKIRIKIJA", "KOKOSOVO", "BUČINO", "REPIČINO", "PALMINO"] },
+
   { key: "namaz", label: "Namaz", matches: ["NAMAZ", "HUMMUS"] },
   { key: "mlijeko", label: "Mlijeko", matches: ["MLIJEKO"] },
   { key: "cips", label: "Čips", matches: ["ČIPS", "CIPS", "FLIPS", "SNACK", "KOKICE"] },
@@ -38,7 +56,10 @@ export const PRODUCT_TYPES = [
   { key: "pasteta", label: "Pašteta", matches: ["PAŠTETA", "PASTETA"] },
   { key: "tuna", label: "Tuna", matches: ["TUNA", "TUNJ"] },
   { key: "tjestenina", label: "Tjestenina", matches: ["TJESTENINA", "TJ.", "TJEST", "NJOKI", "LASAGNE", "MLINCI"] },
-  { key: "kobasica", label: "Kobasica", matches: ["KOBASICA", "KULEN", "HRENOVKE", "KRANJSKA"] },
+  { key: "kobasica", label: "Kobasica", matches: ["KOBASICA"] },
+  { key: "kulen", label: "Kulen", matches: ["KULEN"] },
+  { key: "hrenovke", label: "Hrenovke", matches: ["HRENOVKE"] },
+  { key: "kranjska", label: "Kranjska", matches: ["KRANJSKA"] },
   { key: "gin", label: "Gin", matches: ["GIN"] },
   { key: "kolac", label: "Kolač", matches: ["KOLAČ", "TORTA", "ŠTRUDLA", "DESERT"] },
   { key: "kasica", label: "Kašica", matches: ["KAŠICA", "KASICA", "KAŠA"] },
@@ -66,7 +87,12 @@ export const PRODUCT_TYPES = [
   { key: "tijesto", label: "Tijesto", matches: ["TIJESTO", "LISNATO"] },
   { key: "jaja", label: "Jaja", matches: ["JAJA"] },
   { key: "pizza", label: "Pizza", matches: ["PIZZA"] },
+
+  // Brašno — podtipovi
+  { key: "brasno_ostro", label: "Brašno oštro", matches: ["OŠTRO", "OSTRO"] },
+  { key: "brasno_glatko", label: "Brašno glatko", matches: ["GLATKO"] },
   { key: "brasno", label: "Brašno", matches: ["BRAŠNO", "BRASNO"] },
+
   { key: "maslac", label: "Maslac", matches: ["MASLAC", "MARGARIN"] },
   { key: "jabuka", label: "Jabuka", matches: ["JABUKA"] },
   { key: "kukuruz", label: "Kukuruz", matches: ["KUKURUZ"] },
@@ -106,6 +132,19 @@ export const PRODUCT_TYPES = [
   { key: "cocktail", label: "Cocktail", matches: ["COCKTAIL"] },
   { key: "salvete", label: "Salvete", matches: ["SALVETE"] },
   { key: "zobena", label: "Zobena", matches: ["ZOBENA"] },
+
+  // Nedostajući iz testa košarice + kućanstvo
+  { key: "banana", label: "Banana", matches: ["BANANA", "BANANE"] },
+  { key: "meso_piletina", label: "Piletina", matches: ["PILETINA", "PILEĆI", "PILECI", "PILEĆA", "PILECA"] },
+  { key: "meso_svinjetina", label: "Svinjetina", matches: ["SVINJETINA", "SVINJSKI", "SVINJSKA"] },
+  { key: "meso_junetina", label: "Junetina", matches: ["JUNETINA", "JUNEĆI", "JUNECI", "JUNEĆA", "GOVEDINA"] },
+  { key: "meso", label: "Meso", matches: ["MESO", "PURETINA", "TELETINA", "JANJETINA", "MLJEVENO"] },
+  { key: "papir", label: "Papir", matches: ["PAPIR", "UBRUSI", "UBRUS"] },
+  { key: "sampon", label: "Šampon", matches: ["ŠAMPON", "SAMPON"] },
+  { key: "sapun", label: "Sapun", matches: ["SAPUN"] },
+  { key: "losion", label: "Losjon", matches: ["LOSION", "LOSIONA"] },
+  { key: "omeksivac", label: "Omekšivač", matches: ["OMEKŠIVAČ", "OMEKSIVAC"] },
+  { key: "krpa", label: "Krpa", matches: ["KRPA", "KRPE"] },
 ];
 
 /** Map: UPPER match token → product type key */
@@ -163,20 +202,21 @@ export function tokenizeNameForType(name) {
 }
 
 /**
- * Tip proizvoda: prolazi sve riječi; ako više pogodaka — najduži match token
- * (npr. PROTEINSKI > PROTEIN); pri istoj duljini — kasnija riječ u nazivu.
+ * Tip proizvoda: prolazi sve riječi; najduži match token.
+ * Podtipovi (key s '_') imaju prednost nad generičkim tipom iste obitelji.
  * @param {string | null | undefined} name
  * @returns {string | null} product_type key
  */
 export function matchProductType(name) {
   const tokens = tokenizeNameForType(name || "");
   let bestKey = null;
-  let bestLen = -1;
+  let bestScore = -1;
   for (const token of tokens) {
     const key = MATCH_TO_KEY.get(token);
     if (!key) continue;
-    if (token.length >= bestLen) {
-      bestLen = token.length;
+    const score = token.length + (key.includes("_") ? 100 : 0);
+    if (score >= bestScore) {
+      bestScore = score;
       bestKey = key;
     }
   }

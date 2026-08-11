@@ -1,6 +1,6 @@
 /**
  * Parsiranje količine iz naziva proizvoda.
- * Podržava: "0,75 L", "625ml", "cca 850g", "155 g", "1kg", "1,5 kg"
+ * Podržava: "0,75 L", "625ml", "cca 850g", "6x1.5L", "6 x 1,5 l", "4x80 g"
  */
 
 const UNIT_MAP = {
@@ -20,9 +20,34 @@ const UNIT_MAP = {
   litre: "L",
 };
 
+const UNIT_ALT = "kg|g|gr|grama|gram|ml|mililitara|mililitar|l|lit|litara|litra|litre";
+
 /**
  * @typedef {{ value: number, unit: 'g'|'kg'|'ml'|'L' }} ParsedQuantity
  */
+
+/**
+ * Multipack: "6x1.5L", "6 x 1,5 l", "4×80 g" → ukupna količina.
+ * @param {string} s
+ * @returns {ParsedQuantity | null}
+ */
+function parseMultipack(s) {
+  const re = new RegExp(
+    `(\\d+)\\s*[x×*]\\s*(\\d+(?:[.,]\\d+)?)\\s*(${UNIT_ALT})\\b`,
+    "gi"
+  );
+  let best = null;
+  let m;
+  while ((m = re.exec(s)) !== null) {
+    const count = parseInt(m[1], 10);
+    const unitVal = parseFloat(m[2].replace(",", "."));
+    const unit = UNIT_MAP[m[3].toLowerCase()];
+    if (!Number.isFinite(count) || count <= 0) continue;
+    if (!Number.isFinite(unitVal) || unitVal <= 0 || !unit) continue;
+    best = { value: count * unitVal, unit };
+  }
+  return best;
+}
 
 /**
  * @param {string | null | undefined} name
@@ -32,9 +57,15 @@ export function parseQuantityFromName(name) {
   const s = String(name || "");
   if (!s.trim()) return null;
 
-  // cca / ca / approx optional, number with . or ,, optional space, unit
-  const re =
-    /(?:\bcca|\bca|\bapprox\.?)?\s*(\d+(?:[.,]\d+)?)\s*(kg|g|gr|grama|gram|ml|mililitara|mililitar|l|lit|litara|litra|litre)\b/gi;
+  // Multipack ima prednost (ukupna količina, ne jedan komad)
+  const multi = parseMultipack(s);
+  if (multi) return multi;
+
+  // Jedna količina: cca / ca / approx optional
+  const re = new RegExp(
+    `(?:\\bcca|\\bca|\\bapprox\\.?)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(${UNIT_ALT})\\b`,
+    "gi"
+  );
 
   let best = null;
   let m;
@@ -42,10 +73,8 @@ export function parseQuantityFromName(name) {
     const rawNum = m[1].replace(",", ".");
     const value = parseFloat(rawNum);
     if (!Number.isFinite(value) || value <= 0) continue;
-    const unitKey = m[2].toLowerCase();
-    const unit = UNIT_MAP[unitKey];
+    const unit = UNIT_MAP[m[2].toLowerCase()];
     if (!unit) continue;
-    // Prefer later match (often pack size at end) but keep first decent if none
     best = { value, unit };
   }
   return best;
