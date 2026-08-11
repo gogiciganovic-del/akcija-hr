@@ -20,7 +20,7 @@ export const PRODUCT_TYPES = [
 
   // Kava — podtipovi (duži token pobjeđuje generički KAVA)
   { key: "kava_mljevena", label: "Kava mljevena", matches: ["MLJEVENA", "MLJEVE"] },
-  { key: "kava_zrno", label: "Kava u zrnu", matches: ["ZRNO", "ZRNA"] },
+  { key: "kava_zrno", label: "Kava u zrnu", matches: ["ZRNIMA", "ZRNITO"] },
   { key: "kava_instant", label: "Kava instant", matches: ["INSTANT", "3U1"] },
   { key: "kava_cappuccino", label: "Cappuccino", matches: ["CAPPUCCINO"] },
   { key: "kava", label: "Kava", matches: ["KAVA"] },

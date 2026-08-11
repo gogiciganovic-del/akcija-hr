@@ -42,7 +42,8 @@ function quantityInBase(value, unit) {
 
 /**
  * Značajne riječi naziva: bez brojeva/jedinica i bez tokena tipa (SIR, ULJE, KAVA…).
- * Zahtjev za fallback: barem jedna zajednička s kandidatom.
+ * Zahtjev za fallback: barem jedna zajednička s kandidatom — osim kad naziv
+ * nema druge riječi osim tipa (npr. „Maslinovo ulje”); tada dovoljan tip+pakiranje.
  */
 function significantNameTokens(name, typeMeta) {
   const typeTokens = new Set(
@@ -52,11 +53,15 @@ function significantNameTokens(name, typeMeta) {
   if (typeMeta?.label) {
     for (const t of tokenizeNameForType(typeMeta.label)) typeTokens.add(t)
   }
+  // Ambalaža / šum — ne broje se kao „zajednička riječ”
+  for (const w of ["PET", "PACK", "PROMO", "XXL", "DUO", "SET", "MINI"]) {
+    typeTokens.add(w)
+  }
   return tokenizeNameForType(name).filter((t) => t.length >= 3 && !typeTokens.has(t))
 }
 
 function sharesSignificantWord(queryTokens, candidateName, typeMeta) {
-  if (!queryTokens.length) return false
+  if (!queryTokens.length) return true
   const cand = new Set(significantNameTokens(candidateName, typeMeta))
   return queryTokens.some((t) => cand.has(t))
 }
@@ -96,8 +101,6 @@ async function resolveByTypeUnitPrice(item, chain) {
   if (wantedBaseQty == null) return null
 
   const querySig = significantNameTokens(name, typeMeta)
-  // Bez druge značajne riječi ne možemo razlikovati "ulje" od "ulje" — bolje nedostupno
-  if (!querySig.length) return null
 
   const cols =
     'barcode, name, brand, chain, price, special_price, product_type, quantity_value, quantity_unit'
