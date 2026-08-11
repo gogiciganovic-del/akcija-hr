@@ -204,16 +204,28 @@ export function tokenizeNameForType(name) {
 /**
  * Tip proizvoda: prolazi sve riječi; najduži match token.
  * Podtipovi (key s '_') imaju prednost nad generičkim tipom iste obitelji.
+ * Posebno: „mljevena kava“ (ne sama MLJEVENA — to je i meso).
  * @param {string | null | undefined} name
  * @returns {string | null} product_type key
  */
 export function matchProductType(name) {
   const tokens = tokenizeNameForType(name || "");
+  const tokenSet = new Set(tokens);
+
+  // Kava mljevena samo kad je i KAVA u nazivu (inače MLJEVENA = meso)
+  if (
+    tokenSet.has("KAVA") &&
+    (tokenSet.has("MLJEVENA") || tokenSet.has("MLJEVE") || tokenSet.has("MLJEVENOG"))
+  ) {
+    return "kava_mljevena";
+  }
+
   let bestKey = null;
   let bestScore = -1;
   for (const token of tokens) {
     const key = MATCH_TO_KEY.get(token);
     if (!key) continue;
+    if (key === "kava_mljevena") continue; // samo preko compound pravila gore
     const score = token.length + (key.includes("_") ? 100 : 0);
     if (score >= bestScore) {
       bestScore = score;

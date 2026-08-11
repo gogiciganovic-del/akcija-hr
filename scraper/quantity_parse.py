@@ -153,13 +153,26 @@ def tokenize_name_for_type(name: str | None) -> list[str]:
 
 
 def match_product_type(name: str | None) -> str | None:
-    """Prođi sve riječi; najduži match; podtipovi (key s '_') imaju prednost."""
+    """Prođi sve riječi; najduži match; podtipovi (key s '_') imaju prednost.
+
+    „mljevena kava“ samo uz KAVA — sama MLJEVENA je često meso.
+    """
     mmap = get_match_map()
+    tokens = tokenize_name_for_type(name)
+    token_set = set(tokens)
+
+    if "KAVA" in token_set and (
+        "MLJEVENA" in token_set or "MLJEVE" in token_set or "MLJEVENOG" in token_set
+    ):
+        return "kava_mljevena"
+
     best_key: str | None = None
     best_score = -1
-    for token in tokenize_name_for_type(name):
+    for token in tokens:
         key = mmap.get(token)
         if not key:
+            continue
+        if key == "kava_mljevena":
             continue
         score = len(token) + (100 if "_" in key else 0)
         if score >= best_score:
