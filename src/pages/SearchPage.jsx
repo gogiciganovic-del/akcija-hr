@@ -16,6 +16,7 @@ import {
   pricePerBaseUnit,
   formatPricePerUnit,
 } from "../lib/quantityParse";
+import { matchProductType } from "../lib/productTypes";
 
 function highlight(text, query) {
   if (!query) return text;
@@ -56,7 +57,100 @@ function SourceBadge({ source }) {
   );
 }
 
+/** Jedinična cijena — slična težina kao REDOVNA/AKCIJA, diskretnije boje. */
+function UnitPriceBadge({ label }) {
+  if (!label) return null;
+  return (
+    <span
+      className="inline-flex flex-shrink-0 font-bold rounded px-1.5 py-0.5 tabular-nums"
+      style={{
+        fontSize: 10,
+        letterSpacing: "0.02em",
+        color: "#bae6fd",
+        background: "rgba(56, 189, 248, 0.16)",
+        border: "1px solid rgba(125, 211, 252, 0.35)",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function median(nums) {
+  if (!nums.length) return null;
+  const s = [...nums].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+/** @returns {{ perUnit: number, unitLabel: string, typeKey: string|null } | null} */
+function getUnitPriceInfo(p) {
+  const price = p.salePrice ?? p.price;
+  if (price == null || !(Number(price) > 0)) return null;
+
+  let qv = p.quantity_value ?? p.quantityValue;
+  let qu = p.quantity_unit ?? p.quantityUnit;
+  if (qv == null || !qu) {
+    const parsed = parseQuantityFromName(p.name);
+    if (parsed) {
+      qv = parsed.value;
+      qu = parsed.unit;
+    }
+  }
+  const per = pricePerBaseUnit(price, qv, qu);
+  if (!per || !(per.perUnit > 0)) return null;
+
+  const typeKey = p.product_type || p.productType || matchProductType(p.name) || null;
+  return { perUnit: per.perUnit, unitLabel: per.unitLabel, typeKey };
+}
+
+function sortByUnitPrice(list) {
+  const annotated = list.map((p, index) => ({ p, index, info: getUnitPriceInfo(p) }));
+
+  /** @type {Map<string, number[]>} */
+  const byType = new Map();
+  for (const a of annotated) {
+    if (!a.info?.typeKey) continue;
+    const arr = byType.get(a.info.typeKey) || [];
+    arr.push(a.info.perUnit);
+    byType.set(a.info.typeKey, arr);
+  }
+
+  /** @type {Map<string, number>} */
+  const medByType = new Map();
+  for (const [key, vals] of byType) {
+    const med = median(vals);
+    if (med != null && med > 0) medByType.set(key, med);
+  }
+
+  const rankable = [];
+  const rest = [];
+  for (const a of annotated) {
+    if (!a.info) {
+      rest.push(a);
+      continue;
+    }
+    const { perUnit, typeKey } = a.info;
+    if (typeKey && medByType.has(typeKey)) {
+      const med = medByType.get(typeKey);
+      if (perUnit < med / 5 || perUnit > 5 * med) {
+        rest.push(a);
+        continue;
+      }
+    }
+    rankable.push(a);
+  }
+
+  rankable.sort((a, b) => {
+    const d = a.info.perUnit - b.info.perUnit;
+    return d !== 0 ? d : a.index - b.index;
+  });
+  rest.sort((a, b) => a.index - b.index);
+  return [...rankable, ...rest].map((a) => a.p);
+}
+
 function sortProducts(list, sortMode) {
+  if (sortMode === "unit_price_asc") return sortByUnitPrice(list);
   const copy = [...list];
   if (sortMode === "price_asc") {
     copy.sort((a, b) => (a.salePrice ?? 0) - (b.salePrice ?? 0));
@@ -76,19 +170,9 @@ function sortProducts(list, sortMode) {
 }
 
 function unitPriceLabel(p) {
-  const price = p.salePrice ?? p.price;
-  let qv = p.quantity_value ?? p.quantityValue;
-  let qu = p.quantity_unit ?? p.quantityUnit;
-  if (qv == null || !qu) {
-    const parsed = parseQuantityFromName(p.name);
-    if (parsed) {
-      qv = parsed.value;
-      qu = parsed.unit;
-    }
-  }
-  const per = pricePerBaseUnit(price, qv, qu);
-  if (!per) return null;
-  return formatPricePerUnit(per.perUnit, per.unitLabel);
+  const info = getUnitPriceInfo(p);
+  if (!info) return null;
+  return formatPricePerUnit(info.perUnit, info.unitLabel);
 }
 
 function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta, isCheapest }) {
@@ -163,26 +247,26 @@ function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta,
           </p>
         )}
         <div className="flex items-center gap-2">
-          <div>
-            {showStrike && (
-              <p
-                style={{
-                  color: "rgba(255,255,255,0.25)",
-                  fontSize: 10,
-                  textDecoration: "line-through",
-                }}
-              >
-                {fmt(p.originalPrice)}
+          <div className="flex items-end gap-2 min-w-0">
+            <div>
+              {showStrike && (
+                <p
+                  style={{
+                    color: "rgba(255,255,255,0.25)",
+                    fontSize: 10,
+                    textDecoration: "line-through",
+                  }}
+                >
+                  {fmt(p.originalPrice)}
+                </p>
+              )}
+              <p className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>
+                {fmt(p.salePrice)}
               </p>
-            )}
-            <p className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>
-              {fmt(p.salePrice)}
-            </p>
-            {perUnit && (
-              <p style={{ color: "rgba(255,255,255,0.38)", fontSize: 10, marginTop: 1 }}>
-                {perUnit}
-              </p>
-            )}
+            </div>
+            <div className="pb-0.5">
+              <UnitPriceBadge label={perUnit} />
+            </div>
           </div>
           {showDiscount && (
             <div
@@ -231,7 +315,7 @@ export function SearchPage({
   onGoCart,
 }) {
   const [query, setQuery] = useState("");
-  const [sortMode, setSort] = useState("discount");
+  const [sortMode, setSort] = useState("price_asc");
   const [catFilter, setCat] = useState("Sve");
   const [regularProducts, setRegularProducts] = useState([]);
   const [regularLoading, setRegularLoading] = useState(false);
@@ -251,7 +335,7 @@ export function SearchPage({
   const searchTerm = query.trim();
   const { products: saleProducts, loading: saleLoading } = useProducts({
     search: searchTerm || undefined,
-    sortBy: sortMode,
+    sortBy: sortMode === "unit_price_asc" ? "price_asc" : sortMode,
   });
 
   const runBarcodeLookup = useCallback(async (code) => {
@@ -421,10 +505,13 @@ export function SearchPage({
     priceSource: p.priceSource || "sale",
   }));
 
-  const merged = [
-    ...sortProducts(saleTagged, sortMode),
-    ...sortProducts(regularProducts, sortMode === "discount" ? "price_asc" : sortMode),
-  ];
+  const merged =
+    sortMode === "unit_price_asc"
+      ? sortProducts([...saleTagged, ...regularProducts], "unit_price_asc")
+      : [
+          ...sortProducts(saleTagged, sortMode),
+          ...sortProducts(regularProducts, sortMode === "discount" ? "price_asc" : sortMode),
+        ];
 
   const results =
     catFilter !== "Sve" ? merged.filter((p) => p.category === catFilter) : merged;
@@ -840,7 +927,7 @@ export function SearchPage({
 
       {!showingScan && query && (
         <div className="px-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between gap-2 mb-3">
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
               {loading ? (
                 "Tražim..."
@@ -850,18 +937,38 @@ export function SearchPage({
                 </>
               )}
             </p>
-            <button
-              type="button"
-              onClick={() => setSort((s) => (s === "discount" ? "price_asc" : "discount"))}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold"
+            <div
+              className="flex items-center rounded-xl p-0.5 flex-shrink-0"
               style={{
                 background: "rgba(255,255,255,0.05)",
                 border: "1px solid rgba(255,255,255,0.08)",
-                color: "rgba(255,255,255,0.6)",
               }}
+              role="group"
+              aria-label="Sortiranje"
             >
-              ↕ {sortMode === "discount" ? "Najveći popust" : "Najniža cijena"}
-            </button>
+              <button
+                type="button"
+                onClick={() => setSort("price_asc")}
+                className="px-2.5 py-1.5 rounded-[10px] text-[11px] font-semibold"
+                style={{
+                  background: sortMode !== "unit_price_asc" ? "rgba(255,255,255,0.12)" : "transparent",
+                  color: sortMode !== "unit_price_asc" ? "#fff" : "rgba(255,255,255,0.55)",
+                }}
+              >
+                Cijena
+              </button>
+              <button
+                type="button"
+                onClick={() => setSort("unit_price_asc")}
+                className="px-2.5 py-1.5 rounded-[10px] text-[11px] font-semibold"
+                style={{
+                  background: sortMode === "unit_price_asc" ? "rgba(56,189,248,0.22)" : "transparent",
+                  color: sortMode === "unit_price_asc" ? "#bae6fd" : "rgba(255,255,255,0.55)",
+                }}
+              >
+                Cijena po kg
+              </button>
+            </div>
           </div>
 
           {!loading && results.length > 0 && (
