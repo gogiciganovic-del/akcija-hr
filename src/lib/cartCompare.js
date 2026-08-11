@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { STORES, chainFromStoreName } from './constants'
-import { matchProductType, getProductType } from './productTypes'
+import { matchProductType, getProductType, tokenizeNameForType } from './productTypes'
 import { parseQuantityFromName, pricePerBaseUnit } from './quantityParse'
 
 function round2(n) {
@@ -31,6 +31,42 @@ function baseUnitOf(unit) {
   return null
 }
 
+/** Količina u baznoj jedinici (kg ili L) radi usporedbe pakiranja. */
+function quantityInBase(value, unit) {
+  const v = Number(value)
+  if (!Number.isFinite(v) || v <= 0) return null
+  if (unit === 'g' || unit === 'ml') return v / 1000
+  if (unit === 'kg' || unit === 'L') return v
+  return null
+}
+
+/**
+ * Značajne riječi naziva: bez brojeva/jedinica i bez tokena tipa (SIR, ULJE, KAVA…).
+ * Zahtjev za fallback: barem jedna zajednička s kandidatom.
+ */
+function significantNameTokens(name, typeMeta) {
+  const typeTokens = new Set(
+    (typeMeta?.matches || []).map((m) => String(m).toUpperCase())
+  )
+  if (typeMeta?.key) typeTokens.add(String(typeMeta.key).toUpperCase())
+  if (typeMeta?.label) {
+    for (const t of tokenizeNameForType(typeMeta.label)) typeTokens.add(t)
+  }
+  return tokenizeNameForType(name).filter((t) => t.length >= 3 && !typeTokens.has(t))
+}
+
+function sharesSignificantWord(queryTokens, candidateName, typeMeta) {
+  if (!queryTokens.length) return false
+  const cand = new Set(significantNameTokens(candidateName, typeMeta))
+  return queryTokens.some((t) => cand.has(t))
+}
+
+function packSizeOk(wantedBaseQty, candValue, candUnit) {
+  const candBase = quantityInBase(candValue, candUnit)
+  if (wantedBaseQty == null || candBase == null) return false
+  return candBase >= wantedBaseQty * 0.5 && candBase <= wantedBaseQty * 2
+}
+
 function median(nums) {
   if (!nums.length) return null
   const s = [...nums].sort((a, b) => a - b)
@@ -41,7 +77,8 @@ function median(nums) {
 /**
  * Fallback: najniži €/kg (ili €/L) unutar product_type u lancu.
  * Samo ako točan barkod/naziv nije pronađen.
- * Isključeno: cijena ≤ 0. Outlieri: €/jedinica izvan [med/5, 5×med].
+ * Filtri: cijena > 0, pakiranje 0,5×–2×, barem jedna zajednička značajna riječ,
+ * €/jedinica u [med/5, 5×med]. Bez kandidata → null (nedostupno).
  */
 async function resolveByTypeUnitPrice(item, chain) {
   const name = (item.name || '').trim()
@@ -54,6 +91,13 @@ async function resolveByTypeUnitPrice(item, chain) {
 
   const typeMeta = getProductType(typeKey)
   if (!typeMeta) return null
+
+  const wantedBaseQty = quantityInBase(qty.value, qty.unit)
+  if (wantedBaseQty == null) return null
+
+  const querySig = significantNameTokens(name, typeMeta)
+  // Bez druge značajne riječi ne možemo razlikovati "ulje" od "ulje" — bolje nedostupno
+  if (!querySig.length) return null
 
   const cols =
     'barcode, name, brand, chain, price, special_price, product_type, quantity_value, quantity_unit'
@@ -88,6 +132,8 @@ async function resolveByTypeUnitPrice(item, chain) {
   const cands = []
   for (const row of rows) {
     if (matchProductType(row.name) !== typeKey) continue
+    if (!sharesSignificantWord(querySig, row.name, typeMeta)) continue
+
     let qv = row.quantity_value != null ? Number(row.quantity_value) : null
     let qu = row.quantity_unit || null
     if (qv == null || !qu) {
@@ -97,6 +143,8 @@ async function resolveByTypeUnitPrice(item, chain) {
       qu = parsed.unit
     }
     if (baseUnitOf(qu) !== wantedBase) continue
+    if (!packSizeOk(wantedBaseQty, qv, qu)) continue
+
     const price = parsePrice(row.special_price) ?? parsePrice(row.price)
     if (price == null || price <= 0) continue
     const per = pricePerBaseUnit(price, qv, qu)
@@ -284,7 +332,8 @@ async function findSaleExact(name, chain) {
 /**
  * Primarni lanac: ukupna cijena + ušteda na akcijskim stavkama.
  * Ostali lanci: barkod → točan naziv → fallback najniži €/kg unutar product_type
- * (cijena > 0, medijan filter [1/5, 5×]). Tip-fallback nije isti artikl.
+ * (cijena > 0, pakiranje 0,5×–2×, zajednička značajna riječ, medijan [1/5, 5×]).
+ * Tip-fallback nije isti artikl; bez kandidata → nedostupno.
  *
  * @param {string} selectedChain
  * @param {Array<{ id?: string, name: string, barcode?: string|null, price?: number, originalPrice?: number, priceSource?: string }>} items
