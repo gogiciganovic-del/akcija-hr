@@ -8,6 +8,10 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { matchProductType, getProductType, tokenizeNameForType } from "../src/lib/productTypes.js";
 import { parseQuantityFromName, pricePerBaseUnit } from "../src/lib/quantityParse.js";
+import {
+  shouldSkipTypeFallbackCandidate,
+  shouldSkipTypeFallbackQuery,
+} from "../src/lib/typeFallbackFilters.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -57,15 +61,20 @@ function significantNameTokens(name, typeMeta) {
 }
 
 async function bestFallback(cartName, chain) {
-  if (isComboProduct(cartName)) return { ok: false, reason: "combo-2u1" };
+  if (isComboProduct(cartName)) return { ok: false, reason: "no_similar" };
   const typeKey = matchProductType(cartName);
   const qty = parseQuantityFromName(cartName);
   const typeMeta = getProductType(typeKey);
-  if (!typeKey || !qty || !typeMeta) return { ok: false, reason: "no-type-or-qty" };
+  if (!typeKey || !qty || !typeMeta || !baseUnit(qty.unit)) {
+    return { ok: false, reason: "cannot_compare" };
+  }
+  if (shouldSkipTypeFallbackQuery(cartName)) {
+    return { ok: false, reason: "no_similar" };
+  }
   const wantedBase = baseUnit(qty.unit);
   const wantedQty = qtyBase(qty.value, qty.unit);
   const wantedUnitSize = qty.unitValue != null ? qtyBase(qty.unitValue, qty.unit) : null;
-  if (!wantedBase || wantedQty == null) return { ok: false, reason: "no-type-or-qty" };
+  if (wantedQty == null) return { ok: false, reason: "cannot_compare" };
   const qSig = significantNameTokens(cartName, typeMeta);
   const needShared = !typeKey.includes("_");
 
@@ -77,10 +86,13 @@ async function bestFallback(cartName, chain) {
     .limit(100);
   if (error) return { ok: false, reason: error.message };
 
+  const typedRows = (data || []).filter((row) => matchProductType(row.name) === typeKey);
+  if (!typedRows.length) return { ok: false, reason: "not_in_catalog" };
+
   const cands = [];
-  for (const row of data || []) {
+  for (const row of typedRows) {
     if (isComboProduct(row.name)) continue;
-    if (matchProductType(row.name) !== typeKey) continue;
+    if (shouldSkipTypeFallbackCandidate(row.name, typeKey)) continue;
     if (needShared && qSig.length) {
       const cSig = new Set(significantNameTokens(row.name, typeMeta));
       if (!qSig.some((t) => cSig.has(t))) continue;
@@ -105,7 +117,7 @@ async function bestFallback(cartName, chain) {
     if (!per) continue;
     cands.push(row.name);
   }
-  if (!cands.length) return { ok: false, reason: "no-candidates" };
+  if (!cands.length) return { ok: false, reason: "no_similar" };
   return { ok: true, name: cands[0], n: cands.length };
 }
 

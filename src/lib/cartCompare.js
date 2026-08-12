@@ -2,6 +2,13 @@ import { supabase } from './supabase'
 import { STORES, chainFromStoreName } from './constants'
 import { matchProductType, getProductType, tokenizeNameForType } from './productTypes'
 import { parseQuantityFromName, pricePerBaseUnit } from './quantityParse'
+import {
+  shouldSkipTypeFallbackCandidate,
+  shouldSkipTypeFallbackQuery,
+  UNAVAILABLE_REASON_LABELS,
+} from './typeFallbackFilters.js'
+
+export { UNAVAILABLE_REASON_LABELS, unavailableReasonLabel } from './typeFallbackFilters.js'
 
 function round2(n) {
   return Math.round(n * 100) / 100
@@ -96,27 +103,34 @@ function median(nums) {
 }
 
 /**
- * Fallback: najniži €/kg (ili €/L) unutar product_type u lancu.
- * Samo ako točan barkod/naziv nije pronađen.
- * Filtri: cijena > 0, pakiranje 0,5×–2×, bez 2u1 kombinacija,
- * zajednička značajna riječ samo za generičke tipove (ne podtipove),
- * €/jedinica u [med/5, 5×med]. Bez kandidata → null (nedostupno).
+ * Fallback: najniži €/kg (ili €/L / €/kom) unutar product_type u lancu.
+ * Vraća { available: true, ... } ili { available: false, unavailableReason }.
  */
 async function resolveByTypeUnitPrice(item, chain) {
   const name = (item.name || '').trim()
-  if (isComboProduct(name)) return null
+  if (isComboProduct(name)) {
+    return { available: false, unavailableReason: 'no_similar' }
+  }
   const typeKey = matchProductType(name)
   const qty = parseQuantityFromName(name)
-  if (!typeKey || !qty) return null
+  if (!typeKey || !qty) {
+    return { available: false, unavailableReason: 'cannot_compare' }
+  }
 
   const wantedBase = baseUnitOf(qty.unit)
-  if (!wantedBase) return null
+  if (!wantedBase) {
+    return { available: false, unavailableReason: 'cannot_compare' }
+  }
 
   const typeMeta = getProductType(typeKey)
-  if (!typeMeta) return null
+  if (!typeMeta) {
+    return { available: false, unavailableReason: 'cannot_compare' }
+  }
 
   const wantedBaseQty = quantityInBase(qty.value, qty.unit)
-  if (wantedBaseQty == null) return null
+  if (wantedBaseQty == null) {
+    return { available: false, unavailableReason: 'cannot_compare' }
+  }
   const wantedUnitSizeBase =
     qty.unitValue != null ? quantityInBase(qty.unitValue, qty.unit) : null
 
@@ -139,7 +153,9 @@ async function resolveByTypeUnitPrice(item, chain) {
     const tokens = typeMeta.matches
       .filter((m) => /^[\p{L}\p{N}]+$/u.test(m) && m.length >= 3)
       .slice(0, 5)
-    if (!tokens.length) return null
+    if (!tokens.length) {
+      return { available: false, unavailableReason: 'not_in_catalog' }
+    }
     const orFilter = tokens.map((t) => `name.ilike.${t}%`).join(',')
     const byName = await supabase
       .from('regular_prices')
@@ -147,17 +163,24 @@ async function resolveByTypeUnitPrice(item, chain) {
       .eq('chain', chain)
       .or(orFilter)
       .limit(100)
-    if (byName.error) return null
+    if (byName.error) {
+      return { available: false, unavailableReason: 'not_in_catalog' }
+    }
     rows = byName.data || []
+  }
+
+  const typedRows = rows.filter((row) => matchProductType(row.name) === typeKey)
+  if (!typedRows.length) {
+    return { available: false, unavailableReason: 'not_in_catalog' }
   }
 
   const needSharedWord = requiresSharedSignificantWord(typeKey)
 
   /** @type {{ row: object, perUnit: number, unitLabel: string, price: number }[]} */
   const cands = []
-  for (const row of rows) {
+  for (const row of typedRows) {
     if (isComboProduct(row.name)) continue
-    if (matchProductType(row.name) !== typeKey) continue
+    if (shouldSkipTypeFallbackCandidate(row.name, typeKey)) continue
     if (needSharedWord && !sharesSignificantWord(querySig, row.name, typeMeta)) continue
 
     let qv = row.quantity_value != null ? Number(row.quantity_value) : null
@@ -182,7 +205,9 @@ async function resolveByTypeUnitPrice(item, chain) {
     cands.push({ row, perUnit: per.perUnit, unitLabel: per.unitLabel, price })
   }
 
-  if (!cands.length) return null
+  if (!cands.length) {
+    return { available: false, unavailableReason: 'no_similar' }
+  }
 
   const med = median(cands.map((c) => c.perUnit))
   const filtered =
@@ -279,6 +304,7 @@ async function resolveItemAtChain(item, chain) {
       name,
       barcode,
       matchedBy: null,
+      unavailableReason: 'cannot_compare',
     }
   }
 
@@ -319,8 +345,34 @@ async function resolveItemAtChain(item, chain) {
   }
 
   // Fallback: €/kg po tipu (nije isti artikl)
+  const typeKey = matchProductType(name)
+  const qty = parseQuantityFromName(name)
+  const canTypeFallback =
+    typeKey &&
+    qty &&
+    baseUnitOf(qty.unit) &&
+    !isComboProduct(name) &&
+    !shouldSkipTypeFallbackQuery(name)
+
+  if (!canTypeFallback) {
+    const reason =
+      !typeKey || !qty || !baseUnitOf(qty?.unit)
+        ? 'cannot_compare'
+        : 'no_similar'
+    return {
+      available: false,
+      price: null,
+      originalPrice: null,
+      priceSource: null,
+      name,
+      barcode,
+      matchedBy: null,
+      unavailableReason: reason,
+    }
+  }
+
   const byType = await resolveByTypeUnitPrice(item, chain)
-  if (byType) return byType
+  if (byType.available) return byType
 
   return {
     available: false,
@@ -330,6 +382,7 @@ async function resolveItemAtChain(item, chain) {
     name,
     barcode,
     matchedBy: null,
+    unavailableReason: byType.unavailableReason || 'no_similar',
   }
 }
 

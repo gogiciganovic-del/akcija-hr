@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Plus, X, Trash2, Loader2, ChevronDown, Share2, MapPin } from "lucide-react";
 import { CjenkoFace } from "../components/CjenkoFace";
-import { analyzeChainCart, REGULAR_PRICE_CHAINS } from "../lib/cartCompare";
+import { analyzeChainCart, REGULAR_PRICE_CHAINS, unavailableReasonLabel } from "../lib/cartCompare";
 import { useProductSuggestions } from "../hooks/useProductSuggestions";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { STORES } from "../lib/constants";
@@ -740,7 +740,12 @@ export function CartPage() {
                       )}
                     </span>
                   ) : (
-                    <span style={{ color: "#ff6b6b", fontSize: 12 }}>nedostupno</span>
+                    <span
+                      style={{ color: "#ff6b6b", fontSize: 12 }}
+                      title={unavailableReasonLabel(line.unavailableReason)}
+                    >
+                      {unavailableReasonLabel(line.unavailableReason)}
+                    </span>
                   )}
                 </li>
                 );
@@ -871,24 +876,14 @@ export function CartPage() {
                                   )}
                                 </span>
                               ) : (
-                                <span className="flex-shrink-0" style={{ color: "#ff6b6b" }}>
-                                  nedostupno
+                                <span
+                                  className="flex-shrink-0 text-right"
+                                  style={{ color: "#ff6b6b", fontSize: 11, maxWidth: "46%" }}
+                                >
+                                  {unavailableReasonLabel(line.unavailableReason)}
                                 </span>
                               )}
                             </div>
-                            {!line.available && (
-                              <p
-                                className="mt-0.5 pr-1"
-                                style={{
-                                  color: "rgba(255,255,255,0.28)",
-                                  fontSize: 10,
-                                  lineHeight: 1.35,
-                                }}
-                              >
-                                Vlastita marka ili drugačije pakiranje — nema izravne zamjene kod ovog
-                                lanca
-                              </p>
-                            )}
                           </li>
                           );
                         })}
