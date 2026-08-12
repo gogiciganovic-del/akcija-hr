@@ -160,6 +160,13 @@ const SPECIAL_FILTERS = [
 const EXPIRING_PREVIEW = 4;
 const NOVO_PREVIEW = 4;
 
+const HOW_IT_WORKS_STEPS = [
+  { n: 1, text: "Skeniraj ili traži proizvod" },
+  { n: 2, text: "Usporedi cijene u lancima" },
+  { n: 3, text: "Košarica — vidi uštedu" },
+  { n: 4, text: "Favoriti — prati uštedu" },
+];
+
 export function HomePage({
   onProductSelect,
   onSearchFocus,
@@ -319,26 +326,47 @@ export function HomePage({
           </div>
           <ScanBarcodeButton onClick={() => setScannerOpen(true)} />
         </div>
-        <div className="mx-4 mb-3">
+        <div className="mx-4 mb-2">
           <p
-            className="font-bold mb-1.5"
-            style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, letterSpacing: "0.06em" }}
+            className="font-bold mb-1"
+            style={{ color: "rgba(255,255,255,0.4)", fontSize: 9, letterSpacing: "0.06em" }}
           >
             KAKO RADI CJENKO
           </p>
-          <ol className="m-0 p-0 list-none flex flex-col gap-1">
-            <li style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.35 }}>
-              1. Skeniraj ili potraži proizvod
-            </li>
-            <li style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.35 }}>
-              2. Usporedi cijene u lancima
-            </li>
-            <li style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.35 }}>
-              3. Dodaj u košaricu i vidi uštedu
-            </li>
-            <li style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.35 }}>
-              4. Favoriti — vidi uštedu na spremljenim akcijama
-            </li>
+          <ol className="m-0 p-0 list-none grid grid-cols-2 gap-1">
+            {HOW_IT_WORKS_STEPS.map(({ n, text }) => (
+              <li
+                key={n}
+                className="flex items-start gap-1 min-w-0 rounded-lg px-2 py-1.5"
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <span
+                  className="flex-shrink-0 font-bold tabular-nums"
+                  style={{
+                    color: "rgba(0,255,136,0.55)",
+                    fontSize: 10,
+                    lineHeight: 1.35,
+                    minWidth: 14,
+                  }}
+                >
+                  {n}.
+                </span>
+                <span
+                  className="min-w-0 flex-1"
+                  style={{
+                    color: "rgba(255,255,255,0.32)",
+                    fontSize: 10,
+                    lineHeight: 1.35,
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {text}
+                </span>
+              </li>
+            ))}
           </ol>
         </div>
       </header>
