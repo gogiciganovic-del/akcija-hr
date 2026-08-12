@@ -671,7 +671,7 @@ export function CartPage() {
             {(results.primary.savings ?? 0) >= MIN_SAVINGS_HIGHLIGHT ? (
               <>
                 <p style={{ color: "rgba(0,255,136,0.75)", fontSize: 13, marginBottom: 4 }}>
-                  Uštedio si!
+                  Ušteda na akcijama u {results.primary.label}
                 </p>
                 <p
                   className="font-black tabular-nums"
@@ -717,34 +717,56 @@ export function CartPage() {
                 const perHint = line.available
                   ? unitPriceHint(line.name || line.cartName, line.price)
                   : null;
+                const reason = line.available
+                  ? null
+                  : unavailableReasonLabel(line.unavailableReason);
                 return (
                 <li
                   key={`primary-${idx}-${line.cartName}`}
-                  className="flex items-center justify-between gap-2"
                   style={{ fontSize: 13 }}
                 >
-                  <span className="text-white/80 truncate min-w-0 flex-1">
-                    {line.name || line.cartName}
-                  </span>
                   {line.available ? (
-                    <span className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                      <span className="flex items-center gap-2">
-                        <span className="text-white/70 tabular-nums">{fmtEur(line.price)}</span>
-                        <SourceBadge source={line.priceSource} />
-                      </span>
-                      {perHint && (
-                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.32)" }}>
-                          {perHint}
+                    <>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span
+                          className="text-white/80 truncate min-w-0 font-medium"
+                          title={line.name || line.cartName}
+                        >
+                          {line.name || line.cartName}
                         </span>
-                      )}
-                    </span>
+                        <MatchByHint
+                          matchedBy={line.matchedBy}
+                          productTypeLabel={line.productTypeLabel}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-white/70 tabular-nums flex-shrink-0">
+                          {fmtEur(line.price)}
+                        </span>
+                        <SourceBadge source={line.priceSource} />
+                        {perHint && (
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.32)" }}>
+                            {perHint}
+                          </span>
+                        )}
+                      </div>
+                    </>
                   ) : (
-                    <span
-                      style={{ color: "#ff6b6b", fontSize: 12 }}
-                      title={unavailableReasonLabel(line.unavailableReason)}
-                    >
-                      {unavailableReasonLabel(line.unavailableReason)}
-                    </span>
+                    <>
+                      <span
+                        className="text-white/55 truncate block"
+                        title={line.cartName}
+                      >
+                        {line.cartName || "—"}
+                      </span>
+                      <p
+                        className="mt-0.5"
+                        style={{ color: "#ff6b6b", fontSize: 12, lineHeight: 1.35 }}
+                        title={reason}
+                      >
+                        {reason}
+                      </p>
+                    </>
                   )}
                 </li>
                 );
