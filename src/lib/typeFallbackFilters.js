@@ -58,6 +58,21 @@ export function isTypeWordIngredient(name, typeKey) {
   return false
 }
 
+/** Kaša / dječja hrana / hrana za ljubimce — nije meso, čak i kad piše PILETINA. */
+const NOT_MEAT_TOKENS = new Set(['KAŠA', 'KAŠICA', 'KASICA', 'KAŠ', 'HIPP', 'WHISKAS'])
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isPorridgeOrBabyOrPetFood(name) {
+  const words = String(name || '')
+    .toUpperCase()
+    .normalize('NFC')
+    .split(/[^A-ZČĆŽŠĐ]+/u)
+    .filter(Boolean)
+  return words.some((w) => NOT_MEAT_TOKENS.has(w))
+}
+
 /**
  * Tip-fallback preskoči kandidata (ili query ako applyToQuery).
  * @param {string | null | undefined} name
@@ -66,6 +81,7 @@ export function isTypeWordIngredient(name, typeKey) {
 export function shouldSkipTypeFallbackCandidate(name, typeKey) {
   if (hasProcessedForm(name)) return true
   if (isTypeWordIngredient(name, typeKey)) return true
+  if (typeKey === 'meso_piletina' && isPorridgeOrBabyOrPetFood(name)) return true
   return false
 }
 
