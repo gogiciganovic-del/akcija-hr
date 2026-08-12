@@ -26,6 +26,14 @@ function countFound(lines) {
   return lines.filter((l) => l?.available && l.price != null).length;
 }
 
+/** Svi dostupni retci su točan artikl (barkod/naziv) — ne sličan tip. */
+function allExactMatches(lines) {
+  if (!Array.isArray(lines)) return false;
+  const available = lines.filter((l) => l?.available && l.price != null);
+  if (!available.length) return false;
+  return available.every((l) => l.matchedBy === "barcode" || l.matchedBy === "name");
+}
+
 function foundLabel(found, total) {
   if (!total) return null;
   if (found >= total) return `Pronađeno ${total} od ${total} · kompletna košarica`;
@@ -811,12 +819,13 @@ export function CartPage() {
                   const x = countFound(row.lines);
                   const complete = x >= y && y > 0;
                   const none = x === 0;
+                  const exactComplete = complete && allExactMatches(row.lines);
                   return (
                     <div
                       key={row.chain}
                       className="px-4 py-3.5"
                       style={{
-                        background: complete
+                        background: exactComplete
                           ? "rgba(0,255,136,0.06)"
                           : "rgba(255,255,255,0.03)",
                         borderTop: i === 0 ? "none" : "1px solid rgba(255,255,255,0.06)",
@@ -841,9 +850,9 @@ export function CartPage() {
                           <p
                             className="tabular-nums"
                             style={{
-                              fontSize: complete ? 14 : 12,
-                              fontWeight: complete ? 700 : 500,
-                              color: complete
+                              fontSize: exactComplete ? 14 : 12,
+                              fontWeight: exactComplete ? 700 : 500,
+                              color: exactComplete
                                 ? "#00ff88"
                                 : none
                                   ? "rgba(255,255,255,0.28)"
