@@ -896,29 +896,22 @@ export function CartPage() {
                                   className="flex items-baseline gap-1.5 flex-shrink-0 mt-0.5"
                                   style={{ fontSize: 12 }}
                                 >
-                                  {perHint ? (
+                                  <span
+                                    className="tabular-nums font-bold flex-shrink-0"
+                                    style={{ color: "rgba(255,255,255,0.88)", fontSize: 13 }}
+                                  >
+                                    {fmtEur(line.price)}
+                                  </span>
+                                  {perHint && (
                                     <>
-                                      <span
-                                        className="tabular-nums font-bold"
-                                        style={{ color: "rgba(255,255,255,0.88)", fontSize: 13 }}
-                                      >
-                                        {perHint}
-                                      </span>
                                       <span style={{ color: "rgba(255,255,255,0.28)" }}>·</span>
                                       <span
                                         className="tabular-nums flex-shrink-0"
-                                        style={{ color: "rgba(255,255,255,0.42)", fontSize: 12 }}
+                                        style={{ color: "rgba(255,255,255,0.42)", fontSize: 11 }}
                                       >
-                                        {fmtEur(line.price)}
+                                        {perHint}
                                       </span>
                                     </>
-                                  ) : (
-                                    <span
-                                      className="tabular-nums font-bold flex-shrink-0"
-                                      style={{ color: "rgba(255,255,255,0.88)", fontSize: 13 }}
-                                    >
-                                      {fmtEur(line.price)}
-                                    </span>
                                   )}
                                 </div>
                               </>
