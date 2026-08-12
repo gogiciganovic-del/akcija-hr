@@ -17,6 +17,7 @@ import {
   formatPricePerUnit,
 } from "../lib/quantityParse";
 import { matchProductType } from "../lib/productTypes";
+import { sortBySearchRelevance } from "../lib/searchRelevance";
 
 function highlight(text, query) {
   if (!query) return text;
@@ -315,7 +316,7 @@ export function SearchPage({
   onGoCart,
 }) {
   const [query, setQuery] = useState("");
-  const [sortMode, setSort] = useState("price_asc");
+  const [sortMode, setSort] = useState("relevance");
   const [catFilter, setCat] = useState("Sve");
   const [regularProducts, setRegularProducts] = useState([]);
   const [regularLoading, setRegularLoading] = useState(false);
@@ -335,7 +336,8 @@ export function SearchPage({
   const searchTerm = query.trim();
   const { products: saleProducts, loading: saleLoading } = useProducts({
     search: searchTerm || undefined,
-    sortBy: sortMode === "unit_price_asc" ? "price_asc" : sortMode,
+    sortBy:
+      sortMode === "unit_price_asc" || sortMode === "relevance" ? "price_asc" : sortMode,
   });
 
   const runBarcodeLookup = useCallback(async (code) => {
@@ -458,14 +460,16 @@ export function SearchPage({
         if (error) throw error;
         if (cancelled) return;
 
-        const adapted = (data || []).map((row, i) => {
-          const p = adaptRegularPrice(row);
-          return {
-            ...p,
-            id: `regular-${row.chain}-${row.barcode || row.name}-${i}`,
-            image: productPlaceholderDataUri(row.name, 80),
-          };
-        });
+        const adapted = (data || [])
+          .map((row, i) => {
+            const p = adaptRegularPrice(row);
+            return {
+              ...p,
+              id: `regular-${row.chain}-${row.barcode || row.name}-${i}`,
+              image: productPlaceholderDataUri(row.name, 80),
+            };
+          })
+          .filter((p) => Number(p.salePrice) > 0);
         setRegularProducts(adapted);
       } catch {
         if (!cancelled) setRegularProducts([]);
@@ -500,18 +504,26 @@ export function SearchPage({
 
   const loading = saleLoading || regularLoading;
 
-  const saleTagged = saleProducts.map((p) => ({
-    ...p,
-    priceSource: p.priceSource || "sale",
-  }));
+  const hasPositivePrice = (p) => Number(p.salePrice ?? p.price) > 0;
+
+  const saleTagged = saleProducts
+    .filter(hasPositivePrice)
+    .map((p) => ({
+      ...p,
+      priceSource: p.priceSource || "sale",
+    }));
+
+  const regularPositive = regularProducts.filter(hasPositivePrice);
 
   const merged =
     sortMode === "unit_price_asc"
-      ? sortProducts([...saleTagged, ...regularProducts], "unit_price_asc")
-      : [
-          ...sortProducts(saleTagged, sortMode),
-          ...sortProducts(regularProducts, sortMode === "discount" ? "price_asc" : sortMode),
-        ];
+      ? sortProducts([...saleTagged, ...regularPositive], "unit_price_asc")
+      : sortMode === "relevance"
+        ? sortBySearchRelevance([...saleTagged, ...regularPositive], searchTerm)
+        : [
+            ...sortProducts(saleTagged, sortMode),
+            ...sortProducts(regularPositive, sortMode === "discount" ? "price_asc" : sortMode),
+          ];
 
   const results =
     catFilter !== "Sve" ? merged.filter((p) => p.category === catFilter) : merged;
@@ -948,11 +960,23 @@ export function SearchPage({
             >
               <button
                 type="button"
-                onClick={() => setSort("price_asc")}
-                className="px-2.5 py-1.5 rounded-[10px] text-[11px] font-semibold"
+                onClick={() => setSort("relevance")}
+                className="px-2 py-1.5 rounded-[10px] text-[10px] font-semibold"
                 style={{
-                  background: sortMode !== "unit_price_asc" ? "rgba(255,255,255,0.12)" : "transparent",
-                  color: sortMode !== "unit_price_asc" ? "#fff" : "rgba(255,255,255,0.55)",
+                  background:
+                    sortMode === "relevance" ? "rgba(0,255,136,0.18)" : "transparent",
+                  color: sortMode === "relevance" ? "#00ff88" : "rgba(255,255,255,0.55)",
+                }}
+              >
+                Podudaranje
+              </button>
+              <button
+                type="button"
+                onClick={() => setSort("price_asc")}
+                className="px-2 py-1.5 rounded-[10px] text-[10px] font-semibold"
+                style={{
+                  background: sortMode === "price_asc" ? "rgba(255,255,255,0.12)" : "transparent",
+                  color: sortMode === "price_asc" ? "#fff" : "rgba(255,255,255,0.55)",
                 }}
               >
                 Cijena
@@ -960,9 +984,10 @@ export function SearchPage({
               <button
                 type="button"
                 onClick={() => setSort("unit_price_asc")}
-                className="px-2.5 py-1.5 rounded-[10px] text-[11px] font-semibold"
+                className="px-2 py-1.5 rounded-[10px] text-[10px] font-semibold"
                 style={{
-                  background: sortMode === "unit_price_asc" ? "rgba(56,189,248,0.22)" : "transparent",
+                  background:
+                    sortMode === "unit_price_asc" ? "rgba(56,189,248,0.22)" : "transparent",
                   color: sortMode === "unit_price_asc" ? "#bae6fd" : "rgba(255,255,255,0.55)",
                 }}
               >
