@@ -34,7 +34,7 @@ function foundLabel(found, total) {
 }
 
 /** Diskretna oznaka pouzdanosti uparivanja — samo UI. */
-function MatchByHint({ matchedBy, productTypeLabel, unitLabel }) {
+function MatchByHint({ matchedBy, productTypeLabel }) {
   if (matchedBy === "barcode") {
     return (
       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)", flexShrink: 0 }}>
@@ -50,10 +50,9 @@ function MatchByHint({ matchedBy, productTypeLabel, unitLabel }) {
     );
   }
   if (matchedBy === "type_unit") {
-    const u = unitLabel === "L" ? "€/L" : unitLabel === "kom" ? "€/kom" : "€/kg";
     return (
       <span style={{ fontSize: 10, color: "rgba(239,159,39,0.75)", flexShrink: 0 }}>
-        sličan {productTypeLabel || "tip"} · {u}
+        sličan {productTypeLabel || "tip"}
       </span>
     );
   }
@@ -837,53 +836,85 @@ export function CartPage() {
                         {foundLabel(x, y)}
                         {!complete && !none ? " · zbroj pronađenih" : ""}
                       </p>
-                      <ul className="mt-2 space-y-1">
+                      <ul className="mt-2 space-y-2.5">
                         {row.lines.map((line, idx) => {
                           const perHint = line.available
                             ? unitPriceHint(line.name || line.cartName, line.price)
                             : null;
+                          const reason = line.available
+                            ? null
+                            : unavailableReasonLabel(line.unavailableReason);
                           return (
                           <li key={`${row.chain}-${idx}`} className="py-0.5" style={{ fontSize: 12 }}>
-                            <div className="flex justify-between gap-2 items-center">
-                              <span className="truncate text-white/55 min-w-0">
-                                {line.cartName}
-                              </span>
-                              {line.available ? (
-                                <span className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                                  <span className="flex items-center gap-1.5">
-                                    <MatchByHint
-                                      matchedBy={line.matchedBy}
-                                      productTypeLabel={line.productTypeLabel}
-                                      unitLabel={line.unitLabel}
-                                    />
-                                    <span className="tabular-nums text-white/70">
+                            {line.available ? (
+                              <>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span
+                                    className="truncate min-w-0 font-semibold text-white"
+                                    style={{ fontSize: 12 }}
+                                    title={line.name || line.cartName}
+                                  >
+                                    {line.name || line.cartName}
+                                  </span>
+                                  <MatchByHint
+                                    matchedBy={line.matchedBy}
+                                    productTypeLabel={line.productTypeLabel}
+                                  />
+                                </div>
+                                <div
+                                  className="flex items-baseline gap-1.5 flex-shrink-0 mt-0.5"
+                                  style={{ fontSize: 12 }}
+                                >
+                                  {perHint ? (
+                                    <>
+                                      <span
+                                        className="tabular-nums font-bold"
+                                        style={{ color: "rgba(255,255,255,0.88)", fontSize: 13 }}
+                                      >
+                                        {perHint}
+                                      </span>
+                                      <span style={{ color: "rgba(255,255,255,0.28)" }}>·</span>
+                                      <span
+                                        className="tabular-nums flex-shrink-0"
+                                        style={{ color: "rgba(255,255,255,0.42)", fontSize: 12 }}
+                                      >
+                                        {fmtEur(line.price)}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span
+                                      className="tabular-nums font-bold flex-shrink-0"
+                                      style={{ color: "rgba(255,255,255,0.88)", fontSize: 13 }}
+                                    >
                                       {fmtEur(line.price)}
                                     </span>
+                                  )}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="min-w-0">
+                                  <span
+                                    className="truncate block text-white/55"
+                                    style={{ fontSize: 12 }}
+                                    title={line.cartName}
+                                  >
+                                    {line.cartName || "—"}
                                   </span>
-                                  {perHint && (
-                                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)" }}>
-                                      {perHint}
-                                    </span>
-                                  )}
-                                  {line.matchedBy === "type_unit" && line.name && (
-                                    <span
-                                      className="truncate max-w-[180px]"
-                                      style={{ fontSize: 9, color: "rgba(239,159,39,0.55)" }}
-                                      title={line.name}
-                                    >
-                                      {line.name}
-                                    </span>
-                                  )}
-                                </span>
-                              ) : (
-                                <span
-                                  className="flex-shrink-0 text-right"
-                                  style={{ color: "#ff6b6b", fontSize: 11, maxWidth: "46%" }}
+                                </div>
+                                <p
+                                  className="mt-0.5"
+                                  style={{
+                                    color: "#ff6b6b",
+                                    fontSize: 11,
+                                    lineHeight: 1.35,
+                                  }}
+                                  title={reason}
                                 >
-                                  {unavailableReasonLabel(line.unavailableReason)}
-                                </span>
-                              )}
-                            </div>
+                                  {reason}
+                                </p>
+                              </>
+                            )}
                           </li>
                           );
                         })}
