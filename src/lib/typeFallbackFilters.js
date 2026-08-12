@@ -1,4 +1,27 @@
 import { getProductType } from './productTypes.js'
+import { tokenMatchesTerm } from './searchRelevance.js'
+
+const MAX_TYPE_SUFFIX_LEN = 4
+
+/**
+ * Podudaranje riječi s tokenom tipa (korijen + padež).
+ * tokenMatchesTerm pokriva SIROM→SIR; zajednički prefiks pokriva PILETINOM↔PILETINA.
+ */
+function typeMatchToken(word, term) {
+  if (tokenMatchesTerm(word, term) || tokenMatchesTerm(term, word)) return true
+  const w = String(word).toUpperCase().normalize('NFC')
+  const t = String(term).toUpperCase().normalize('NFC')
+  let i = 0
+  while (i < w.length && i < t.length && w[i] === t[i]) i++
+  if (i < 3) return false
+  const suffixW = w.length - i
+  const suffixT = t.length - i
+  return (
+    suffixW > 0 &&
+    suffixW <= MAX_TYPE_SUFFIX_LEN &&
+    suffixT <= MAX_TYPE_SUFFIX_LEN
+  )
+}
 
 /** Prerađeni oblici — drugi cijenski razred unutar istog tipa. */
 const PROCESSED_FORM_RE =
@@ -13,15 +36,14 @@ export function hasProcessedForm(name) {
 
 /**
  * Riječ tipa odmah iza „sa“ / „s“ = sastojak, ne vrsta proizvoda.
+ * Koristi isto podudaranje kao rječnik (korijen + nastavak), ne točan oblik.
  * @param {string | null | undefined} name
  * @param {string} typeKey
  */
 export function isTypeWordIngredient(name, typeKey) {
   const typeMeta = getProductType(typeKey)
   if (!typeMeta) return false
-  const matchSet = new Set(
-    (typeMeta.matches || []).map((m) => String(m).toUpperCase())
-  )
+  const matchTokens = (typeMeta.matches || []).map((m) => String(m).toUpperCase())
   const words = String(name || '')
     .toUpperCase()
     .normalize('NFC')
@@ -30,7 +52,8 @@ export function isTypeWordIngredient(name, typeKey) {
   for (let i = 1; i < words.length; i++) {
     const prev = words[i - 1]
     if (prev !== 'SA' && prev !== 'S') continue
-    if (matchSet.has(words[i])) return true
+    const word = words[i]
+    if (matchTokens.some((m) => typeMatchToken(word, m))) return true
   }
   return false
 }
