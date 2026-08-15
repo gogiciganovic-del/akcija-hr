@@ -93,6 +93,15 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
     }
   }, []);
 
+  const resetUi = useCallback(() => {
+    scannedLockRef.current = false;
+    stopCamera();
+    setScannerError(null);
+    setScannerStatus("");
+    setManualCode("");
+    setManualHint("");
+  }, [stopCamera]);
+
   const emitDetected = useCallback(
     (raw) => {
       if (scannedLockRef.current) return;
@@ -102,20 +111,48 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
       stopCamera();
       setScannerError(null);
       setScannerStatus("");
+      // Makni scanner flag bez history.back() — inače bi poništio tab push (npr. → Pretraga).
+      if (window.history.state?.scanner) {
+        const prev =
+          window.history.state && typeof window.history.state === "object"
+            ? { ...window.history.state }
+            : {};
+        delete prev.scanner;
+        window.history.replaceState(prev, "", window.location.href);
+      }
       onDetectedRef.current?.(raw);
     },
     [stopCamera]
   );
 
   const handleClose = useCallback(() => {
-    scannedLockRef.current = false;
-    stopCamera();
-    setScannerError(null);
-    setScannerStatus("");
-    setManualCode("");
-    setManualHint("");
+    if (window.history.state?.scanner) {
+      window.history.back();
+      return;
+    }
+    resetUi();
     onClose?.();
-  }, [onClose, stopCamera]);
+  }, [onClose, resetUi]);
+
+  // Android/TWA back: zatvori skener umjesto izlaza iz appa.
+  useEffect(() => {
+    if (!open) return;
+
+    if (!window.history.state?.scanner) {
+      const prev =
+        window.history.state && typeof window.history.state === "object"
+          ? { ...window.history.state }
+          : {};
+      window.history.pushState({ ...prev, scanner: true }, "", window.location.href);
+    }
+
+    const onPop = () => {
+      resetUi();
+      onClose?.();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [open, onClose, resetUi]);
 
   const submitManual = useCallback(() => {
     const digits = normalizeBarcodeInput(manualCode);

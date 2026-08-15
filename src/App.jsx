@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { BottomNav }     from "./components/BottomNav";
 import { ProductSheet }  from "./components/ProductSheet";
 import { HomePage }      from "./pages/HomePage";
@@ -9,29 +9,116 @@ import { Admin }         from "./pages/Admin";
 import { useFavorites }  from "./hooks/useFavorites";
 import { CjenkoPeek }    from "./components/CjenkoPeek";
 
+const VALID_TABS = new Set(["home", "search", "cart", "fav"]);
+
+function tabFromLocation() {
+  const hash = String(window.location.hash || "").replace(/^#/, "");
+  if (VALID_TABS.has(hash)) return hash;
+  const stateTab = window.history.state?.tab;
+  if (VALID_TABS.has(stateTab)) return stateTab;
+  return "home";
+}
+
+function urlForTab(tab) {
+  if (tab === "home") {
+    return `${window.location.pathname}${window.location.search}` || "/";
+  }
+  return `#${tab}`;
+}
+
 export default function App() {
   const { favorites, isFav, toggle, clear } = useFavorites();
-  const [activeTab, setActiveTab] = useState("home");
+  const [activeTab, setActiveTab] = useState(() => tabFromLocation());
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [homeResetSignal, setHomeResetSignal] = useState(0);
   const [pendingBarcode, setPendingBarcode] = useState(null);
   const [scanToast, setScanToast] = useState(null);
 
-  const handleProductSelect = useCallback((product) => setSelectedProduct(product), []);
-  const handleCloseSheet    = useCallback(() => setSelectedProduct(null), []);
-  const handleHomeClick     = useCallback(() => {
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const sheetOpenRef = useRef(false);
+
+  /** Promjena taba s history entryjem (korak-po-korak back). */
+  const goTab = useCallback((tab) => {
+    if (!VALID_TABS.has(tab)) return;
+    if (tab === activeTabRef.current) {
+      setActiveTab(tab);
+      return;
+    }
+    setActiveTab(tab);
+    window.history.pushState({ tab }, "", urlForTab(tab));
+  }, []);
+
+  useEffect(() => {
+    const tab = tabFromLocation();
+    window.history.replaceState({ tab }, "", urlForTab(tab));
+  }, []);
+
+  useEffect(() => {
+    const onPopState = (event) => {
+      const state = event.state;
+
+      if (!state?.sheet) {
+        sheetOpenRef.current = false;
+        setSelectedProduct(null);
+      }
+
+      const tab = VALID_TABS.has(state?.tab)
+        ? state.tab
+        : tabFromLocation();
+      setActiveTab(tab);
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const handleProductSelect = useCallback((product) => {
+    setSelectedProduct(product);
+    if (!sheetOpenRef.current) {
+      sheetOpenRef.current = true;
+      window.history.pushState(
+        { tab: activeTabRef.current, sheet: true },
+        "",
+        window.location.href
+      );
+    }
+  }, []);
+
+  const handleCloseSheet = useCallback(() => {
+    if (sheetOpenRef.current && window.history.state?.sheet) {
+      window.history.back();
+      return;
+    }
+    sheetOpenRef.current = false;
+    setSelectedProduct(null);
+  }, []);
+
+  const handleHomeClick = useCallback(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
     setHomeResetSignal((n) => n + 1);
   }, []);
-  const handleTabChange     = useCallback((tab) => setActiveTab(tab), []);
-  const handleBarcodeScanned = useCallback((code) => {
-    setPendingBarcode(code);
-    setScanToast({ message: "Barkod pronađen — cijene su na Pretrazi" });
-    setActiveTab("search");
-  }, []);
+
+  const handleTabChange = useCallback(
+    (tab) => {
+      goTab(tab);
+    },
+    [goTab]
+  );
+
+  const handleBarcodeScanned = useCallback(
+    (code) => {
+      setPendingBarcode(code);
+      setScanToast({ message: "Barkod pronađen — cijene su na Pretrazi" });
+      goTab("search");
+    },
+    [goTab]
+  );
+
   const handlePendingBarcodeConsumed = useCallback(() => {
     setPendingBarcode(null);
   }, []);
+
   const handleCartFeedback = useCallback((payload) => {
     if (typeof payload === "string") {
       setScanToast({ message: payload });
@@ -53,7 +140,7 @@ export default function App() {
     home: (
       <HomePage
         onProductSelect={handleProductSelect}
-        onSearchFocus={() => setActiveTab("search")}
+        onSearchFocus={() => goTab("search")}
         onBarcodeScanned={handleBarcodeScanned}
         isFav={isFav}
         onToggleFav={toggle}
@@ -66,7 +153,7 @@ export default function App() {
         pendingBarcode={pendingBarcode}
         onPendingBarcodeConsumed={handlePendingBarcodeConsumed}
         onCartFeedback={handleCartFeedback}
-        onGoCart={() => setActiveTab("cart")}
+        onGoCart={() => goTab("cart")}
       />
     ),
     cart: <CartPage onProductSelect={handleProductSelect} />,
@@ -76,7 +163,7 @@ export default function App() {
         onToggleFavorite={toggle}
         onClearAll={clear}
         onProductSelect={handleProductSelect}
-        onGoHome={() => setActiveTab("home")}
+        onGoHome={() => goTab("home")}
       />
     ),
   };
@@ -124,7 +211,7 @@ export default function App() {
               type="button"
               onClick={() => {
                 setScanToast(null);
-                setActiveTab("cart");
+                goTab("cart");
               }}
               className="w-full py-2 rounded-xl font-bold"
               style={{
