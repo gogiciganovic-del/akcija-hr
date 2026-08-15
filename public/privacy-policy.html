@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pravila o privatnosti — Cjenko</title>
+  <meta name="description" content="Pravila o privatnosti aplikacije Cjenko (cjenko.app)." />
+  <meta name="robots" content="index,follow" />
+  <meta name="theme-color" content="#EF9F27" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #020617;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #ef9f27;
+      --border: rgba(255, 255, 255, 0.1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      font-size: 16px;
+    }
+    main {
+      max-width: 42rem;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3.5rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      letter-spacing: -0.03em;
+      margin: 0 0 0.5rem;
+      color: #fff;
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin: 1.75rem 0 0.6rem;
+      color: #fff;
+    }
+    p, li { color: var(--muted); }
+    p { margin: 0.6rem 0; }
+    ul { padding-left: 1.2rem; margin: 0.5rem 0; }
+    li { margin: 0.35rem 0; }
+    a { color: var(--accent); }
+    .meta {
+      font-size: 0.875rem;
+      color: rgba(255, 255, 255, 0.4);
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="brand">Cjenko</p>
+    <h1>Pravila o privatnosti</h1>
+    <p class="meta">
+      Posljednje ažuriranje: 15. kolovoza 2026.<br />
+      Aplikacija / web: <a href="https://cjenko.app">cjenko.app</a>
+      · <a href="https://www.cjenko.app">www.cjenko.app</a>
+    </p>
+
+    <p>
+      Ova pravila opisuju kako aplikacija <strong style="color:#fff">Cjenko</strong>
+      (web i Android TWA na cjenko.app) postupa s podacima. Cjenko pomaže usporediti
+      javno dostupne cijene i akcije u hrvatskim trgovačkim lancima.
+    </p>
+
+    <h2>1. Tko smo</h2>
+    <p>
+      Cjenko je potrošački alat za pregled i usporedbu cijena. Kontakt u vezi
+      privatnosti: putem kanala navedenih na <a href="https://cjenko.app">cjenko.app</a>
+      ili na adresi e-pošte koju navedete u Google Play konzoli za ovu aplikaciju.
+    </p>
+
+    <h2>2. Koje podatke obrađujemo</h2>
+    <p><strong style="color:#fff">Ne tražimo registraciju ni prijavu</strong> za osnovno korištenje.</p>
+    <ul>
+      <li>
+        <strong style="color:#fff">Cijene i proizvodi</strong> — dohvaćaju se iz javno
+        dostupnih izvora (objavljeni cjenici / baze cijena). To nisu osobni podaci korisnika.
+      </li>
+      <li>
+        <strong style="color:#fff">Podaci na uređaju</strong> — košarica, favoriti i slične
+        postavke mogu se spremati lokalno u pregledniku / aplikaciji (npr. localStorage).
+        Ti podaci ostaju na vašem uređaju i ne šalju se kao korisnički profil.
+      </li>
+      <li>
+        <strong style="color:#fff">Lokacija (opcionalno)</strong> — samo ako odobrite pristup
+        lokaciji (npr. za trgovine u blizini ili Google Maps). Koordinate se koriste na uređaju
+        za tu funkciju; ne gradimo trajni profil kretanja.
+      </li>
+      <li>
+        <strong style="color:#fff">Kamera (opcionalno)</strong> — samo za skeniranje barkoda
+        proizvoda. Slike se ne koriste za prepoznavanje osoba i ne spremamo video snimke
+        radi praćenja korisnika.
+      </li>
+      <li>
+        <strong style="color:#fff">Tehnički zahtjevi</strong> — pri dohvatu cijena poslužitelj
+        (npr. Supabase) može vidjeti uobičajene tehničke podatke zahtjeva (IP, user-agent),
+        kao kod većine web usluga. Ne koristimo to za oglašavanje profila.
+      </li>
+    </ul>
+
+    <h2>3. Čemu služe podaci</h2>
+    <ul>
+      <li>prikaz i usporedba cijena / akcija,</li>
+      <li>košarica i favoriti na vašem uređaju,</li>
+      <li>opcionalno: bliže trgovine ili mapa,</li>
+      <li>opcionalno: prepoznavanje proizvoda skeniranjem barkoda,</li>
+      <li>održavanje i sigurnost usluge.</li>
+    </ul>
+
+    <h2>4. Dijeljenje s trećima</h2>
+    <p>
+      Ne prodajemo osobne podatke. Za rad aplikacije koristimo infrastrukturu trećih strana
+      (npr. hosting, baza cijena). Vanjske usluge (npr. Open Food Facts za informacije o
+      proizvodu, Google Maps ako otvorite kartu) imaju vlastita pravila o privatnosti.
+    </p>
+
+    <h2>5. Kolačići i praćenje</h2>
+    <p>
+      Cjenko ne koristi marketinške trackere radi praćenja ponašanja radi oglasa.
+      Lokalna pohrana na uređaju služi funkcijama aplikacije (npr. košarica), ne oglašavanju.
+    </p>
+
+    <h2>6. Djeca</h2>
+    <p>
+      Aplikacija nije namijenjena djeci mlađoj od 13 godina. Ne prikupljamo svjesno
+      osobne podatke djece.
+    </p>
+
+    <h2>7. Vaša prava</h2>
+    <p>
+      Budući da većina podataka o korištenju ostaje na uređaju, možete ih obrisati
+      brisanjem podataka aplikacije / lokalne pohrane preglednika. Za upite o privatnosti
+      kontaktirajte nas na način naveden gore.
+    </p>
+
+    <h2>8. Izmjene</h2>
+    <p>
+      Ova pravila možemo povremeno ažurirati. Datum „Posljednje ažuriranje” na vrhu
+      stranice pokazuje verziju. Nastavak korištenja nakon izmjene znači da ste
+      upoznati s ažuriranim tekstom.
+    </p>
+
+    <h2>9. Sažetak</h2>
+    <p>
+      Cjenko prikazuje javne cijene trgovina. Ne zahtijeva login. Lokacija i kamera
+      koriste se samo uz vašu dozvolu i samo za funkcije koje odaberete. Podaci košarice
+      i favorita tipično ostaju na vašem uređaju.
+    </p>
+
+    <p style="margin-top: 2rem; font-size: 0.875rem;">
+      <a href="https://cjenko.app/">← Natrag na Cjenko</a>
+    </p>
+  </main>
+</body>
+</html>

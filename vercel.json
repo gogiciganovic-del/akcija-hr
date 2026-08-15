@@ -11,6 +11,8 @@
     }
   ],
   "rewrites": [
+    { "source": "/privacy-policy", "destination": "/privacy-policy.html" },
+    { "source": "/privacy-policy/", "destination": "/privacy-policy.html" },
     { "source": "/((?!\\.well-known/).*)", "destination": "/index.html" }
   ]
 }
