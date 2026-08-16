@@ -2,10 +2,18 @@ import { X, Heart } from "lucide-react";
 import { usePriceHistory } from "../hooks/usePriceHistory";
 import { PRICE_DISCLAIMER, productDateLabel } from "../lib/priceTrust";
 
-const fmt = (v) => v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
+const fmt = (v) =>
+  Number(v).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
+
+function formatHistoryDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getDate()}.${d.getMonth() + 1}.`;
+}
 
 export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFavorite }) {
-  const { history, loading } = usePriceHistory(product?.product_id);
+  const { history, loading } = usePriceHistory(product?.barcode, product?.chain);
   const dateLabel = productDateLabel(product);
 
   if (!isOpen || !product) return null;
@@ -98,20 +106,25 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
           {loading ? (
             <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 13 }}>Učitavanje...</p>
           ) : history.length === 0 ? (
-            <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 13 }}>Nema povijesti cijena.</p>
+            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, lineHeight: 1.45 }}>
+              Povijest cijena tek počinje bilježiti. Promjene će se pojaviti nakon
+              sljedećih ažuriranja cjenika.
+            </p>
           ) : (
             <div className="flex flex-col gap-2">
               {history.map((h, i) => (
                 <div
-                  key={i}
-                  className="flex items-center justify-between rounded-xl px-3 py-2.5"
+                  key={h.id || `${h.detected_at}-${i}`}
+                  className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5"
                   style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}
                 >
-                  <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
-                    {h.stores?.chain || "Trgovina"}
+                  <span className="tabular-nums font-bold text-white" style={{ fontSize: 13 }}>
+                    {fmt(h.old_price)}
+                    <span style={{ color: "rgba(255,255,255,0.35)", fontWeight: 500 }}> → </span>
+                    {fmt(h.new_price)}
                   </span>
-                  <span className="font-bold text-white" style={{ fontSize: 13 }}>
-                    {fmt(h.price)}
+                  <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, flexShrink: 0 }}>
+                    {formatHistoryDate(h.detected_at)}
                   </span>
                 </div>
               ))}

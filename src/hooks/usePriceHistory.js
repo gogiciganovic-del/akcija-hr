@@ -1,34 +1,51 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-export function usePriceHistory(productId) {
+/**
+ * Promjene redovne cijene za EAN + lanac (tablica price_history).
+ * @param {string|null|undefined} barcode
+ * @param {string|null|undefined} chain  npr. 'Lidl'
+ */
+export function usePriceHistory(barcode, chain) {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!productId) return
+    const code = String(barcode || '').trim()
+    const ch = String(chain || '').trim()
+    if (!code || !ch) {
+      setHistory([])
+      setLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setLoading(true)
 
     async function fetch() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('price_history')
-        .select(`
-          price,
-          original_price,
-          discount_pct,
-          valid_from,
-          valid_until,
-          stores (name, chain, city)
-        `)
-        .eq('product_id', productId)
-        .order('valid_from', { ascending: false })
-        .limit(20)
+        .select('id, old_price, new_price, detected_at, chain, barcode')
+        .eq('barcode', code)
+        .eq('chain', ch)
+        .order('detected_at', { ascending: false })
+        .limit(12)
 
-      setHistory(data || [])
+      if (cancelled) return
+      if (error) {
+        console.warn('price_history fetch:', error.message)
+        setHistory([])
+      } else {
+        setHistory(data || [])
+      }
       setLoading(false)
     }
 
     fetch()
-  }, [productId])
+    return () => {
+      cancelled = true
+    }
+  }, [barcode, chain])
 
   return { history, loading }
 }

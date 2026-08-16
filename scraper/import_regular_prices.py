@@ -7,7 +7,9 @@ Očekivana struktura:
   <input>/<chain>/prices.csv
 
 Agregira min(price) po (barcode, chain) i upserta u Supabase tablicu regular_prices.
-Prije upserta detektira promjene gramaže → product_size_history (šrinkflacija).
+Prije upserta detektira:
+  - promjene gramaže → product_size_history (šrinkflacija)
+  - promjene cijene → price_history (≥ 1%, samo stabilni EAN)
 """
 
 from __future__ import annotations
@@ -46,6 +48,7 @@ CHAIN_LABEL = {
 BATCH_SIZE = 500
 # Zanemari sitne razlike (zaokruživanje / parser šum)
 MIN_QTY_CHANGE_RATIO = 0.02
+MIN_PRICE_CHANGE_RATIO = 0.01
 _EAN_RE = re.compile(r"^\d{8,14}$")
 
 
@@ -268,6 +271,66 @@ def insert_size_history(client, changes: list[dict]) -> int:
     return total
 
 
+def price_change_significant(old_p: float, new_p: float) -> bool:
+    if old_p <= 0 or new_p <= 0:
+        return False
+    return abs(new_p - old_p) / old_p >= MIN_PRICE_CHANGE_RATIO
+
+
+def detect_price_changes(
+    incoming: list[dict], existing: dict[tuple[str, str], dict]
+) -> list[dict]:
+    """Usporedi dolazeće retke s bazom → retci za price_history."""
+    changes: list[dict] = []
+    for row in incoming:
+        barcode = str(row.get("barcode") or "").strip()
+        chain = row.get("chain")
+        if not chain or not is_stable_ean(barcode):
+            continue
+
+        new_price = row.get("price")
+        if new_price is None:
+            continue
+
+        prev = existing.get((chain, barcode))
+        if not prev:
+            continue
+
+        old_price = prev.get("price")
+        if old_price is None:
+            continue
+
+        try:
+            old_f = float(old_price)
+            new_f = float(new_price)
+        except (TypeError, ValueError):
+            continue
+
+        if not price_change_significant(old_f, new_f):
+            continue
+
+        changes.append(
+            {
+                "barcode": barcode,
+                "chain": chain,
+                "old_price": round(old_f, 4),
+                "new_price": round(new_f, 4),
+            }
+        )
+    return changes
+
+
+def insert_price_history(client, changes: list[dict]) -> int:
+    if not changes:
+        return 0
+    total = 0
+    for i in range(0, len(changes), BATCH_SIZE):
+        batch = changes[i : i + BATCH_SIZE]
+        client.table("price_history").insert(batch).execute()
+        total += len(batch)
+    return total
+
+
 def upsert_batches(client, rows: list[dict]) -> int:
     total = 0
     for i in range(0, len(rows), BATCH_SIZE):
@@ -333,16 +396,17 @@ def main() -> int:
             by_key[key] = row
     deduped = list(by_key.values())
 
-    print(f"Comparing quantities for size-change detection ({len(deduped)} rows) ...")
+    print(f"Comparing existing rows for size/price change detection ({len(deduped)} rows) ...")
     existing = fetch_existing_qty(client, deduped)
-    changes = detect_size_changes(deduped, existing)
-    by_chain_counts: dict[str, int] = defaultdict(int)
-    for c in changes:
-        by_chain_counts[c["chain"]] += 1
 
-    if changes:
+    size_changes = detect_size_changes(deduped, existing)
+    size_by_chain: dict[str, int] = defaultdict(int)
+    for c in size_changes:
+        size_by_chain[c["chain"]] += 1
+
+    if size_changes:
         try:
-            n = insert_size_history(client, changes)
+            n = insert_size_history(client, size_changes)
             print(f"product_size_history: inserted {n} size change(s)")
         except Exception as e:
             print(
@@ -354,9 +418,34 @@ def main() -> int:
         print("product_size_history: 0 size changes (očekivano na prvom prolazu / isti snapshot)")
 
     print("Size changes by chain:")
-    if by_chain_counts:
-        for chain in sorted(by_chain_counts.keys()):
-            print(f"  {chain}: {by_chain_counts[chain]}")
+    if size_by_chain:
+        for chain in sorted(size_by_chain.keys()):
+            print(f"  {chain}: {size_by_chain[chain]}")
+    else:
+        print("  (none)")
+
+    price_changes = detect_price_changes(deduped, existing)
+    price_by_chain: dict[str, int] = defaultdict(int)
+    for c in price_changes:
+        price_by_chain[c["chain"]] += 1
+
+    if price_changes:
+        try:
+            n = insert_price_history(client, price_changes)
+            print(f"price_history: inserted {n} price change(s)")
+        except Exception as e:
+            print(
+                f"WARN: price_history insert failed ({e}). "
+                "Primijeni migraciju 014 u Supabase SQL Editoru.",
+                file=sys.stderr,
+            )
+    else:
+        print("price_history: 0 price changes (očekivano na prvom prolazu / isti snapshot)")
+
+    print("Price changes by chain:")
+    if price_by_chain:
+        for chain in sorted(price_by_chain.keys()):
+            print(f"  {chain}: {price_by_chain[chain]}")
     else:
         print("  (none)")
 
