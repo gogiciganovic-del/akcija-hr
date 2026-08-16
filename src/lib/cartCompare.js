@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import { STORES, chainFromStoreName } from './constants'
 import { matchProductType, getProductType, tokenizeNameForType } from './productTypes'
 import { parseQuantityFromName, pricePerBaseUnit } from './quantityParse'
+import { normalizeImageUrl } from './productImage'
 import {
   shouldSkipTypeFallbackCandidate,
   shouldSkipTypeFallbackQuery,
@@ -9,6 +10,103 @@ import {
 } from './typeFallbackFilters.js'
 
 export { UNAVAILABLE_REASON_LABELS, unavailableReasonLabel } from './typeFallbackFilters.js'
+
+const DEAL_IMAGE_IN_CHUNK = 80
+
+/**
+ * Batch: slike iz active_deals za pronađene artikle (po barkodu ili točnom nazivu + lanac).
+ * Ne dira matching — samo obogaćuje već resolved linije.
+ */
+async function attachDealImages(primary, others) {
+  /** @type {{ chain: string, line: object }[]} */
+  const targets = []
+  if (primary?.lines) {
+    for (const line of primary.lines) {
+      if (line?.available) targets.push({ chain: primary.chain, line })
+    }
+  }
+  for (const row of others || []) {
+    for (const line of row.lines || []) {
+      if (line?.available) targets.push({ chain: row.chain, line })
+    }
+  }
+  if (!targets.length) return
+
+  const barcodes = [
+    ...new Set(
+      targets
+        .map((t) => String(t.line.barcode || '').trim())
+        .filter((b) => b.length >= 8)
+    ),
+  ]
+  const names = [
+    ...new Set(
+      targets
+        .map((t) => String(t.line.name || '').trim())
+        .filter(Boolean)
+    ),
+  ]
+
+  const byChainBarcode = new Map()
+  const byChainName = new Map()
+
+  const ingest = (rows) => {
+    for (const row of rows || []) {
+      const url = normalizeImageUrl(row.image_url)
+      if (!url) continue
+      const chain = chainFromStoreName(row.store_name)
+      if (!chain) continue
+      const bc = String(row.barcode || '').trim()
+      const nm = String(row.name || '').trim()
+      if (bc) {
+        const key = `${chain}|${bc}`
+        if (!byChainBarcode.has(key)) byChainBarcode.set(key, url)
+      }
+      if (nm) {
+        const key = `${chain}|${nm}`
+        if (!byChainName.has(key)) byChainName.set(key, url)
+      }
+    }
+  }
+
+  for (let i = 0; i < barcodes.length; i += DEAL_IMAGE_IN_CHUNK) {
+    const chunk = barcodes.slice(i, i + DEAL_IMAGE_IN_CHUNK)
+    const { data, error } = await supabase
+      .from('active_deals')
+      .select('barcode, name, store_name, image_url')
+      .in('barcode', chunk)
+    if (error) throw error
+    ingest(data)
+  }
+
+  for (let i = 0; i < names.length; i += DEAL_IMAGE_IN_CHUNK) {
+    const chunk = names.slice(i, i + DEAL_IMAGE_IN_CHUNK)
+    const { data, error } = await supabase
+      .from('active_deals')
+      .select('barcode, name, store_name, image_url')
+      .in('name', chunk)
+    if (error) throw error
+    ingest(data)
+  }
+
+  const enrichLine = (line, chain) => {
+    if (!line?.available) return line
+    const bc = String(line.barcode || '').trim()
+    const nm = String(line.name || '').trim()
+    let imageUrl = null
+    if (bc) imageUrl = byChainBarcode.get(`${chain}|${bc}`) || null
+    if (!imageUrl && nm) imageUrl = byChainName.get(`${chain}|${nm}`) || null
+    if (!imageUrl) return line
+    return { ...line, imageUrl }
+  }
+
+  if (primary?.lines) {
+    primary.lines = primary.lines.map((line) => enrichLine(line, primary.chain))
+  }
+  for (const row of others || []) {
+    row.lines = (row.lines || []).map((line) => enrichLine(line, row.chain))
+  }
+}
 
 function round2(n) {
   return Math.round(n * 100) / 100
@@ -536,17 +634,21 @@ export async function analyzeChainCart(selectedChain, items) {
 
   const primaryFound = primaryLines.filter((l) => l.available).length
 
+  const primary = {
+    chain: selectedChain,
+    label: STORES.find((s) => s.id === selectedChain)?.label || selectedChain,
+    total: primaryTotal,
+    savings: primarySavings,
+    lines: primaryLines,
+    complete: primaryComplete,
+    found: primaryFound,
+  }
+
+  await attachDealImages(primary, others)
+
   return {
     selectedChain,
-    primary: {
-      chain: selectedChain,
-      label: STORES.find((s) => s.id === selectedChain)?.label || selectedChain,
-      total: primaryTotal,
-      savings: primarySavings,
-      lines: primaryLines,
-      complete: primaryComplete,
-      found: primaryFound,
-    },
+    primary,
     others,
     itemCount: items.length,
   }

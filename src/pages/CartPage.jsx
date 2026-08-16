@@ -13,6 +13,7 @@ import {
   pricePerBaseUnit,
   formatPricePerUnit,
 } from "../lib/quantityParse";
+import { normalizeImageUrl } from "../lib/productImage";
 
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -875,46 +876,67 @@ export function CartPage() {
                           const reason = line.available
                             ? null
                             : unavailableReasonLabel(line.unavailableReason);
+                          const thumb = line.available
+                            ? normalizeImageUrl(line.imageUrl)
+                            : null;
                           return (
                           <li key={`${row.chain}-${idx}`} className="py-0.5" style={{ fontSize: 12 }}>
                             {line.available ? (
-                              <>
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span
-                                    className="truncate min-w-0 font-semibold text-white"
-                                    style={{ fontSize: 12 }}
-                                    title={line.name || line.cartName}
-                                  >
-                                    {line.name || line.cartName}
-                                  </span>
-                                  <MatchByHint
-                                    matchedBy={line.matchedBy}
-                                    productTypeLabel={line.productTypeLabel}
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                {thumb ? (
+                                  <img
+                                    src={thumb}
+                                    alt=""
+                                    width={52}
+                                    height={52}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="rounded-lg flex-shrink-0 object-cover"
+                                    style={{
+                                      width: 52,
+                                      height: 52,
+                                      background: "rgba(255,255,255,0.04)",
+                                    }}
                                   />
-                                </div>
-                                <div
-                                  className="flex items-baseline gap-1.5 flex-shrink-0 mt-0.5"
-                                  style={{ fontSize: 12 }}
-                                >
-                                  <span
-                                    className="tabular-nums font-bold flex-shrink-0"
-                                    style={{ color: "rgba(255,255,255,0.88)", fontSize: 13 }}
+                                ) : null}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span
+                                      className="truncate min-w-0 font-semibold text-white"
+                                      style={{ fontSize: 12 }}
+                                      title={line.name || line.cartName}
+                                    >
+                                      {line.name || line.cartName}
+                                    </span>
+                                    <MatchByHint
+                                      matchedBy={line.matchedBy}
+                                      productTypeLabel={line.productTypeLabel}
+                                    />
+                                  </div>
+                                  <div
+                                    className="flex items-baseline gap-1.5 flex-shrink-0 mt-0.5"
+                                    style={{ fontSize: 12 }}
                                   >
-                                    {fmtEur(line.price)}
-                                  </span>
-                                  {perHint && (
-                                    <>
-                                      <span style={{ color: "rgba(255,255,255,0.28)" }}>·</span>
-                                      <span
-                                        className="tabular-nums flex-shrink-0"
-                                        style={{ color: "rgba(255,255,255,0.42)", fontSize: 11 }}
-                                      >
-                                        {perHint}
-                                      </span>
-                                    </>
-                                  )}
+                                    <span
+                                      className="tabular-nums font-bold flex-shrink-0"
+                                      style={{ color: "rgba(255,255,255,0.88)", fontSize: 13 }}
+                                    >
+                                      {fmtEur(line.price)}
+                                    </span>
+                                    {perHint && (
+                                      <>
+                                        <span style={{ color: "rgba(255,255,255,0.28)" }}>·</span>
+                                        <span
+                                          className="tabular-nums flex-shrink-0"
+                                          style={{ color: "rgba(255,255,255,0.42)", fontSize: 11 }}
+                                        >
+                                          {perHint}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
-                              </>
+                              </div>
                             ) : (
                               <>
                                 <div className="min-w-0">
