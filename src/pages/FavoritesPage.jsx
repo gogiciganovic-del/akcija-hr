@@ -14,12 +14,18 @@ const fmtEur = (v) =>
 /** Ispod ovoga ušteda nije hero — samo UI. */
 const MIN_SAVINGS_HIGHLIGHT = 0.1;
 
-function totalSavings(items) {
-  return items.reduce((sum, p) => {
-    const original = Number(p.originalPrice) || 0;
-    const sale = Number(p.salePrice) || 0;
-    return sum + Math.max(0, original - sale);
-  }, 0);
+function favoriteTotals(items) {
+  return items.reduce(
+    (acc, p) => {
+      const original = Number(p.originalPrice) || 0;
+      const sale = Number(p.salePrice) || 0;
+      acc.original += original;
+      acc.sale += sale;
+      acc.saved += Math.max(0, original - sale);
+      return acc;
+    },
+    { original: 0, sale: 0, saved: 0 }
+  );
 }
 
 function EmptySavingsCard() {
@@ -40,7 +46,7 @@ function EmptySavingsCard() {
 }
 
 function SavingsCard({ items, onShare, shareFeedback }) {
-  const saved = totalSavings(items);
+  const { original, sale, saved } = favoriteTotals(items);
   const showHero = saved >= MIN_SAVINGS_HIGHLIGHT;
   const countLabel =
     items.length === 1 ? "1 spremljena akcija" : `${items.length} spremljenih akcija`;
@@ -69,11 +75,32 @@ function SavingsCard({ items, onShare, shareFeedback }) {
           border: "1px solid rgba(255,255,255,0.08)",
         }}
       >
-        <p className="font-bold mb-2" style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
+        <p className="font-bold mb-3" style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
           TVOJA UŠTEDA
         </p>
         {showHero ? (
           <>
+            <div className="mb-3 space-y-1.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Bez popusta</span>
+                <span
+                  className="tabular-nums"
+                  style={{
+                    color: "rgba(255,255,255,0.35)",
+                    fontSize: 15,
+                    textDecoration: "line-through",
+                  }}
+                >
+                  {fmtEur(original)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 13 }}>Platiš</span>
+                <span className="font-bold text-white tabular-nums" style={{ fontSize: 16 }}>
+                  {fmtEur(sale)}
+                </span>
+              </div>
+            </div>
             <p style={{ color: "rgba(0,255,136,0.75)", fontSize: 13, marginBottom: 4 }}>
               Uštedio si!
             </p>
@@ -82,12 +109,6 @@ function SavingsCard({ items, onShare, shareFeedback }) {
               style={{ color: "#00ff88", fontSize: 34, letterSpacing: "-0.03em", lineHeight: 1.1 }}
             >
               {fmtEur(saved)}
-            </p>
-            <p
-              className="tabular-nums"
-              style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginTop: 6 }}
-            >
-              Na tvojim favoritima
             </p>
             <div className="mt-3">
               <button
@@ -108,6 +129,27 @@ function SavingsCard({ items, onShare, shareFeedback }) {
           </>
         ) : (
           <>
+            <div className="mb-2 space-y-1.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Bez popusta</span>
+                <span
+                  className="tabular-nums"
+                  style={{
+                    color: "rgba(255,255,255,0.35)",
+                    fontSize: 14,
+                    textDecoration: "line-through",
+                  }}
+                >
+                  {fmtEur(original)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 13 }}>Platiš</span>
+                <span className="font-bold text-white tabular-nums" style={{ fontSize: 15 }}>
+                  {fmtEur(sale)}
+                </span>
+              </div>
+            </div>
             <p className="font-black text-white tabular-nums" style={{ fontSize: 22 }}>
               {fmtEur(saved)}
             </p>
@@ -141,11 +183,12 @@ export function FavoritesPage({
         : `${expiringCount} favorita ističu danas`;
 
   const handleShareSavings = useCallback(async () => {
-    const saved = totalSavings(items);
+    const { original, sale, saved } = favoriteTotals(items);
     if (!(saved >= MIN_SAVINGS_HIGHLIGHT)) return;
 
     const text =
       `Uštedio sam ${fmtEur(saved)} na favoritima uz Cjenko Akcije! 💚\n` +
+      `Bez popusta ${fmtEur(original)} → platiš ${fmtEur(sale)}\n` +
       `https://cjenko.app`;
 
     try {
