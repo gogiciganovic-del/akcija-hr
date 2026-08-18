@@ -12,6 +12,18 @@ import {
 export { UNAVAILABLE_REASON_LABELS, unavailableReasonLabel } from './typeFallbackFilters.js'
 
 const DEAL_IMAGE_IN_CHUNK = 80
+const DEAL_IMAGE_PAGE = 1000
+
+/** Letak-sufiks s najcijena.hr — katalog-nazivi ga nemaju. */
+function stripDealNameSuffix(name) {
+  return String(name || '')
+    .replace(/\s+akcija\s+u\s+trgovini\s+.+$/i, '')
+    .trim()
+}
+
+function normalizeDealNameKey(name) {
+  return stripDealNameSuffix(name).toLowerCase().replace(/\s+/g, ' ').trim()
+}
 
 /**
  * Batch: slike iz active_deals za pronađene artikle (po barkodu ili točnom nazivu + lanac).
@@ -39,13 +51,7 @@ async function attachDealImages(primary, others) {
         .filter((b) => b.length >= 8)
     ),
   ]
-  const names = [
-    ...new Set(
-      targets
-        .map((t) => String(t.line.name || '').trim())
-        .filter(Boolean)
-    ),
-  ]
+  const chainIds = [...new Set(targets.map((t) => t.chain).filter(Boolean))]
 
   const byChainBarcode = new Map()
   const byChainName = new Map()
@@ -57,11 +63,11 @@ async function attachDealImages(primary, others) {
       const chain = chainFromStoreName(row.store_name)
       if (!chain) continue
       const bc = String(row.barcode || '').trim()
-      const nm = String(row.name || '').trim()
       if (bc) {
         const key = `${chain}|${bc}`
         if (!byChainBarcode.has(key)) byChainBarcode.set(key, url)
       }
+      const nm = normalizeDealNameKey(row.name)
       if (nm) {
         const key = `${chain}|${nm}`
         if (!byChainName.has(key)) byChainName.set(key, url)
@@ -79,20 +85,29 @@ async function attachDealImages(primary, others) {
     ingest(data)
   }
 
-  for (let i = 0; i < names.length; i += DEAL_IMAGE_IN_CHUNK) {
-    const chunk = names.slice(i, i + DEAL_IMAGE_IN_CHUNK)
-    const { data, error } = await supabase
-      .from('active_deals')
-      .select('barcode, name, store_name, image_url')
-      .in('name', chunk)
-    if (error) throw error
-    ingest(data)
+  // Nazivi akcija imaju sufiks; .in('name', katalog) ne pogađa. Dohvati deals
+  // za lance u rezultatu, pa usporedi očišćeni naziv (case/space insensitive).
+  if (chainIds.length) {
+    const storeOr = chainIds.map((c) => `store_name.ilike.%${c}%`).join(',')
+    let from = 0
+    while (true) {
+      const { data, error } = await supabase
+        .from('active_deals')
+        .select('barcode, name, store_name, image_url')
+        .or(storeOr)
+        .not('image_url', 'is', null)
+        .range(from, from + DEAL_IMAGE_PAGE - 1)
+      if (error) throw error
+      ingest(data)
+      if (!data?.length || data.length < DEAL_IMAGE_PAGE) break
+      from += DEAL_IMAGE_PAGE
+    }
   }
 
   const enrichLine = (line, chain) => {
     if (!line?.available) return line
     const bc = String(line.barcode || '').trim()
-    const nm = String(line.name || '').trim()
+    const nm = normalizeDealNameKey(line.name)
     let imageUrl = null
     if (bc) imageUrl = byChainBarcode.get(`${chain}|${bc}`) || null
     if (!imageUrl && nm) imageUrl = byChainName.get(`${chain}|${nm}`) || null
