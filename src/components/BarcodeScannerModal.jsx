@@ -54,6 +54,16 @@ function createZxingReader() {
   return new BrowserMultiFormatReader(hints);
 }
 
+/** Isti kod 3× unutar ovog prozora = prihvaćen. */
+const STABLE_HITS_NEEDED = 3;
+const STABLE_WINDOW_MS = 420;
+/** Pauza između pokušaja kad kadar nije jasan (i throttle native detect). */
+const SCAN_ATTEMPT_GAP_MS = 130;
+
+function emptyStableScan() {
+  return { code: "", count: 0, firstAt: 0 };
+}
+
 /**
  * Full-screen kamera skener: native BarcodeDetector → ZXing fallback → ručni EAN.
  */
@@ -68,6 +78,9 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
   const detectorRef = useRef(null);
   const zxingControlsRef = useRef(null);
   const scannedLockRef = useRef(false);
+  const lastAttemptAtRef = useRef(0);
+  const lastMissAtRef = useRef(0);
+  const stableScanRef = useRef(emptyStableScan());
   const onDetectedRef = useRef(onDetected);
   onDetectedRef.current = onDetected;
 
@@ -95,6 +108,9 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
 
   const resetUi = useCallback(() => {
     scannedLockRef.current = false;
+    lastAttemptAtRef.current = 0;
+    lastMissAtRef.current = 0;
+    stableScanRef.current = emptyStableScan();
     stopCamera();
     setScannerError(null);
     setScannerStatus("");
@@ -102,10 +118,27 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
     setManualHint("");
   }, [stopCamera]);
 
+  /** Vrati digits kad je isti barkod dovoljno puta pročitan; inače null. */
+  const noteStableHit = useCallback((raw) => {
+    const digits = normalizeBarcodeInput(raw);
+    if (!isPlausibleBarcode(digits)) return null;
+    const now = performance.now();
+    const s = stableScanRef.current;
+    if (s.code === digits && now - s.firstAt <= STABLE_WINDOW_MS) {
+      s.count += 1;
+    } else {
+      stableScanRef.current = { code: digits, count: 1, firstAt: now };
+    }
+    return stableScanRef.current.count >= STABLE_HITS_NEEDED
+      ? stableScanRef.current.code
+      : null;
+  }, []);
+
   const emitDetected = useCallback(
     (raw) => {
       if (scannedLockRef.current) return;
       scannedLockRef.current = true;
+      stableScanRef.current = emptyStableScan();
       vibrateOk();
       setScannerStatus("Pronađen barkod...");
       stopCamera();
@@ -168,6 +201,9 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
     if (!open) return;
 
     scannedLockRef.current = false;
+    lastAttemptAtRef.current = 0;
+    lastMissAtRef.current = 0;
+    stableScanRef.current = emptyStableScan();
     setScannerError(null);
     setScannerStatus("Pokrećem kameru...");
     setManualCode("");
@@ -214,20 +250,32 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
 
           const tick = async () => {
             if (cancelled || scannedLockRef.current) return;
+            const now = performance.now();
+            if (now - lastAttemptAtRef.current < SCAN_ATTEMPT_GAP_MS) {
+              rafRef.current = requestAnimationFrame(tick);
+              return;
+            }
+            lastAttemptAtRef.current = now;
             const v = videoRef.current;
             const det = detectorRef.current;
             if (v && det && v.readyState >= 2) {
               try {
                 const codes = await det.detect(v);
-                if (codes?.length && !scannedLockRef.current) {
-                  const raw = codes[0].rawValue;
-                  if (raw) {
-                    emitDetected(raw);
+                const raw = codes?.[0]?.rawValue;
+                if (raw && !scannedLockRef.current) {
+                  const confirmed = noteStableHit(raw);
+                  if (confirmed) {
+                    emitDetected(confirmed);
                     return;
+                  }
+                } else {
+                  lastMissAtRef.current = now;
+                  if (now - stableScanRef.current.firstAt > STABLE_WINDOW_MS) {
+                    stableScanRef.current = emptyStableScan();
                   }
                 }
               } catch {
-                // ignore frame errors
+                lastMissAtRef.current = now;
               }
             }
             rafRef.current = requestAnimationFrame(tick);
@@ -241,12 +289,20 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
         const reader = createZxingReader();
         const controls = await reader.decodeFromStream(stream, video, (result, err) => {
           if (cancelled || scannedLockRef.current) return;
+          const now = performance.now();
           if (result?.getText) {
+            if (now - lastMissAtRef.current < SCAN_ATTEMPT_GAP_MS) return;
+            lastAttemptAtRef.current = now;
             const text = result.getText();
-            if (text) emitDetected(text);
+            if (!text) return;
+            const confirmed = noteStableHit(text);
+            if (confirmed) emitDetected(confirmed);
             return;
           }
-          // NotFoundException itd. — ignoriraj
+          lastMissAtRef.current = now;
+          if (now - stableScanRef.current.firstAt > STABLE_WINDOW_MS) {
+            stableScanRef.current = emptyStableScan();
+          }
           if (err && err.name && err.name !== "NotFoundException") {
             // tiho
           }
@@ -277,7 +333,7 @@ export function BarcodeScannerModal({ open, onClose, onDetected }) {
       cancelled = true;
       stopCamera();
     };
-  }, [open, stopCamera, emitDetected]);
+  }, [open, stopCamera, emitDetected, noteStableHit]);
 
   if (!open) return null;
 
