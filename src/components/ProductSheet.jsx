@@ -4,6 +4,8 @@ import { usePriceHistory } from "../hooks/usePriceHistory";
 import { PRICE_DISCLAIMER, productDateLabel } from "../lib/priceTrust";
 import { enqueueCartAdd } from "../lib/cartDraft";
 import { chainFromStoreName } from "../lib/constants";
+import { fetchCheaperAlternatives } from "../lib/cheaperAlternatives";
+import { normalizeImageUrl } from "../lib/productImage";
 
 const fmt = (v) =>
   Number(v).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -19,15 +21,38 @@ function productChain(product) {
   return product?.chain || chainFromStoreName(product?.store) || null;
 }
 
+async function addProductToList(entry) {
+  const chain = entry.chain || null;
+  if (!chain) return { ok: false, reason: "missing_chain" };
+  const rawCode = entry.barcode || null;
+  const barcode =
+    rawCode && String(rawCode).length >= 8 && !String(rawCode).includes("-")
+      ? String(rawCode)
+      : null;
+  return enqueueCartAdd({
+    name: entry.name,
+    barcode,
+    price: entry.price,
+    originalPrice: entry.originalPrice ?? entry.price,
+    priceSource: entry.priceSource === "sale" ? "sale" : "regular",
+    chain,
+  });
+}
+
 export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFavorite }) {
   const { history, loading } = usePriceHistory(product?.barcode, product?.chain);
   const dateLabel = productDateLabel(product);
   const [listFeedback, setListFeedback] = useState(null); // 'ok' | string error
   const [adding, setAdding] = useState(false);
+  const [cheaper, setCheaper] = useState([]);
+  const [cheaperLoading, setCheaperLoading] = useState(false);
+  const [altAdded, setAltAdded] = useState({}); // key -> true
 
   useEffect(() => {
     setListFeedback(null);
     setAdding(false);
+    setCheaper([]);
+    setAltAdded({});
   }, [product?.id, product?.barcode, product?.name, isOpen]);
 
   useEffect(() => {
@@ -35,6 +60,39 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
     const t = setTimeout(() => setListFeedback(null), 1800);
     return () => clearTimeout(t);
   }, [listFeedback]);
+
+  useEffect(() => {
+    if (!isOpen || !product) return;
+    const chain = productChain(product);
+    if (!chain) {
+      setCheaper([]);
+      return;
+    }
+
+    let cancelled = false;
+    setCheaperLoading(true);
+    fetchCheaperAlternatives({
+      name: product.name,
+      barcode: product.barcode,
+      chain,
+      salePrice: product.salePrice,
+      price: product.salePrice,
+      product_type: product.product_type || product.productType,
+    })
+      .then((rows) => {
+        if (!cancelled) setCheaper(rows || []);
+      })
+      .catch(() => {
+        if (!cancelled) setCheaper([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCheaperLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, product]);
 
   const handleAddToList = useCallback(async () => {
     if (!product || adding) return;
@@ -46,15 +104,9 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
 
     setAdding(true);
     try {
-      const rawCode = product.barcode || null;
-      const barcode =
-        rawCode && String(rawCode).length >= 8 && !String(rawCode).includes("-")
-          ? String(rawCode)
-          : null;
-
-      const result = await enqueueCartAdd({
+      const result = await addProductToList({
         name: product.name,
-        barcode,
+        barcode: product.barcode,
         price: product.salePrice,
         originalPrice: product.originalPrice ?? product.salePrice,
         priceSource: product.priceSource,
@@ -76,6 +128,30 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
       setAdding(false);
     }
   }, [product, adding]);
+
+  const handleAddAlt = useCallback(async (alt) => {
+    const key = `${alt.barcode || ""}|${alt.name}`;
+    if (altAdded[key]) return;
+    const result = await addProductToList({
+      name: alt.name,
+      barcode: alt.barcode,
+      price: alt.price,
+      originalPrice: alt.price,
+      priceSource: "regular",
+      chain: alt.chain,
+    });
+    if (!result.ok && result.reason === "chain_mismatch") {
+      setListFeedback(
+        `Popis je za ${result.selectedChain}. Očisti popis ili dodaj iz istog lanca.`
+      );
+      return;
+    }
+    if (!result.ok) {
+      setListFeedback("Nije moguće dodati na popis.");
+      return;
+    }
+    setAltAdded((prev) => ({ ...prev, [key]: true }));
+  }, [altAdded]);
 
   if (!isOpen || !product) return null;
 
@@ -204,6 +280,79 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
             <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6, marginBottom: 20 }}>
               {product.description}
             </p>
+          )}
+
+          {!cheaperLoading && cheaper.length > 0 && (
+            <div className="mb-5">
+              <p
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "rgba(255,255,255,0.3)",
+                  letterSpacing: "0.12em",
+                  marginBottom: 10,
+                }}
+              >
+                SLIČNO, JEFTINIJE
+              </p>
+              <ul className="flex flex-col gap-2">
+                {cheaper.map((alt) => {
+                  const key = `${alt.barcode || ""}|${alt.name}`;
+                  const done = Boolean(altAdded[key]);
+                  const thumb = normalizeImageUrl(alt.imageUrl);
+                  return (
+                    <li
+                      key={key}
+                      className="flex items-center gap-2.5 rounded-xl px-2.5 py-2"
+                      style={{
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                      }}
+                    >
+                      {thumb ? (
+                        <img
+                          src={thumb}
+                          alt=""
+                          width={44}
+                          height={44}
+                          loading="lazy"
+                          className="rounded-lg flex-shrink-0 object-cover"
+                          style={{ width: 44, height: 44, background: "rgba(255,255,255,0.04)" }}
+                        />
+                      ) : null}
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className="truncate font-semibold text-white"
+                          style={{ fontSize: 12 }}
+                          title={alt.name}
+                        >
+                          {alt.name}
+                        </p>
+                        <p className="tabular-nums" style={{ fontSize: 11, color: "rgba(0,255,136,0.85)" }}>
+                          {alt.perUnitLabel}
+                          <span style={{ color: "rgba(255,255,255,0.35)" }}> · {fmt(alt.price)}</span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAddAlt(alt)}
+                        className="flex-shrink-0 px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1"
+                        style={{
+                          background: done ? "rgba(0,255,136,0.16)" : "rgba(0,255,136,0.08)",
+                          border: "1px solid rgba(0,255,136,0.28)",
+                          color: "#00ff88",
+                          fontSize: 11,
+                        }}
+                        aria-label={`Dodaj ${alt.name} na popis`}
+                      >
+                        {done ? <Check size={13} /> : <ListPlus size={13} />}
+                        {done ? "OK" : "Dodaj"}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           )}
 
           <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.12em", marginBottom: 12 }}>
