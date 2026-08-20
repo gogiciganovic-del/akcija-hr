@@ -147,6 +147,22 @@ def main():
     writer = ScraperSupabaseWriter()
     stats = writer.save_deals(all_deals)
     print(f"Gotovo: {stats['deals']} akcija, {stats['errors']} gresaka")
+
+    # Barkod iz kataloga (strip sufiks + unique + price guard) — preživi refresh
+    print("\nPovezivanje products.barcode s regular_prices...")
+    try:
+        from link_product_barcodes import link_active_deal_barcodes
+
+        link_stats = link_active_deal_barcodes(writer.client, dry_run=False)
+        print(
+            f"Barkodovi: unique={link_stats['unique']} "
+            f"updated={link_stats['updated']} "
+            f"already={link_stats['already_ok']} "
+            f"rejected_price={link_stats['rejected_price']} "
+            f"ambiguous={link_stats['ambiguous']}"
+        )
+    except Exception as exc:
+        print(f"  ! link_product_barcodes nije uspio (deals su spremljeni): {exc}")
     return 0
 
 

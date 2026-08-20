@@ -15,6 +15,13 @@ jobs:
           python-version: '3.11'
       - run: pip install -r scraper/requirements.txt
       - run: python scraper/scraper.py --all
+        working-directory: .
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      # Osiguraj barkod-mapiranje i ako scrape nije ništa upisao / partial run
+      - name: Link deal barcodes from regular_prices
+        run: python scraper/link_product_barcodes.py
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

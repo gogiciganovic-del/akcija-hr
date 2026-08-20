@@ -31,3 +31,11 @@ jobs:
         run: |
           cd scraper
           py scraper.py --all --pages 3
+
+      - name: Link deal barcodes from regular_prices
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          cd scraper
+          py link_product_barcodes.py
