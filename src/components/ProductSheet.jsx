@@ -1,6 +1,9 @@
-import { X, Heart } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { X, Heart, ListPlus, Check } from "lucide-react";
 import { usePriceHistory } from "../hooks/usePriceHistory";
 import { PRICE_DISCLAIMER, productDateLabel } from "../lib/priceTrust";
+import { enqueueCartAdd } from "../lib/cartDraft";
+import { chainFromStoreName } from "../lib/constants";
 
 const fmt = (v) =>
   Number(v).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -12,11 +15,72 @@ function formatHistoryDate(iso) {
   return `${d.getDate()}.${d.getMonth() + 1}.`;
 }
 
+function productChain(product) {
+  return product?.chain || chainFromStoreName(product?.store) || null;
+}
+
 export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFavorite }) {
   const { history, loading } = usePriceHistory(product?.barcode, product?.chain);
   const dateLabel = productDateLabel(product);
+  const [listFeedback, setListFeedback] = useState(null); // 'ok' | string error
+  const [adding, setAdding] = useState(false);
+
+  useEffect(() => {
+    setListFeedback(null);
+    setAdding(false);
+  }, [product?.id, product?.barcode, product?.name, isOpen]);
+
+  useEffect(() => {
+    if (listFeedback !== "ok") return;
+    const t = setTimeout(() => setListFeedback(null), 1800);
+    return () => clearTimeout(t);
+  }, [listFeedback]);
+
+  const handleAddToList = useCallback(async () => {
+    if (!product || adding) return;
+    const chain = productChain(product);
+    if (!chain) {
+      setListFeedback("Nedostaje lanac proizvoda — ne može se dodati na popis.");
+      return;
+    }
+
+    setAdding(true);
+    try {
+      const rawCode = product.barcode || null;
+      const barcode =
+        rawCode && String(rawCode).length >= 8 && !String(rawCode).includes("-")
+          ? String(rawCode)
+          : null;
+
+      const result = await enqueueCartAdd({
+        name: product.name,
+        barcode,
+        price: product.salePrice,
+        originalPrice: product.originalPrice ?? product.salePrice,
+        priceSource: product.priceSource,
+        chain,
+      });
+
+      if (!result.ok && result.reason === "chain_mismatch") {
+        setListFeedback(
+          `Popis je za ${result.selectedChain}. Očisti popis ili dodaj iz istog lanca.`
+        );
+        return;
+      }
+      if (!result.ok) {
+        setListFeedback("Nije moguće dodati na popis.");
+        return;
+      }
+      setListFeedback("ok");
+    } finally {
+      setAdding(false);
+    }
+  }, [product, adding]);
 
   if (!isOpen || !product) return null;
+
+  const addedOk = listFeedback === "ok";
+  const errorMsg = listFeedback && listFeedback !== "ok" ? listFeedback : null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
@@ -28,16 +92,20 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <button
+            type="button"
             onClick={() => onToggleFavorite(product)}
             className="w-9 h-9 rounded-full flex items-center justify-center"
             style={{ background: "rgba(255,255,255,0.06)" }}
+            aria-label={isFavorite ? "Ukloni iz favorita" : "Dodaj u favorite"}
           >
             <Heart size={16} fill={isFavorite ? "#ff6b6b" : "none"} stroke={isFavorite ? "#ff6b6b" : "#fff"} />
           </button>
           <button
+            type="button"
             onClick={onClose}
             className="w-9 h-9 rounded-full flex items-center justify-center"
             style={{ background: "rgba(255,255,255,0.06)" }}
+            aria-label="Zatvori"
           >
             <X size={16} style={{ color: "rgba(255,255,255,0.6)" }} />
           </button>
@@ -71,19 +139,57 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
                 {fmt(product.salePrice)}
               </p>
             </div>
-            <div
-              className="px-3 py-1.5 rounded-xl font-black"
-              style={{
-                fontSize: 14,
-                background: product.isGlitch
-                  ? "linear-gradient(135deg,#00ff88,#00cc6a)"
-                  : "linear-gradient(135deg,#ffd700,#ffaa00)",
-                color: "#020617",
-              }}
-            >
-              -{product.discount}%
-            </div>
+            {product.discount > 0 && (
+              <div
+                className="px-3 py-1.5 rounded-xl font-black"
+                style={{
+                  fontSize: 14,
+                  background: product.isGlitch
+                    ? "linear-gradient(135deg,#00ff88,#00cc6a)"
+                    : "linear-gradient(135deg,#ffd700,#ffaa00)",
+                  color: "#020617",
+                }}
+              >
+                -{product.discount}%
+              </div>
+            )}
           </div>
+
+          <button
+            type="button"
+            onClick={handleAddToList}
+            disabled={adding}
+            className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 mb-2"
+            style={{
+              background: addedOk ? "rgba(0,255,136,0.18)" : "rgba(0,255,136,0.12)",
+              border: "1px solid rgba(0,255,136,0.35)",
+              color: "#00ff88",
+              fontSize: 14,
+              opacity: adding ? 0.7 : 1,
+            }}
+          >
+            {addedOk ? <Check size={18} strokeWidth={2.5} /> : <ListPlus size={18} strokeWidth={2.2} />}
+            {addedOk ? "Dodano na popis" : adding ? "Dodajem…" : "Dodaj na popis"}
+          </button>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.38)",
+              fontSize: 11,
+              lineHeight: 1.45,
+              marginBottom: errorMsg ? 8 : 16,
+            }}
+          >
+            Dodaje se u tvoj popis za usporedbu — ništa se ne kupuje ni plaća.
+          </p>
+          {errorMsg && (
+            <p
+              className="mb-4"
+              style={{ color: "rgba(255,107,107,0.9)", fontSize: 12, lineHeight: 1.4 }}
+              role="status"
+            >
+              {errorMsg}
+            </p>
+          )}
 
           {dateLabel && (
             <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginBottom: 8 }}>
