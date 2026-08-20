@@ -25,6 +25,52 @@ function normalizeDealNameKey(name) {
   return stripDealNameSuffix(name).toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
+function escapeIlike(s) {
+  return String(s || '').replace(/[%_,]/g, '')
+}
+
+const SALE_DEAL_COLS =
+  'deal_id, product_id, name, store_name, price, original_price, discount_pct, image_url, category'
+
+/** Kratki cache dealova po lancu — findSaleExact fallback (letak-sufiks). */
+const dealsByChainCache = new Map()
+
+async function loadDealsForChain(chain) {
+  const hit = dealsByChainCache.get(chain)
+  if (hit && Date.now() - hit.at < 60_000) return hit.rows
+
+  const storeOr = `store_name.ilike.%${chain}%`
+  const rows = []
+  let from = 0
+  while (true) {
+    const { data, error } = await supabase
+      .from('active_deals')
+      .select(SALE_DEAL_COLS)
+      .or(storeOr)
+      .order('price', { ascending: true })
+      .range(from, from + DEAL_IMAGE_PAGE - 1)
+    if (error) throw error
+    if (!data?.length) break
+    rows.push(...data)
+    if (data.length < DEAL_IMAGE_PAGE) break
+    from += DEAL_IMAGE_PAGE
+  }
+  dealsByChainCache.set(chain, { at: Date.now(), rows })
+  return rows
+}
+
+function saleHitFromDealRow(row) {
+  const price = parsePrice(row.price)
+  if (price == null) return null
+  const originalPrice = parsePrice(row.original_price)
+  return {
+    name: row.name,
+    price,
+    originalPrice: originalPrice ?? price,
+    deal: row,
+  }
+}
+
 /**
  * Batch: slike iz active_deals za pronađene artikle (po barkodu ili točnom nazivu + lanac).
  * Ne dira matching — samo obogaćuje već resolved linije.
@@ -499,28 +545,55 @@ async function resolveItemAtChain(item, chain) {
   }
 }
 
+/**
+ * Akcija za lanac: točan naziv, zatim isti normalizeDealNameKey
+ * (strip „Akcija u trgovini …“ + case/space). Bez fuzzy / tip-fallbacka.
+ */
 async function findSaleExact(name, chain) {
-  const { data, error } = await supabase
+  const nameTrim = (name || '').trim()
+  if (!nameTrim || !chain) return null
+  const wantKey = normalizeDealNameKey(nameTrim)
+  if (!wantKey) return null
+
+  const { data: exactRows, error: exactErr } = await supabase
     .from('active_deals')
-    .select(
-      'deal_id, product_id, name, store_name, price, original_price, discount_pct, image_url, category'
-    )
-    .eq('name', name)
+    .select(SALE_DEAL_COLS)
+    .eq('name', nameTrim)
     .order('price', { ascending: true })
     .limit(40)
 
-  if (error) throw error
-  for (const row of data || []) {
+  if (exactErr) throw exactErr
+  for (const row of exactRows || []) {
     if (chainFromStoreName(row.store_name) !== chain) continue
-    const price = parsePrice(row.price)
-    if (price == null) continue
-    const originalPrice = parsePrice(row.original_price)
-    return {
-      name: row.name,
-      price,
-      originalPrice: originalPrice ?? price,
-      deal: row,
+    const hit = saleHitFromDealRow(row)
+    if (hit) return hit
+  }
+
+  const needle = escapeIlike(nameTrim)
+  if (needle.length >= 3) {
+    const { data: prefixRows, error: prefixErr } = await supabase
+      .from('active_deals')
+      .select(SALE_DEAL_COLS)
+      .ilike('name', `${needle}%`)
+      .order('price', { ascending: true })
+      .limit(80)
+
+    if (prefixErr) throw prefixErr
+    for (const row of prefixRows || []) {
+      if (chainFromStoreName(row.store_name) !== chain) continue
+      if (normalizeDealNameKey(row.name) !== wantKey) continue
+      const hit = saleHitFromDealRow(row)
+      if (hit) return hit
     }
+  }
+
+  // Fallback: svi deals lanca (cache), match samo po očišćenom ključu
+  const chainDeals = await loadDealsForChain(chain)
+  for (const row of chainDeals) {
+    if (chainFromStoreName(row.store_name) !== chain) continue
+    if (normalizeDealNameKey(row.name) !== wantKey) continue
+    const hit = saleHitFromDealRow(row)
+    if (hit) return hit
   }
   return null
 }
