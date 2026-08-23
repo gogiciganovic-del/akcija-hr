@@ -23,9 +23,53 @@ function typeMatchToken(word, term) {
   )
 }
 
-/** Prerađeni oblici — drugi cijenski razred unutar istog tipa. */
+/** Prerađeni oblici — drugi cijenski razred unutar istog tipa. Marinirano ostaje OK (polusirovo). */
 const PROCESSED_FORM_RE =
-  /\b(medaljon\w*|paniran\w*|punjen\w*|punjena\w*|mariniran\w*|gratiniran\w*|u\s+umaku)\b/i
+  /\b(medaljon\w*|paniran\w*|punjen\w*|punjena\w*|gratiniran\w*|u\s+umaku)\b/i
+
+const MEAT_TYPE_KEYS = new Set([
+  'meso_piletina',
+  'meso_svinjetina',
+  'meso_junetina',
+])
+
+/** Gotova jela / prerađevine — ne uspoređuj s file/mljevenim unutar mesa. */
+const READY_MEAL_RE =
+  /\b(paprika[sš]|ra[nž]nji[cć]|ra[nž]nji[cć]i|[čc]evap|[čc]evap[cč]i[cć]|hrenovk|nuget|nugget|burger|kobasic|\bkob\b|pa[sš]tet|lazanj|lasagn)\w*/i
+
+/** Hrana za kućne ljubimce (i kad piše piletina/govedina u nazivu). */
+const PET_FOOD_RE =
+  /\b(hrana\s+za\s+(ma[cč]k|ma[cč]ke|pse|pasa)|za\s+(ma[cč]k|ma[cč]ke|pse)\b|friskies|petties|whiskas|pedigree|felix|gourmet|hobby\s*dog|kitty|macke|ma[cč]ke|buddy|mg\s+mm)\b/i
+
+function isMeatType(typeKey) {
+  return MEAT_TYPE_KEYS.has(typeKey)
+}
+
+/**
+ * Gotovo jelo / prerađevina (ne sirovo meso).
+ * „Svinjetina za gulaš“ = sirovi rez, ne jelo — ostaje dopušteno.
+ * @param {string | null | undefined} name
+ */
+export function isReadyMealOrMeatProduct(name) {
+  const n = String(name || '')
+  if (/\bza\s+gula[sš]\b/i.test(n)) return false
+  if (/\bgula[sš]\b/i.test(n)) return true
+  return READY_MEAL_RE.test(n)
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isPetFood(name) {
+  const n = String(name || '')
+  if (PET_FOOD_RE.test(n)) return true
+  if (/\b(mp|mm)\s+(piletina|svinjetina|govedina)\b/i.test(n)) return true
+  if (/\b(ze[cč]etin|zecetin)\b/i.test(n) && /\b(piletina|pile[cć]i)\b/i.test(n)) return true
+  if (/\bfriends\b/i.test(n) && /\b(hrana|za\s+pse|za\s+ma[cč]k|govedina|jetra)\b/i.test(n)) {
+    return true
+  }
+  return isPorridgeOrBabyOrPetFood(name)
+}
 
 /**
  * @param {string | null | undefined} name
@@ -81,13 +125,19 @@ export function isPorridgeOrBabyOrPetFood(name) {
 export function shouldSkipTypeFallbackCandidate(name, typeKey) {
   if (hasProcessedForm(name)) return true
   if (isTypeWordIngredient(name, typeKey)) return true
-  if (typeKey === 'meso_piletina' && isPorridgeOrBabyOrPetFood(name)) return true
+  if (isMeatType(typeKey)) {
+    if (isReadyMealOrMeatProduct(name)) return true
+    if (isPetFood(name)) return true
+  }
   return false
 }
 
 /** @param {string | null | undefined} name */
 export function shouldSkipTypeFallbackQuery(name) {
-  return hasProcessedForm(name)
+  if (hasProcessedForm(name)) return true
+  if (isReadyMealOrMeatProduct(name)) return true
+  if (isPetFood(name)) return true
+  return false
 }
 
 /** Kratke poruke za UI košarice. */
