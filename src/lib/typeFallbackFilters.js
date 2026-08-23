@@ -218,6 +218,9 @@ export function isChocolateOrFestiveEggProduct(name) {
 const PROCESSED_POTATO_RE =
   /\b(pommes|pomfrit|frites|predpr[žz]|kroketi|valoviti\s+pommes)\b/i
 
+/** Kokice s okusom maslaca — nije maslac. */
+const POPCORN_RE = /\bkokic/i
+
 /** Kikiriki namaz pogrešno označen kao maslac. */
 const PEANUT_MASLAC_RE = /maslac.*kikiriki|kikiriki.*maslac/i
 
@@ -235,6 +238,36 @@ const GNOCCHI_RE = /\bnjok/i
 const LASAGNE_MEAL_RE = /\blasagn/i
 const READY_PASTA_MEAL_RE = /\bgotov/i
 const PASTA_SOUP_RE = /\bjuha\b.*\btjest|\btjest.*\bjuha\b/i
+
+/**
+ * Oblici suhe tjestenine — mlinci su zasebna grupa (drugačiji rez/pakiranje).
+ * Kad query eksplicitno traži oblik, preferiraj isti prije €/kg rangiranja.
+ */
+const PASTA_SHAPE_GROUPS = [
+  { id: 'mlinci', wordRe: /^mlinc\w*$/i },
+  { id: 'spaghetti', wordRe: /^spag\w*$/i },
+  { id: 'spirali', wordRe: /^spir\w*$/i },
+  { id: 'fusilli', wordRe: /^fusill\w*$/i },
+  { id: 'penne', wordRe: /^penn\w*$/i },
+  { id: 'farfalle', wordRe: /^farf\w*$/i },
+  { id: 'rigatoni', wordRe: /^rigat\w*$/i },
+  { id: 'tagliatelle', wordRe: /^tagliat\w*$/i },
+  { id: 'macaroni', wordRe: /^(makaron\w*|macaron\w*)$/i },
+  { id: 'rezanci', wordRe: /^rezanc\w*$/i },
+]
+
+function pastaShapeWord(word) {
+  return String(word)
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isPopcornProduct(name) {
+  return POPCORN_RE.test(String(name || ''))
+}
 
 /**
  * @param {string | null | undefined} name
@@ -275,6 +308,64 @@ export function isNonDryPastaProduct(name) {
     READY_PASTA_MEAL_RE.test(n) ||
     PASTA_SOUP_RE.test(n)
   )
+}
+
+/**
+ * ID-jevi oblika tjestenine u nazivu (prazno = nema eksplicitnog oblika).
+ * @param {string | null | undefined} name
+ * @returns {Set<string>}
+ */
+export function pastaShapeIdsInName(name) {
+  const ids = new Set()
+  for (const word of nameWordsUpper(name)) {
+    const norm = pastaShapeWord(word)
+    for (const g of PASTA_SHAPE_GROUPS) {
+      if (g.wordRe.test(word) || g.wordRe.test(norm)) ids.add(g.id)
+    }
+  }
+  return ids
+}
+
+/**
+ * Kandidat dijeli oblik s queryjem (ili query nema oblik).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function pastaShapeMatchesQuery(queryName, candidateName) {
+  const queryShapes = pastaShapeIdsInName(queryName)
+  if (!queryShapes.size) return true
+  const candShapes = pastaShapeIdsInName(candidateName)
+  for (const id of queryShapes) {
+    if (candShapes.has(id)) return true
+  }
+  return false
+}
+
+/**
+ * Različit eksplicitni oblik (npr. špagete vs mlinci) — preskoči kandidata.
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function pastaShapeMismatch(queryName, candidateName) {
+  const queryShapes = pastaShapeIdsInName(queryName)
+  const candShapes = pastaShapeIdsInName(candidateName)
+  if (!queryShapes.size || !candShapes.size) return false
+  return !pastaShapeMatchesQuery(queryName, candidateName)
+}
+
+/**
+ * Suzi skup kandidata na isti oblik tjestenine; ako nema podudarnih, vrati original.
+ * @template T
+ * @param {T[]} candidates
+ * @param {string | null | undefined} queryName
+ * @param {(item: T) => string | null | undefined} getName
+ * @returns {T[]}
+ */
+export function preferPastaShapeCandidates(candidates, queryName, getName) {
+  const queryShapes = pastaShapeIdsInName(queryName)
+  if (!queryShapes.size || !candidates.length) return candidates
+  const matched = candidates.filter((c) => pastaShapeMatchesQuery(queryName, getName(c)))
+  return matched.length ? matched : candidates
 }
 
 function isBakingPaperName(name) {
@@ -350,11 +441,15 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   if (typeKey === 'krumpir' && isProcessedPotatoProduct(name)) return true
   if (typeKey === 'papir' && queryName && papirSubtypeMismatch(queryName, name)) return true
   if (typeKey === 'maslac') {
+    if (isPopcornProduct(name)) return true
     if (isPeanutMaslacProduct(name)) return true
     if (isMaslacCosmeticProduct(name)) return true
     if (isFlavoredHerbMaslacProduct(name)) return true
   }
-  if (typeKey === 'tjestenina' && isNonDryPastaProduct(name)) return true
+  if (typeKey === 'tjestenina') {
+    if (isNonDryPastaProduct(name)) return true
+    if (queryName && pastaShapeMismatch(queryName, name)) return true
+  }
   if (isMeatType(typeKey)) {
     if (isReadyMealOrMeatProduct(name)) return true
     if (isPetFood(name)) return true

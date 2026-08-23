@@ -7,6 +7,7 @@ import {
   shouldSkipTypeFallbackCandidate,
   shouldSkipTypeFallbackQuery,
   preferMeatCutCandidates,
+  preferPastaShapeCandidates,
   UNAVAILABLE_REASON_LABELS,
 } from './typeFallbackFilters.js'
 
@@ -294,6 +295,7 @@ function pickBestTypeUnitCandidate(cands, wantedUnitSizeBase, wantedBaseQty, que
   let pickFrom = tight.length ? tight : pool
   if (queryName) {
     pickFrom = preferMeatCutCandidates(pickFrom, queryName, (c) => c.row?.name ?? c.name)
+    pickFrom = preferPastaShapeCandidates(pickFrom, queryName, (c) => c.row?.name ?? c.name)
   }
   pickFrom.sort((a, b) => a.perUnit - b.perUnit)
   return pickFrom[0] || null
