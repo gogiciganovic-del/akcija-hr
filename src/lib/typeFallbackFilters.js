@@ -45,6 +45,29 @@ const PET_FOOD_RE =
 const ORGAN_WORD_RE =
   /^(jetr\w*|sr[cč]\w*|[žz]elu\w*|bubreg\w*|bubre[žz]\w*|iznutric\w*|iznutr\w*)$/i
 
+/**
+ * Grupe reza mesa — riječi unutar grupe smatraju se istim rezom (file ≈ prsa).
+ * Kobasica je već u gotovim jelima; ovdje nije uključena.
+ */
+const MEAT_CUT_GROUPS = [
+  { id: 'file', wordRe: /^(file\w*|filet\w*|prsa\w*|prsn\w*|prsi\w*)$/i },
+  { id: 'batak', wordRe: /^(zabatak\w*|batak\w*|batci\w*)$/i },
+  { id: 'krilca', wordRe: /^(krilc\w*|kril\w*)$/i },
+  { id: 'but', wordRe: /^but\w*$/i },
+  { id: 'vrat', wordRe: /^vrat\w*$/i },
+  { id: 'rebra', wordRe: /^rebr\w*$/i },
+  { id: 'koljenica', wordRe: /^koljen\w*$/i },
+  { id: 'mljeven', wordRe: /^mljeven\w*$/i },
+]
+
+function nameWordsUpper(name) {
+  return String(name || '')
+    .toUpperCase()
+    .normalize('NFC')
+    .split(/[^A-ZČĆŽŠĐ]+/u)
+    .filter(Boolean)
+}
+
 function isMeatType(typeKey) {
   return MEAT_TYPE_KEYS.has(typeKey)
 }
@@ -80,12 +103,53 @@ export function isPetFood(name) {
  * @param {string | null | undefined} name
  */
 export function isOrganProduct(name) {
-  const words = String(name || '')
-    .toUpperCase()
-    .normalize('NFC')
-    .split(/[^A-ZČĆŽŠĐ]+/u)
-    .filter(Boolean)
+  const words = nameWordsUpper(name)
   return words.some((w) => ORGAN_WORD_RE.test(w))
+}
+
+/**
+ * ID-jevi grupa reza mesa u nazivu (prazno = nema eksplicitnog reza).
+ * @param {string | null | undefined} name
+ * @returns {Set<string>}
+ */
+export function meatCutIdsInName(name) {
+  const ids = new Set()
+  for (const word of nameWordsUpper(name)) {
+    for (const g of MEAT_CUT_GROUPS) {
+      if (g.wordRe.test(word)) ids.add(g.id)
+    }
+  }
+  return ids
+}
+
+/**
+ * Kandidat dijeli rez s queryjem (ili query nema rez).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function meatCutMatchesQuery(queryName, candidateName) {
+  const queryCuts = meatCutIdsInName(queryName)
+  if (!queryCuts.size) return true
+  const candCuts = meatCutIdsInName(candidateName)
+  for (const id of queryCuts) {
+    if (candCuts.has(id)) return true
+  }
+  return false
+}
+
+/**
+ * Suzi skup kandidata na isti rez; ako nema podudarnih, vrati original.
+ * @template T
+ * @param {T[]} candidates
+ * @param {string | null | undefined} queryName
+ * @param {(item: T) => string | null | undefined} getName
+ * @returns {T[]}
+ */
+export function preferMeatCutCandidates(candidates, queryName, getName) {
+  const queryCuts = meatCutIdsInName(queryName)
+  if (!queryCuts.size || !candidates.length) return candidates
+  const matched = candidates.filter((c) => meatCutMatchesQuery(queryName, getName(c)))
+  return matched.length ? matched : candidates
 }
 
 /**

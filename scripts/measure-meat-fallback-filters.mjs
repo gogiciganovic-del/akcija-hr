@@ -11,6 +11,7 @@ import { parseQuantityFromName, pricePerBaseUnit } from "../src/lib/quantityPars
 import {
   shouldSkipTypeFallbackCandidate,
   shouldSkipTypeFallbackQuery,
+  preferMeatCutCandidates,
 } from "../src/lib/typeFallbackFilters.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -71,7 +72,7 @@ function significantNameTokens(name, typeMeta) {
   return tokenizeNameForType(name).filter((t) => t.length >= 3 && !ban.has(t));
 }
 
-function pickBest(cands, wantedCompare) {
+function pickBest(cands, wantedCompare, queryName) {
   const med = median(cands.map((c) => c.perUnit));
   const filtered =
     med != null && med > 0
@@ -85,7 +86,10 @@ function pickBest(cands, wantedCompare) {
       c.packCompare >= wantedCompare * TIGHT_MIN &&
       c.packCompare <= wantedCompare * TIGHT_MAX
   );
-  const pickFrom = tight.length ? tight : pool;
+  let pickFrom = tight.length ? tight : pool;
+  if (queryName) {
+    pickFrom = preferMeatCutCandidates(pickFrom, queryName, (c) => c.name);
+  }
   pickFrom.sort((a, b) => a.perUnit - b.perUnit);
   return pickFrom[0] || null;
 }
@@ -158,7 +162,7 @@ async function resolveFallback(cartName, chain) {
   }
   if (!cands.length) return { ok: false, reason: "no_similar", typeKey };
 
-  const best = pickBest(cands, wantedCompare);
+  const best = pickBest(cands, wantedCompare, cartName);
   if (!best) return { ok: false, reason: "no_similar", typeKey };
   return { ok: true, name: best.name, typeKey, n: cands.length };
 }
@@ -188,8 +192,10 @@ const CASES = [
 
 const FOCUS = [
   { cart: "Svinjetina mljevena 500 g", chain: "Konzum", note: "ne smije paprikaš" },
-  { cart: "Piletina file 500 g", chain: "Konzum", note: "file/prsa OK, ne jetra" },
-  { cart: "Piletina file 500 g", chain: "Spar", note: "file/prsa OK, ne želuci" },
+  { cart: "Piletina file 500 g", chain: "Konzum", note: "file/prsa, ne zabatak" },
+  { cart: "Piletina file 500 g", chain: "Spar", note: "file/prsa, ne želuci" },
+  { cart: "Piletina file 500 g", chain: "Lidl", note: "fallback ako nema file u lancu" },
+  { cart: "Piletina 1 kg", chain: "Konzum", note: "bez reza — ne sužava" },
   { cart: "Pileća jetrica 500 g", chain: "Konzum", note: "organ query → organ OK" },
   { cart: "Svinjski file 400 g", chain: "Kaufland", note: "sirovo OK" },
   { cart: "MARINIRANI SVINJSKI FILE", chain: "Konzum", note: "marinirano OK kao kandidat" },

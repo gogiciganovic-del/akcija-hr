@@ -6,6 +6,7 @@ import { normalizeImageUrl } from './productImage'
 import {
   shouldSkipTypeFallbackCandidate,
   shouldSkipTypeFallbackQuery,
+  preferMeatCutCandidates,
   UNAVAILABLE_REASON_LABELS,
 } from './typeFallbackFilters.js'
 
@@ -266,7 +267,7 @@ function packSizeTightOk(wantedBaseQty, candValue, candUnit, wantedUnitSizeBase,
   return cand >= wanted * TIGHT_PACK_RATIO_MIN && cand <= wanted * TIGHT_PACK_RATIO_MAX
 }
 
-function pickBestTypeUnitCandidate(cands, wantedUnitSizeBase, wantedBaseQty) {
+function pickBestTypeUnitCandidate(cands, wantedUnitSizeBase, wantedBaseQty, queryName) {
   const med = median(cands.map((c) => c.perUnit))
   const filtered =
     med != null && med > 0
@@ -282,7 +283,10 @@ function pickBestTypeUnitCandidate(cands, wantedUnitSizeBase, wantedBaseQty) {
       c.packCompare >= wanted * TIGHT_PACK_RATIO_MIN &&
       c.packCompare <= wanted * TIGHT_PACK_RATIO_MAX
   )
-  const pickFrom = tight.length ? tight : pool
+  let pickFrom = tight.length ? tight : pool
+  if (queryName) {
+    pickFrom = preferMeatCutCandidates(pickFrom, queryName, (c) => c.row?.name ?? c.name)
+  }
   pickFrom.sort((a, b) => a.perUnit - b.perUnit)
   return pickFrom[0] || null
 }
@@ -409,7 +413,7 @@ async function resolveByTypeUnitPrice(item, chain) {
     return { available: false, unavailableReason: 'no_similar' }
   }
 
-  const best = pickBestTypeUnitCandidate(cands, wantedUnitSizeBase, wantedBaseQty)
+  const best = pickBestTypeUnitCandidate(cands, wantedUnitSizeBase, wantedBaseQty, name)
   if (!best) {
     return { available: false, unavailableReason: 'no_similar' }
   }
