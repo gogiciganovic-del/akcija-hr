@@ -254,6 +254,39 @@ function packSizeOk(wantedBaseQty, candValue, candUnit, wantedUnitSizeBase, cand
   return cand >= wanted * 0.5 && cand <= wanted * 2
 }
 
+/** Uži raspon pakiranja: ±25% (npr. 400 g → 300–500 g). */
+const TIGHT_PACK_RATIO_MIN = 0.75
+const TIGHT_PACK_RATIO_MAX = 1.25
+
+function packSizeTightOk(wantedBaseQty, candValue, candUnit, wantedUnitSizeBase, candUnitSizeBase) {
+  const candBase = quantityInBase(candValue, candUnit)
+  const wanted = wantedUnitSizeBase ?? wantedBaseQty
+  const cand = candUnitSizeBase ?? candBase
+  if (wanted == null || cand == null) return false
+  return cand >= wanted * TIGHT_PACK_RATIO_MIN && cand <= wanted * TIGHT_PACK_RATIO_MAX
+}
+
+function pickBestTypeUnitCandidate(cands, wantedUnitSizeBase, wantedBaseQty) {
+  const med = median(cands.map((c) => c.perUnit))
+  const filtered =
+    med != null && med > 0
+      ? cands.filter((c) => c.perUnit >= med / 5 && c.perUnit <= 5 * med)
+      : cands
+  const pool = filtered.length ? filtered : cands
+  const wanted = wantedUnitSizeBase ?? wantedBaseQty
+
+  const tight = pool.filter(
+    (c) =>
+      c.packCompare != null &&
+      wanted != null &&
+      c.packCompare >= wanted * TIGHT_PACK_RATIO_MIN &&
+      c.packCompare <= wanted * TIGHT_PACK_RATIO_MAX
+  )
+  const pickFrom = tight.length ? tight : pool
+  pickFrom.sort((a, b) => a.perUnit - b.perUnit)
+  return pickFrom[0] || null
+}
+
 function median(nums) {
   if (!nums.length) return null
   const s = [...nums].sort((a, b) => a - b)
@@ -357,25 +390,29 @@ async function resolveByTypeUnitPrice(item, chain) {
     if (baseUnitOf(qu) !== wantedBase) continue
     if (!packSizeOk(wantedBaseQty, qv, qu, wantedUnitSizeBase, candUnitSizeBase)) continue
 
+    const packCompare = candUnitSizeBase ?? quantityInBase(qv, qu)
+
     const price = parsePrice(row.special_price) ?? parsePrice(row.price)
     if (price == null || price <= 0) continue
     const per = pricePerBaseUnit(price, qv, qu)
     if (!per || per.perUnit <= 0) continue
-    cands.push({ row, perUnit: per.perUnit, unitLabel: per.unitLabel, price })
+    cands.push({
+      row,
+      perUnit: per.perUnit,
+      unitLabel: per.unitLabel,
+      price,
+      packCompare,
+    })
   }
 
   if (!cands.length) {
     return { available: false, unavailableReason: 'no_similar' }
   }
 
-  const med = median(cands.map((c) => c.perUnit))
-  const filtered =
-    med != null && med > 0
-      ? cands.filter((c) => c.perUnit >= med / 5 && c.perUnit <= 5 * med)
-      : cands
-  const pool = filtered.length ? filtered : cands
-  pool.sort((a, b) => a.perUnit - b.perUnit)
-  const best = pool[0]
+  const best = pickBestTypeUnitCandidate(cands, wantedUnitSizeBase, wantedBaseQty)
+  if (!best) {
+    return { available: false, unavailableReason: 'no_similar' }
+  }
 
   const sale = await findSaleExact((best.row.name || '').trim(), chain)
   if (sale) {
