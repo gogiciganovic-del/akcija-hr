@@ -41,6 +41,10 @@ const READY_MEAL_RE =
 const PET_FOOD_RE =
   /\b(hrana\s+za\s+(ma[cč]k|ma[cč]ke|pse|pasa)|za\s+(ma[cč]k|ma[cč]ke|pse)\b|friskies|petties|whiskas|pedigree|felix|gourmet|hobby\s*dog|kitty|macke|ma[cč]ke|buddy|mg\s+mm)\b/i
 
+/** Iznutrice — ne uspoređuj s file/prsima osim kad korisnik traži organ. Vrat = rez mesa, ne organ. */
+const ORGAN_WORD_RE =
+  /^(jetr\w*|sr[cč]\w*|[žz]elu\w*|bubreg\w*|bubre[žz]\w*|iznutric\w*|iznutr\w*)$/i
+
 function isMeatType(typeKey) {
   return MEAT_TYPE_KEYS.has(typeKey)
 }
@@ -69,6 +73,19 @@ export function isPetFood(name) {
     return true
   }
   return isPorridgeOrBabyOrPetFood(name)
+}
+
+/**
+ * Iznutrice / organi (jetra, srce, želudac, bubreg…).
+ * @param {string | null | undefined} name
+ */
+export function isOrganProduct(name) {
+  const words = String(name || '')
+    .toUpperCase()
+    .normalize('NFC')
+    .split(/[^A-ZČĆŽŠĐ]+/u)
+    .filter(Boolean)
+  return words.some((w) => ORGAN_WORD_RE.test(w))
 }
 
 /**
@@ -121,13 +138,15 @@ export function isPorridgeOrBabyOrPetFood(name) {
  * Tip-fallback preskoči kandidata (ili query ako applyToQuery).
  * @param {string | null | undefined} name
  * @param {string} typeKey
+ * @param {string | null | undefined} [queryName] — artikl iz košarice; organi ostaju samo kad i query traži organ
  */
-export function shouldSkipTypeFallbackCandidate(name, typeKey) {
+export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   if (hasProcessedForm(name)) return true
   if (isTypeWordIngredient(name, typeKey)) return true
   if (isMeatType(typeKey)) {
     if (isReadyMealOrMeatProduct(name)) return true
     if (isPetFood(name)) return true
+    if (isOrganProduct(name) && !isOrganProduct(queryName)) return true
   }
   return false
 }

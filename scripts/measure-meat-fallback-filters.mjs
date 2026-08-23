@@ -123,7 +123,7 @@ async function resolveFallback(cartName, chain) {
   const cands = [];
   for (const row of typedRows) {
     if (isComboProduct(row.name)) continue;
-    if (shouldSkipTypeFallbackCandidate(row.name, typeKey)) continue;
+    if (shouldSkipTypeFallbackCandidate(row.name, typeKey, cartName)) continue;
     if (needShared && qSig.length) {
       const cSig = new Set(significantNameTokens(row.name, typeMeta));
       if (!qSig.some((t) => cSig.has(t))) continue;
@@ -188,8 +188,9 @@ const CASES = [
 
 const FOCUS = [
   { cart: "Svinjetina mljevena 500 g", chain: "Konzum", note: "ne smije paprikaš" },
-  { cart: "Piletina file 500 g", chain: "Konzum", note: "file/prsa OK" },
-  { cart: "Piletina file 500 g", chain: "Spar", note: "file/prsa OK" },
+  { cart: "Piletina file 500 g", chain: "Konzum", note: "file/prsa OK, ne jetra" },
+  { cart: "Piletina file 500 g", chain: "Spar", note: "file/prsa OK, ne želuci" },
+  { cart: "Pileća jetrica 500 g", chain: "Konzum", note: "organ query → organ OK" },
   { cart: "Svinjski file 400 g", chain: "Kaufland", note: "sirovo OK" },
   { cart: "MARINIRANI SVINJSKI FILE", chain: "Konzum", note: "marinirano OK kao kandidat" },
 ];
@@ -218,18 +219,21 @@ for (const c of FOCUS) {
 
 // Audit: filteri na poznatim lošim nazivima
 const SKIP_NAMES = [
-  "SVINJSKI PAPRIKAŠ 400G CARNEX",
-  "Cekin Nuggets pileći gluten free 600g",
-  "Friskies za mačke, govedina u umaku 85 g",
-  "MARINIRANI SVINJSKI FILE",
-  "Cekin pileći file od prsiju 500g",
-  "Dimljena svinjska rebra, cca. 700g",
+  { name: "SVINJSKI PAPRIKAŠ 400G CARNEX", query: "Svinjetina mljevena 500 g" },
+  { name: "Cekin Nuggets pileći gluten free 600g", query: "Piletina file 500 g" },
+  { name: "Friskies za mačke, govedina u umaku 85 g", query: "Piletina file 500 g" },
+  { name: "JETRA SA SRCEM PILEĆA 500g SVJ VIND", query: "Piletina file 500 g" },
+  { name: "PILEĆI ŽELUCI S BUDGET 400g", query: "Piletina file 500 g" },
+  { name: "Pileća jetrica Perutnina Ptuj 500g", query: "Pileća jetrica 500 g" },
+  { name: "MARINIRANI SVINJSKI FILE", query: "Svinjski file 400 g" },
+  { name: "Cekin pileći file od prsiju 500g", query: "Piletina file 500 g" },
+  { name: "Dimljena svinjska rebra, cca. 700g", query: "Svinjski file 400 g" },
 ];
 console.log("=== shouldSkip (meso_piletina / meso_svinjetina) ===\n");
-for (const name of SKIP_NAMES) {
-  const tP = shouldSkipTypeFallbackCandidate(name, "meso_piletina");
-  const tS = shouldSkipTypeFallbackCandidate(name, "meso_svinjetina");
-  const tJ = shouldSkipTypeFallbackCandidate(name, "meso_junetina");
-  console.log(`${name}`);
+for (const { name, query } of SKIP_NAMES) {
+  const tP = shouldSkipTypeFallbackCandidate(name, "meso_piletina", query);
+  const tS = shouldSkipTypeFallbackCandidate(name, "meso_svinjetina", query);
+  const tJ = shouldSkipTypeFallbackCandidate(name, "meso_junetina", query);
+  console.log(`${name}  (query: ${query})`);
   console.log(`  piletina=${tP} svinjetina=${tS} junetina=${tJ}`);
 }

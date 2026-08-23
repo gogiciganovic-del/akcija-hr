@@ -372,7 +372,7 @@ async function resolveByTypeUnitPrice(item, chain) {
   const cands = []
   for (const row of typedRows) {
     if (isComboProduct(row.name)) continue
-    if (shouldSkipTypeFallbackCandidate(row.name, typeKey)) continue
+    if (shouldSkipTypeFallbackCandidate(row.name, typeKey, name)) continue
     if (needSharedWord && !sharesSignificantWord(querySig, row.name, typeMeta)) continue
 
     let qv = row.quantity_value != null ? Number(row.quantity_value) : null
