@@ -242,8 +242,14 @@ function sharesSignificantWord(queryTokens, candidateName, typeMeta) {
   return queryTokens.some((t) => cand.has(t))
 }
 
+/** Generički tipovi bez rizika krive podvrste — ne zahtijevaju zajedničku riječ u nazivu. */
+const SHARED_WORD_EXEMPT_TYPES = new Set(['jaja', 'krumpir', 'luk', 'secer', 'papir'])
+
 function requiresSharedSignificantWord(typeKey) {
-  return !String(typeKey || '').includes('_')
+  const key = String(typeKey || '')
+  if (key.includes('_')) return false
+  if (SHARED_WORD_EXEMPT_TYPES.has(key)) return false
+  return true
 }
 
 function packSizeOk(wantedBaseQty, candValue, candUnit, wantedUnitSizeBase, candUnitSizeBase) {

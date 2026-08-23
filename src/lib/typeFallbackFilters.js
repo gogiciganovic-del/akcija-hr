@@ -186,6 +186,83 @@ export function isTypeWordIngredient(name, typeKey) {
 /** Kaša / dječja hrana / hrana za ljubimce — nije meso, čak i kad piše PILETINA. */
 const NOT_MEAT_TOKENS = new Set(['KAŠA', 'KAŠICA', 'KASICA', 'KAŠ', 'HIPP', 'WHISKAS'])
 
+/** Prepelja jaja — nisu kokošja. */
+const QUAIL_EGG_RE = /\bprepel/i
+
+export function isChocolateOrFestiveEggProduct(name) {
+  const n = String(name || '')
+  if (!/jaj/i.test(n)) return false
+  const words = nameWordsUpper(name)
+  if (words.some((w) => /^SVJE/.test(w))) return false
+  if (
+    words.some((w) =>
+      /^(COK|ČOK|COKO|ČOKO|COKOLAD|ČOKOLAD|USKRS|USKRŠ|USKRSN|BUNNY|MILKA|HAPPY|MARCIPAN|PRELJEV|KARAMEL|VOĆNIM|VOCNIM)/.test(
+        w
+      )
+    )
+  ) {
+    return true
+  }
+  if (
+    words.includes('MINI') &&
+    words.some((w) => /^JAJ/.test(w)) &&
+    !words.some((w) => /^SVJE/.test(w))
+  ) {
+    return true
+  }
+  if (/\bvo[cć]nim\s+preljevom\b/i.test(n)) return true
+  if (/\bhappy\s*eggs\b/i.test(n)) return true
+  return false
+}
+/** Smrznuti pomfrit / prerađeni krumpir — nije sirovi krumpir. */
+const PROCESSED_POTATO_RE =
+  /\b(pommes|pomfrit|frites|predpr[žz]|kroketi|valoviti\s+pommes)\b/i
+
+function isBakingPaperName(name) {
+  return /\b(pe[cč]enj|pe[cč]\.|za\s+pe[cč])/i.test(String(name || ''))
+}
+
+function isToiletPaperName(name) {
+  const n = String(name || '')
+  if (isBakingPaperName(n)) return false
+  return (
+    /\btoalet/i.test(n) ||
+    /\btoal\./i.test(n) ||
+    /\btoal\b/i.test(n) ||
+    /\bpapir\s+toal/i.test(n) ||
+    /\bt\.?\s*papir/i.test(n)
+  )
+}
+
+/**
+ * Toaletni papir ≠ papir za pečenje (i obrnuto).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+function papirSubtypeMismatch(queryName, candidateName) {
+  const qToilet = isToiletPaperName(queryName)
+  const qBake = isBakingPaperName(queryName)
+  const cToilet = isToiletPaperName(candidateName)
+  const cBake = isBakingPaperName(candidateName)
+  if (qToilet && cBake && !cToilet) return true
+  if (qBake && cToilet && !cBake) return true
+  return false
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isQuailEggProduct(name) {
+  return QUAIL_EGG_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isProcessedPotatoProduct(name) {
+  return PROCESSED_POTATO_RE.test(String(name || ''))
+}
+
 /**
  * @param {string | null | undefined} name
  */
@@ -207,6 +284,12 @@ export function isPorridgeOrBabyOrPetFood(name) {
 export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   if (hasProcessedForm(name)) return true
   if (isTypeWordIngredient(name, typeKey)) return true
+  if (typeKey === 'jaja') {
+    if (isQuailEggProduct(name)) return true
+    if (isChocolateOrFestiveEggProduct(name)) return true
+  }
+  if (typeKey === 'krumpir' && isProcessedPotatoProduct(name)) return true
+  if (typeKey === 'papir' && queryName && papirSubtypeMismatch(queryName, name)) return true
   if (isMeatType(typeKey)) {
     if (isReadyMealOrMeatProduct(name)) return true
     if (isPetFood(name)) return true
