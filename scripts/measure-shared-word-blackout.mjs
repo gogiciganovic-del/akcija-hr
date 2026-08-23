@@ -120,7 +120,9 @@ function sharesSignificantWord(queryTokens, candidateName, typeMeta) {
   return queryTokens.some((t) => cand.has(t));
 }
 
-const SHARED_WORD_EXEMPT_TYPES = new Set(["jaja", "krumpir", "luk", "secer", "papir"]);
+const SHARED_WORD_EXEMPT_TYPES = new Set([
+  "jaja", "krumpir", "luk", "secer", "papir", "keks", "maslac", "tjestenina",
+]);
 
 function requiresSharedSignificantWord(typeKey) {
   const key = String(typeKey || "");

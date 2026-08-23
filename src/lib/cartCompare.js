@@ -243,7 +243,9 @@ function sharesSignificantWord(queryTokens, candidateName, typeMeta) {
 }
 
 /** Generički tipovi bez rizika krive podvrste — ne zahtijevaju zajedničku riječ u nazivu. */
-const SHARED_WORD_EXEMPT_TYPES = new Set(['jaja', 'krumpir', 'luk', 'secer', 'papir'])
+const SHARED_WORD_EXEMPT_TYPES = new Set([
+  'jaja', 'krumpir', 'luk', 'secer', 'papir', 'keks', 'maslac', 'tjestenina',
+])
 
 function requiresSharedSignificantWord(typeKey) {
   const key = String(typeKey || '')

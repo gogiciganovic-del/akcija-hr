@@ -218,6 +218,65 @@ export function isChocolateOrFestiveEggProduct(name) {
 const PROCESSED_POTATO_RE =
   /\b(pommes|pomfrit|frites|predpr[žz]|kroketi|valoviti\s+pommes)\b/i
 
+/** Kikiriki namaz pogrešno označen kao maslac. */
+const PEANUT_MASLAC_RE = /maslac.*kikiriki|kikiriki.*maslac/i
+
+/** Kozmetika / njega (maslac za tijelo, usne, dren…). */
+const MASLAC_COSMETIC_RE =
+  /\b(za\s+(tijelo|tij\.|usne|usna|ruke|lice)|maslac\s+za\s+(tij|usn|ruk|lic)|\bdren\b|deodorant|njeg[aeu]\s+ko[zs]e|body\s+butter|sol\s+de\s+janeiro)\b/i
+
+/** Aromatizirani maslac (začinsko bilje) — druga namjena od običnog. */
+const FLAVORED_MASLAC_RE =
+  /za[cč]in\.?\s*bilj|bilj.*za[cč]in|za[cč]insk|trio\s+za[cč]in/i
+
+/** Punjena / njoki / lasagne / gotova jela — nije suha tjestenina. */
+const STUFFED_PASTA_RE = /\bpunjen/i
+const GNOCCHI_RE = /\bnjok/i
+const LASAGNE_MEAL_RE = /\blasagn/i
+const READY_PASTA_MEAL_RE = /\bgotov/i
+const PASTA_SOUP_RE = /\bjuha\b.*\btjest|\btjest.*\bjuha\b/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isPeanutMaslacProduct(name) {
+  return PEANUT_MASLAC_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isMaslacCosmeticProduct(name) {
+  const n = String(name || '')
+  if (MASLAC_COSMETIC_RE.test(n)) return true
+  // mali ml + maslac bez % mm → često kozmetika (npr. 75 ml dren)
+  if (/maslac/i.test(n) && /\b\d+\s*ml\b/i.test(n) && !/\b\d+\s*g\b/i.test(n) && !/\bmm\b/i.test(n)) {
+    if (/\b(za\s+tij|dren|shea|kokos\s*&\s*shea|njeg)/i.test(n)) return true
+  }
+  return false
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isFlavoredHerbMaslacProduct(name) {
+  return FLAVORED_MASLAC_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isNonDryPastaProduct(name) {
+  const n = String(name || '')
+  return (
+    STUFFED_PASTA_RE.test(n) ||
+    GNOCCHI_RE.test(n) ||
+    LASAGNE_MEAL_RE.test(n) ||
+    READY_PASTA_MEAL_RE.test(n) ||
+    PASTA_SOUP_RE.test(n)
+  )
+}
+
 function isBakingPaperName(name) {
   return /\b(pe[cč]enj|pe[cč]\.|za\s+pe[cč])/i.test(String(name || ''))
 }
@@ -290,6 +349,12 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   }
   if (typeKey === 'krumpir' && isProcessedPotatoProduct(name)) return true
   if (typeKey === 'papir' && queryName && papirSubtypeMismatch(queryName, name)) return true
+  if (typeKey === 'maslac') {
+    if (isPeanutMaslacProduct(name)) return true
+    if (isMaslacCosmeticProduct(name)) return true
+    if (isFlavoredHerbMaslacProduct(name)) return true
+  }
+  if (typeKey === 'tjestenina' && isNonDryPastaProduct(name)) return true
   if (isMeatType(typeKey)) {
     if (isReadyMealOrMeatProduct(name)) return true
     if (isPetFood(name)) return true
