@@ -58,7 +58,36 @@ const MEAT_CUT_GROUPS = [
   { id: 'rebra', wordRe: /^rebr\w*$/i },
   { id: 'koljenica', wordRe: /^koljen\w*$/i },
   { id: 'mljeven', wordRe: /^mljeven\w*$/i },
+  { id: 'odresci', wordRe: /^odresc\w*$/i },
 ]
+
+/** Mast / salo — nije mljeveno niti rez mesa za kuhanje. */
+const MEAT_FAT_RE = /\b(mast|salo)\b/i
+const MEAT_FAT_FALSE_RE = /\bmastil/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isMeatFatProduct(name) {
+  const n = String(name || '')
+  if (MEAT_FAT_FALSE_RE.test(n)) return false
+  return MEAT_FAT_RE.test(n)
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isOdresciProduct(name) {
+  return /\bodresc/i.test(String(name || ''))
+}
+
+/**
+ * Query eksplicitno traži mljeveno meso.
+ * @param {string | null | undefined} name
+ */
+export function queryWantsGroundMeat(name) {
+  return meatCutIdsInName(name).has('mljeven')
+}
 
 function nameWordsUpper(name) {
   return String(name || '')
@@ -149,7 +178,20 @@ export function preferMeatCutCandidates(candidates, queryName, getName) {
   const queryCuts = meatCutIdsInName(queryName)
   if (!queryCuts.size || !candidates.length) return candidates
   const matched = candidates.filter((c) => meatCutMatchesQuery(queryName, getName(c)))
-  return matched.length ? matched : candidates
+  if (matched.length) return matched
+
+  // Mljeveno: nema drugog mljevenog — fallback na druge rezove, ne mast/odreske
+  if (queryCuts.has('mljeven')) {
+    const fallback = candidates.filter((c) => {
+      const n = getName(c) || ''
+      if (isMeatFatProduct(n)) return false
+      if (isOdresciProduct(n)) return false
+      return true
+    })
+    return fallback.length ? fallback : candidates.filter((c) => !isMeatFatProduct(getName(c)))
+  }
+
+  return candidates
 }
 
 /**
@@ -454,6 +496,8 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
     if (isReadyMealOrMeatProduct(name)) return true
     if (isPetFood(name)) return true
     if (isOrganProduct(name) && !isOrganProduct(queryName)) return true
+    if (isMeatFatProduct(name)) return true
+    if (queryName && queryWantsGroundMeat(queryName) && isOdresciProduct(name)) return true
   }
   return false
 }
