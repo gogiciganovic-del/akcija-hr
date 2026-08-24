@@ -447,6 +447,127 @@ function isToiletPaperName(name) {
   )
 }
 
+/** Kozmetika / njega s riječju „mlijeko“ u nazivu. */
+const MLIJEKO_COSMETIC_RE =
+  /\b(za\s+sun[cč]anj\w*|za\s+tijelo|za\s+tij\.|za\s+lice|za\s+[cč]i[sš][cć]en\w*|body\s*(milk|lotion|butter)|losion|maska|spf\b|zf\s*\d|nivea|ziaja|sunlove|afrodita)\b/i
+
+/** Meki / svježi sirevi. */
+const CHEESE_SOFT_RE =
+  /\b(svje[zž]|meki|meka|posni|posna|kremast|krem\s*sir|ricotta|skuta|cottage|quark|mascarpone|labne|zrnati|feta)\b/i
+
+/** Tvrdi / zreli / tipični tvrdi brendovi-sorte. */
+const CHEESE_HARD_RE =
+  /\b(tvrdi|tvrda|zreli|zrela|gauda|gouda|edam|trapist|grana|parmezan|parmigiano|pecorino|cheddar|emmental|maasdam|tilsit|istarski\s+tvrdi)\b/i
+
+/** Mesni sir = kobasica, ne sir. */
+const CHEESE_MESNI_RE = /\bmesni\s+sir\b/i
+
+/** Topljeni sir. */
+const CHEESE_TOPLJENI_RE = /\btopljen/i
+
+/** Pet / snack koji lažno uđu u tip sir. */
+const CHEESE_PET_OR_SNACK_RE =
+  /\b(dreamies|posl\.?\s*ma[cč]|hrana\s+za\s+(ma[cč]k|pse)|doritos|nacho)\b/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isMlijekoCosmeticProduct(name) {
+  return MLIJEKO_COSMETIC_RE.test(String(name || ''))
+}
+
+/**
+ * Postotak masti iz naziva mlijeka (npr. 2,8 → 2.8), ili null.
+ * @param {string | null | undefined} name
+ * @returns {number | null}
+ */
+export function milkFatPercentInName(name) {
+  const m = String(name || '').match(/(\d+[,.]\d+)\s*%/)
+  if (!m) return null
+  const v = Number(String(m[1]).replace(',', '.'))
+  return Number.isFinite(v) ? v : null
+}
+
+/**
+ * Suzi kandidate na sličan % masti (±0,5); ako nema, vrati original.
+ * @template T
+ * @param {T[]} candidates
+ * @param {string | null | undefined} queryName
+ * @param {(item: T) => string | null | undefined} getName
+ * @returns {T[]}
+ */
+export function preferMilkFatCandidates(candidates, queryName, getName) {
+  const want = milkFatPercentInName(queryName)
+  if (want == null || !candidates.length) return candidates
+  const matched = candidates.filter((c) => {
+    const p = milkFatPercentInName(getName(c))
+    if (p == null) return false
+    return Math.abs(p - want) <= 0.5
+  })
+  return matched.length ? matched : candidates
+}
+
+/**
+ * @param {string | null | undefined} name
+ * @returns {'soft' | 'hard' | null}
+ */
+export function cheeseTextureCategory(name) {
+  const n = String(name || '')
+  const soft = CHEESE_SOFT_RE.test(n)
+  const hard = CHEESE_HARD_RE.test(n)
+  if (soft && !hard) return 'soft'
+  if (hard && !soft) return 'hard'
+  // oba ili nijedno — nema jasne kategorije
+  if (soft && hard) return null
+  return null
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isMesniSirProduct(name) {
+  return CHEESE_MESNI_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isTopljeniSirProduct(name) {
+  return CHEESE_TOPLJENI_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isCheesePetOrSnackProduct(name) {
+  return CHEESE_PET_OR_SNACK_RE.test(String(name || ''))
+}
+
+/**
+ * Query traži prirodni/sorte sir (gouda, edam…), ne topljeni.
+ * @param {string | null | undefined} name
+ */
+export function queryWantsNaturalHardCheese(name) {
+  const n = String(name || '')
+  if (isTopljeniSirProduct(n)) return false
+  return CHEESE_HARD_RE.test(n)
+}
+
+/**
+ * Preferiraj istu teksturu sira; ako nema, dopusti fallback na sve.
+ * @template T
+ * @param {T[]} candidates
+ * @param {string | null | undefined} queryName
+ * @param {(item: T) => string | null | undefined} getName
+ * @returns {T[]}
+ */
+export function preferCheeseTextureCandidates(candidates, queryName, getName) {
+  const want = cheeseTextureCategory(queryName)
+  if (!want || !candidates.length) return candidates
+  const matched = candidates.filter((c) => cheeseTextureCategory(getName(c)) === want)
+  return matched.length ? matched : candidates
+}
+
 /**
  * Toaletni papir ≠ papir za pečenje (i obrnuto).
  * @param {string | null | undefined} queryName
@@ -513,6 +634,15 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
     if (isNonDryPastaProduct(name)) return true
     if (queryName && pastaShapeMismatch(queryName, name)) return true
   }
+  if (typeKey === 'mlijeko') {
+    if (isMlijekoCosmeticProduct(name)) return true
+  }
+  if (typeKey === 'sir') {
+    if (isMesniSirProduct(name)) return true
+    if (isCheesePetOrSnackProduct(name)) return true
+    if (isPetFood(name)) return true
+    if (queryName && queryWantsNaturalHardCheese(queryName) && isTopljeniSirProduct(name)) return true
+  }
   if (isMeatType(typeKey)) {
     if (isReadyMealOrMeatProduct(name)) return true
     if (isPetFood(name)) return true
@@ -529,6 +659,9 @@ export function shouldSkipTypeFallbackQuery(name) {
   if (hasProcessedForm(name)) return true
   if (isReadyMealOrMeatProduct(name)) return true
   if (isPetFood(name)) return true
+  if (isMlijekoCosmeticProduct(name)) return true
+  if (isMesniSirProduct(name)) return true
+  if (isCheesePetOrSnackProduct(name)) return true
   return false
 }
 

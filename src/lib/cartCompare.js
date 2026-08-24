@@ -8,6 +8,8 @@ import {
   shouldSkipTypeFallbackQuery,
   preferMeatCutCandidates,
   preferPastaShapeCandidates,
+  preferMilkFatCandidates,
+  preferCheeseTextureCandidates,
   UNAVAILABLE_REASON_LABELS,
 } from './typeFallbackFilters.js'
 
@@ -296,6 +298,8 @@ function pickBestTypeUnitCandidate(cands, wantedUnitSizeBase, wantedBaseQty, que
   if (queryName) {
     pickFrom = preferMeatCutCandidates(pickFrom, queryName, (c) => c.row?.name ?? c.name)
     pickFrom = preferPastaShapeCandidates(pickFrom, queryName, (c) => c.row?.name ?? c.name)
+    pickFrom = preferMilkFatCandidates(pickFrom, queryName, (c) => c.row?.name ?? c.name)
+    pickFrom = preferCheeseTextureCandidates(pickFrom, queryName, (c) => c.row?.name ?? c.name)
   }
   pickFrom.sort((a, b) => a.perUnit - b.perUnit)
   return pickFrom[0] || null
