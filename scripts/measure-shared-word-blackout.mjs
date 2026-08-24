@@ -121,7 +121,7 @@ function sharesSignificantWord(queryTokens, candidateName, typeMeta) {
 }
 
 const SHARED_WORD_EXEMPT_TYPES = new Set([
-  "jaja", "krumpir", "luk", "secer", "papir", "keks", "maslac", "tjestenina",
+  "jaja", "krumpir", "luk", "secer", "papir", "keks", "maslac", "tjestenina", "sir", "mlijeko",
 ]);
 
 function requiresSharedSignificantWord(typeKey) {

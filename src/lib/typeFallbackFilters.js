@@ -457,13 +457,13 @@ const CHEESE_SOFT_RE =
 
 /** Tvrdi / zreli / tipični tvrdi brendovi-sorte. */
 const CHEESE_HARD_RE =
-  /\b(tvrdi|tvrda|zreli|zrela|gauda|gouda|edam|trapist|grana|parmezan|parmigiano|pecorino|cheddar|emmental|maasdam|tilsit|istarski\s+tvrdi)\b/i
+  /\b(tvrdi|tvrda|zreli|zrela|gauda|gouda|edam(ac)?|trapist|grana|parmezan|parmigiano|pecorino|cheddar|emmental|maasdam|tilsit|istarski\s+tvrdi)\b/i
 
 /** Mesni sir = kobasica, ne sir. */
 const CHEESE_MESNI_RE = /\bmesni\s+sir\b/i
 
-/** Topljeni sir. */
-const CHEESE_TOPLJENI_RE = /\btopljen/i
+/** Topljeni sir (uklj. skraćenice tipa „TOPLJ LIST“). */
+const CHEESE_TOPLJENI_RE = /\btoplj/i
 
 /** Pet / snack koji lažno uđu u tip sir. */
 const CHEESE_PET_OR_SNACK_RE =
