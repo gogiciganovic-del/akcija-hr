@@ -35,7 +35,7 @@ const MEAT_TYPE_KEYS = new Set([
 
 /** Gotova jela / prerađevine — ne uspoređuj s file/mljevenim unutar mesa. */
 const READY_MEAL_RE =
-  /\b(paprika[sš]|ra[nž]nji[cć]|ra[nž]nji[cć]i|[čc]evap|[čc]evap[cč]i[cć]|hrenovk|nuget|nugget|burger|kobasic|\bkob\b|pa[sš]tet|lazanj|lasagn)\w*/i
+  /\b(paprika[sš]|ra[nž]nji[cć]|ra[nž]nji[cć]i|[čc]evap|[čc]evap[cč]i[cć]|hren(?:ovk|\.|\b)|nuget|nugget|cheeseburger|(?:ham)?burger|kobasic|\bkob\b|pa[sš]tet|lazanj|lasagn|parizer|vir[sš]l|salam(?!ur)|posebn(?!\w*\s*ponud)|mix\s+za\s+juhu)\w*/i
 
 /** Hrana za kućne ljubimce (i kad piše piletina/govedina u nazivu). */
 const PET_FOOD_RE =
@@ -87,6 +87,25 @@ export function isOdresciProduct(name) {
  */
 export function queryWantsGroundMeat(name) {
   return meatCutIdsInName(name).has('mljeven')
+}
+
+/**
+ * Query traži čisti file/prsa (ne mješavinu).
+ * @param {string | null | undefined} name
+ */
+export function queryWantsCleanFile(name) {
+  const cuts = meatCutIdsInName(name)
+  if (!cuts.has('file')) return false
+  return !isMixFileProduct(name)
+}
+
+/**
+ * Mješavina (npr. „mix file“, „mix mini“) — nije čisti file/prsa.
+ * @param {string | null | undefined} name
+ */
+export function isMixFileProduct(name) {
+  const n = String(name || '')
+  return /\bmix\b/i.test(n) || /\bmije[sš](an|ovin)/i.test(n)
 }
 
 function nameWordsUpper(name) {
@@ -498,6 +517,7 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
     if (isOrganProduct(name) && !isOrganProduct(queryName)) return true
     if (isMeatFatProduct(name)) return true
     if (queryName && queryWantsGroundMeat(queryName) && isOdresciProduct(name)) return true
+    if (queryName && queryWantsCleanFile(queryName) && isMixFileProduct(name)) return true
   }
   return false
 }
