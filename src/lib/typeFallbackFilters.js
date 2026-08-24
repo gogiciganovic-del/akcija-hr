@@ -315,6 +315,8 @@ const PASTA_SHAPE_GROUPS = [
   { id: 'tagliatelle', wordRe: /^tagliat\w*$/i },
   { id: 'macaroni', wordRe: /^(makaron\w*|macaron\w*)$/i },
   { id: 'rezanci', wordRe: /^rezanc\w*$/i },
+  { id: 'bavette', wordRe: /^bavett\w*$/i },
+  { id: 'stelle', wordRe: /^stell\w*$/i },
 ]
 
 function pastaShapeWord(word) {
