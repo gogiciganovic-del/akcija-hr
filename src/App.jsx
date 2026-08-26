@@ -7,6 +7,7 @@ import { FavoritesPage } from "./pages/FavoritesPage";
 import { CartPage }      from "./pages/CartPage";
 import { Admin }         from "./pages/Admin";
 import { useFavorites }  from "./hooks/useFavorites";
+import { usePushNotifications } from "./hooks/usePushNotifications";
 import { CjenkoPeek }    from "./components/CjenkoPeek";
 
 const VALID_TABS = new Set(["home", "search", "cart", "fav"]);
@@ -28,6 +29,12 @@ function urlForTab(tab) {
 
 export default function App() {
   const { favorites, isFav, toggle, clear } = useFavorites();
+  const {
+    status: pushStatus,
+    busy: pushBusy,
+    error: pushError,
+    enable: enablePush,
+  } = usePushNotifications(favorites);
   const [activeTab, setActiveTab] = useState(() => tabFromLocation());
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [homeResetSignal, setHomeResetSignal] = useState(0);
@@ -164,6 +171,10 @@ export default function App() {
         onClearAll={clear}
         onProductSelect={handleProductSelect}
         onGoHome={() => goTab("home")}
+        pushStatus={pushStatus}
+        pushBusy={pushBusy}
+        pushError={pushError}
+        onEnablePush={enablePush}
       />
     ),
   };

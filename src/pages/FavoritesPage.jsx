@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Trash2, Share2 } from "lucide-react";
+import { Bell, BellOff, BellRing, Trash2, Share2 } from "lucide-react";
 import { ProductCard } from "../components/ProductCard";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { CjenkoShrug } from "../components/CjenkoShrug";
@@ -25,6 +25,105 @@ function favoriteTotals(items) {
       return acc;
     },
     { original: 0, sale: 0, saved: 0 }
+  );
+}
+
+function PushNotifyBanner({ status, busy, error, onEnable }) {
+  if (status === "unsupported") {
+    return (
+      <div
+        className="mx-4 mb-4 rounded-2xl px-4 py-3"
+        style={{
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, lineHeight: 1.45 }}>
+          Ovaj preglednik ne podržava push obavijesti.
+        </p>
+      </div>
+    );
+  }
+
+  if (status === "denied") {
+    return (
+      <div
+        className="mx-4 mb-4 rounded-2xl px-4 py-3 flex gap-3 items-start"
+        style={{
+          background: "rgba(255,107,107,0.06)",
+          border: "1px solid rgba(255,107,107,0.2)",
+        }}
+      >
+        <BellOff size={18} style={{ color: "#ff6b6b", flexShrink: 0, marginTop: 2 }} />
+        <div>
+          <p className="font-bold" style={{ color: "#ff6b6b", fontSize: 13 }}>
+            Obavijesti su blokirane
+          </p>
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, lineHeight: 1.45, marginTop: 4 }}>
+            Uključi ih u postavkama preglednika za ovu stranicu — nećemo ponovno pitati.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "subscribed") {
+    return (
+      <div
+        className="mx-4 mb-4 rounded-2xl px-4 py-3 flex gap-3 items-center"
+        style={{
+          background: "rgba(0,255,136,0.06)",
+          border: "1px solid rgba(0,255,136,0.2)",
+        }}
+      >
+        <BellRing size={18} style={{ color: "#00ff88", flexShrink: 0 }} />
+        <p style={{ color: "rgba(0,255,136,0.9)", fontSize: 13, lineHeight: 1.4 }}>
+          Obavijesti o padu cijene uključene — pratimo tvoje favorite.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="mx-4 mb-4 rounded-2xl px-4 py-3"
+      style={{
+        background: "rgba(255,255,255,0.03)",
+        border: "1px solid rgba(255,255,255,0.08)",
+      }}
+    >
+      <div className="flex gap-3 items-start">
+        <Bell size={18} style={{ color: "#EF9F27", flexShrink: 0, marginTop: 2 }} />
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-white" style={{ fontSize: 13 }}>
+            Obavijesti o padu cijene
+          </p>
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, lineHeight: 1.45, marginTop: 4 }}>
+            Javit ćemo ti kad favoritima padne cijena.
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onEnable}
+        disabled={busy}
+        className="w-full mt-3 py-2.5 rounded-xl font-bold"
+        style={{
+          background: busy ? "rgba(239,159,39,0.08)" : "rgba(239,159,39,0.14)",
+          border: "1px solid rgba(239,159,39,0.35)",
+          color: "#EF9F27",
+          fontSize: 13,
+          opacity: busy ? 0.7 : 1,
+        }}
+      >
+        {busy ? "Uključujem…" : "Uključi obavijesti o padu cijene"}
+      </button>
+      {error ? (
+        <p className="mt-2" style={{ color: "rgba(255,107,107,0.9)", fontSize: 11, lineHeight: 1.4 }}>
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -169,6 +268,10 @@ export function FavoritesPage({
   onClearAll,
   onProductSelect,
   onGoHome,
+  pushStatus = "prompt",
+  pushBusy = false,
+  pushError = null,
+  onEnablePush,
 }) {
   const items = [...favorites.values()];
   const hasItems = items.length > 0;
@@ -267,6 +370,13 @@ export function FavoritesPage({
           </p>
         )}
       </div>
+
+      <PushNotifyBanner
+        status={pushStatus}
+        busy={pushBusy}
+        error={pushError}
+        onEnable={onEnablePush}
+      />
 
       {hasItems ? (
         <SavingsCard
