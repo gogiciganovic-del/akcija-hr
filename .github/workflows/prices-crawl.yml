@@ -38,6 +38,10 @@ jobs:
       - name: Install importer deps
         run: pip install -r scraper/requirements.txt
 
+      - name: Record push since timestamp
+        id: push_since
+        run: echo "since=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Import into Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -48,3 +52,15 @@ jobs:
           python scraper/import_regular_prices.py \
             --input "/tmp/cijene-out/${DATE_DIR}" \
             --chains lidl,konzum,kaufland,spar,plodine,eurospin,tommy,studenac,dm
+
+      # --limit 1 dok lokalni pravi send nije potvrđen na uređaju; makni limit kasnije
+      - name: Send price-drop push notifications
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+        run: |
+          python scraper/send_price_drop_pushes.py \
+            --since "${{ steps.push_since.outputs.since }}" \
+            --limit 1
