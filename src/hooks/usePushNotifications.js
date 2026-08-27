@@ -9,8 +9,9 @@ import {
 
 /**
  * @param {Map<string, any>} favorites
+ * @param {boolean} [favoritesLoading=false]
  */
-export function usePushNotifications(favorites) {
+export function usePushNotifications(favorites, favoritesLoading = false) {
   const [status, setStatus] = useState(() => {
     if (!isPushSupported()) return "unsupported";
     const p = getNotificationPermission();
@@ -49,10 +50,12 @@ export function usePushNotifications(favorites) {
   }, [refreshStatus]);
 
   // Sinkroniziraj barkodove kad se favoriti mijenjaju (localStorage ostaje u useFavorites).
+  // Čekaj kraj učitavanja — inače mount s praznim Mapom upisuje tracked_barcodes=[].
   useEffect(() => {
+    if (favoritesLoading) return;
     if (!(favorites instanceof Map)) return;
     syncPushTrackedBarcodes(favorites);
-  }, [favorites]);
+  }, [favorites, favoritesLoading]);
 
   const enable = useCallback(async () => {
     if (busy) return;

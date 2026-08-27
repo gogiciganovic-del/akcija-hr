@@ -28,13 +28,13 @@ function urlForTab(tab) {
 }
 
 export default function App() {
-  const { favorites, isFav, toggle, clear } = useFavorites();
+  const { favorites, isFav, toggle, clear, loading: favoritesLoading } = useFavorites();
   const {
     status: pushStatus,
     busy: pushBusy,
     error: pushError,
     enable: enablePush,
-  } = usePushNotifications(favorites);
+  } = usePushNotifications(favorites, favoritesLoading);
   const [activeTab, setActiveTab] = useState(() => tabFromLocation());
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [homeResetSignal, setHomeResetSignal] = useState(0);
