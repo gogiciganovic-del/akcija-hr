@@ -1,9 +1,28 @@
+import { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
+import { productPlaceholderDataUri } from "../lib/productImage";
 
 const fmt = (v) => v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
 
+function isRemoteSrc(src) {
+  return typeof src === "string" && (src.startsWith("http://") || src.startsWith("https://"));
+}
+
 export function ProductCard({ product, size = "normal", isFavorite, onToggleFavorite, onClick }) {
   const large = size === "large";
+  const imageHeight = large ? 140 : 100;
+  const fallbackSrc = productPlaceholderDataUri(product.name, imageHeight);
+
+  const [displaySrc, setDisplaySrc] = useState(product.image || fallbackSrc);
+  const [imageLoading, setImageLoading] = useState(() => isRemoteSrc(product.image));
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    const next = product.image || fallbackSrc;
+    setDisplaySrc(next);
+    setImageFailed(false);
+    setImageLoading(isRemoteSrc(product.image));
+  }, [product.image, product.name, fallbackSrc]);
 
   return (
     <div
@@ -28,17 +47,33 @@ export function ProductCard({ product, size = "normal", isFavorite, onToggleFavo
         />
       </button>
 
-      <img
-        src={product.image}
-        alt={product.name}
-        className="w-full object-cover"
+      <div
+        className="relative w-full overflow-hidden"
         style={{
-          height: large ? 140 : 100,
-          background: product.imageBg,
-          opacity: 0.9,
+          height: imageHeight,
+          background: product.imageBg || "#0d1f3a",
         }}
-        onError={(e) => { e.target.style.display = "none"; }}
-      />
+      >
+        {imageLoading && !imageFailed && (
+          <div
+            className="absolute inset-0 animate-pulse"
+            style={{ background: "rgba(255,255,255,0.06)" }}
+            aria-hidden
+          />
+        )}
+        <img
+          src={displaySrc}
+          alt={product.name}
+          className="relative w-full h-full object-contain"
+          style={{ opacity: imageLoading ? 0 : 0.9 }}
+          onLoad={() => setImageLoading(false)}
+          onError={() => {
+            setImageFailed(true);
+            setImageLoading(false);
+            setDisplaySrc(fallbackSrc);
+          }}
+        />
+      </div>
 
       <div className="p-2.5">
         <p
