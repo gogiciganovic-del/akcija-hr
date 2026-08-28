@@ -14,10 +14,17 @@ const VALID_TABS = new Set(["home", "search", "cart", "fav"]);
 
 function tabFromLocation() {
   const hash = String(window.location.hash || "").replace(/^#/, "");
-  if (VALID_TABS.has(hash)) return hash;
+  const base = hash.split("?")[0].split("&")[0];
+  if (VALID_TABS.has(base)) return base;
   const stateTab = window.history.state?.tab;
   if (VALID_TABS.has(stateTab)) return stateTab;
   return "home";
+}
+
+function urlForLocation(tab) {
+  const path = `${window.location.pathname}${window.location.search}`;
+  if (tab === "home") return path || "/";
+  return `${path}#${tab}`;
 }
 
 function urlForTab(tab) {
@@ -58,7 +65,21 @@ export default function App() {
 
   useEffect(() => {
     const tab = tabFromLocation();
-    window.history.replaceState({ tab }, "", urlForTab(tab));
+    const path = `${window.location.pathname}${window.location.search}`;
+    const href = window.location.hash
+      ? `${path}${window.location.hash}`
+      : urlForLocation(tab);
+    window.history.replaceState({ tab }, "", href);
+  }, []);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      sheetOpenRef.current = false;
+      setSelectedProduct(null);
+      setActiveTab(tabFromLocation());
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
   useEffect(() => {
@@ -167,6 +188,7 @@ export default function App() {
     fav: (
       <FavoritesPage
         favorites={favorites}
+        favoritesLoading={favoritesLoading}
         onToggleFavorite={toggle}
         onClearAll={clear}
         onProductSelect={handleProductSelect}

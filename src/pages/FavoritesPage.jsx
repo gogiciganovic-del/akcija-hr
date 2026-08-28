@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Bell, BellOff, BellRing, Trash2, Share2 } from "lucide-react";
 import { ProductCard } from "../components/ProductCard";
 import { CjenkoFace } from "../components/CjenkoFace";
@@ -13,6 +13,20 @@ const fmtEur = (v) =>
 
 /** Ispod ovoga ušteda nije hero — samo UI. */
 const MIN_SAVINGS_HIGHLIGHT = 0.1;
+const HIGHLIGHT_GLOW_MS = 3000;
+
+function parseHighlightFromHash() {
+  const hash = String(window.location.hash || "");
+  const q = hash.indexOf("?");
+  if (q === -1) return null;
+  const value = new URLSearchParams(hash.slice(q + 1)).get("highlight");
+  return value ? String(value).trim() : null;
+}
+
+function clearHighlightFromHash() {
+  const path = `${window.location.pathname}${window.location.search}`;
+  window.history.replaceState(window.history.state, "", `${path}#fav`);
+}
 
 function favoriteTotals(items) {
   return items.reduce(
@@ -264,6 +278,7 @@ function SavingsCard({ items, onShare, shareFeedback }) {
 
 export function FavoritesPage({
   favorites,
+  favoritesLoading = false,
   onToggleFavorite,
   onClearAll,
   onProductSelect,
@@ -276,6 +291,10 @@ export function FavoritesPage({
   const items = [...favorites.values()];
   const hasItems = items.length > 0;
   const [shareFeedback, setShareFeedback] = useState(null);
+  const [highlightBarcode, setHighlightBarcode] = useState(() => parseHighlightFromHash());
+  const [glowBarcode, setGlowBarcode] = useState(null);
+  const [missingHighlight, setMissingHighlight] = useState(false);
+  const cardRefs = useRef(new Map());
   const expiringToday = items.filter((p) => isExpiringTodayProduct(p));
   const expiringCount = expiringToday.length;
   const expiringHint =
@@ -284,6 +303,55 @@ export function FavoritesPage({
       : expiringCount === 1
         ? "1 favorit ističe danas"
         : `${expiringCount} favorita ističu danas`;
+
+  useEffect(() => {
+    const syncHighlight = () => setHighlightBarcode(parseHighlightFromHash());
+    window.addEventListener("hashchange", syncHighlight);
+    return () => window.removeEventListener("hashchange", syncHighlight);
+  }, []);
+
+  useEffect(() => {
+    if (favoritesLoading) return;
+
+    if (!highlightBarcode) {
+      setMissingHighlight(false);
+      return;
+    }
+
+    const normalized = highlightBarcode;
+    const match = items.find(
+      (p) => String(p.barcode || "").trim() === normalized
+    );
+
+    if (!match) {
+      setGlowBarcode(null);
+      setMissingHighlight(true);
+      clearHighlightFromHash();
+      setHighlightBarcode(null);
+      return;
+    }
+
+    setMissingHighlight(false);
+    setGlowBarcode(normalized);
+
+    const scrollTimer = window.requestAnimationFrame(() => {
+      cardRefs.current.get(normalized)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+
+    const glowTimer = window.setTimeout(() => {
+      setGlowBarcode(null);
+      clearHighlightFromHash();
+      setHighlightBarcode(null);
+    }, HIGHLIGHT_GLOW_MS);
+
+    return () => {
+      window.cancelAnimationFrame(scrollTimer);
+      window.clearTimeout(glowTimer);
+    };
+  }, [highlightBarcode, items, favoritesLoading]);
 
   const handleShareSavings = useCallback(async () => {
     const { original, sale, saved } = favoriteTotals(items);
@@ -369,6 +437,20 @@ export function FavoritesPage({
             {expiringHint}
           </p>
         )}
+        {missingHighlight && (
+          <p
+            className="mt-2 px-3 py-1.5 rounded-xl"
+            style={{
+              fontSize: 11,
+              color: "rgba(255,255,255,0.35)",
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              lineHeight: 1.35,
+            }}
+          >
+            Proizvod više nije u favoritima.
+          </p>
+        )}
       </div>
 
       <PushNotifyBanner
@@ -392,8 +474,25 @@ export function FavoritesPage({
         <div className="grid grid-cols-2 gap-2.5 px-4 pb-8">
           {items.map((p) => {
             const expiring = isExpiringTodayProduct(p);
+            const barcodeKey = String(p.barcode || "").trim();
+            const isGlowing = glowBarcode && barcodeKey === glowBarcode;
             return (
-              <div key={p.id} className="relative">
+              <div
+                key={p.id}
+                ref={(el) => {
+                  if (el && barcodeKey) cardRefs.current.set(barcodeKey, el);
+                  else if (barcodeKey) cardRefs.current.delete(barcodeKey);
+                }}
+                className="relative rounded-2xl transition-shadow duration-300"
+                style={
+                  isGlowing
+                    ? {
+                        boxShadow:
+                          "0 0 0 2px rgba(0,255,136,0.85), 0 0 24px rgba(0,255,136,0.35)",
+                      }
+                    : undefined
+                }
+              >
                 {expiring && (
                   <span
                     className="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded font-semibold"

@@ -27,7 +27,7 @@ load_dotenv(ROOT / ".env")
 
 FETCH_BATCH = 500
 SUB_BARCODE_CHUNK = 200
-DEFAULT_URL = "#favorites"
+DEFAULT_URL = "#fav"
 NAME_MAX_LEN = 45
 
 
@@ -182,7 +182,7 @@ def build_payload(drop: dict, product_name: str | None = None) -> dict:
     return {
         "title": "Cjenko",
         "body": body,
-        "url": DEFAULT_URL,
+        "url": f"#fav?highlight={barcode}" if barcode else DEFAULT_URL,
         "tag": f"price-drop-{barcode}-{chain}".lower().replace(" ", "-"),
     }
 
