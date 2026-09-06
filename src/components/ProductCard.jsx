@@ -66,6 +66,8 @@ export function ProductCard({ product, size = "normal", isFavorite, onToggleFavo
           alt={product.name}
           className="relative w-full h-full object-contain"
           style={{ opacity: imageLoading ? 0 : 0.9 }}
+          loading="lazy"
+          decoding="async"
           onLoad={() => setImageLoading(false)}
           onError={() => {
             setImageFailed(true);
