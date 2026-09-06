@@ -821,6 +821,20 @@ export function CartPage() {
                   const complete = x >= y && y > 0;
                   const none = x === 0;
                   const exactComplete = complete && allExactMatches(row.lines);
+                  const primaryY =
+                    results.itemCount || results.primary?.lines?.length || 0;
+                  const primaryX = countFound(results.primary?.lines);
+                  const primaryComplete = primaryY > 0 && primaryX >= primaryY;
+                  const cheaperBy =
+                    primaryComplete && complete
+                      ? (results.primary?.total ?? 0) - (row.total ?? 0)
+                      : 0;
+                  const firstRowBadge =
+                    i === 0 && complete
+                      ? cheaperBy >= MIN_SAVINGS_HIGHLIGHT
+                        ? `Jeftinije za ${fmtEur(cheaperBy)}`
+                        : "Najjeftinija kompletna"
+                      : null;
                   return (
                     <div
                       key={row.chain}
@@ -833,9 +847,28 @@ export function CartPage() {
                       }}
                     >
                       <div className="flex items-baseline justify-between gap-2">
-                        <p className="font-black text-white" style={{ fontSize: 15 }}>
-                          {row.label}
-                        </p>
+                        <div className="flex items-baseline gap-2 min-w-0 flex-wrap">
+                          <p className="font-black text-white" style={{ fontSize: 15 }}>
+                            {row.label}
+                          </p>
+                          {firstRowBadge && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                lineHeight: 1.2,
+                                padding: "2px 7px",
+                                borderRadius: 999,
+                                color: "#00ff88",
+                                background: "rgba(0,255,136,0.12)",
+                                border: "1px solid rgba(0,255,136,0.28)",
+                                flexShrink: 0,
+                              }}
+                            >
+                              {firstRowBadge}
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-baseline gap-2 flex-shrink-0">
                           {!complete && !none && (
                             <span
