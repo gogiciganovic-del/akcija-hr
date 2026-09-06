@@ -27,6 +27,47 @@ function countFound(lines) {
   return lines.filter((l) => l?.available && l.price != null).length;
 }
 
+/**
+ * Badge na narančastom primary sažetku — samo UI.
+ * Uspoređuje samo kompletne košarice (isto pravilo kao lista others).
+ */
+function primarySummaryBadge(results) {
+  const primary = results?.primary;
+  if (!primary) return null;
+  const itemCount = results.itemCount || primary.lines?.length || 0;
+  const primaryComplete = itemCount > 0 && countFound(primary.lines) >= itemCount;
+  if (!primaryComplete) return null;
+
+  let bestOther = null;
+  for (const row of results.others || []) {
+    const y = results.itemCount || row.lines?.length || 0;
+    const x = countFound(row.lines);
+    if (!(y > 0 && x >= y)) continue;
+    if (!bestOther || (row.total ?? 0) < (bestOther.total ?? 0)) bestOther = row;
+  }
+
+  if (bestOther) {
+    const cheaperBy = (primary.total ?? 0) - (bestOther.total ?? 0);
+    if (cheaperBy >= MIN_SAVINGS_HIGHLIGHT) {
+      return `Jeftinije u ${bestOther.label} za ${fmtEur(cheaperBy)}`;
+    }
+  }
+  return "Najjeftinije";
+}
+
+const PRIMARY_SUMMARY_BADGE_STYLE = {
+  display: "inline-block",
+  fontSize: 10,
+  fontWeight: 700,
+  lineHeight: 1.2,
+  padding: "2px 7px",
+  borderRadius: 999,
+  color: "#00ff88",
+  background: "rgba(0,255,136,0.18)",
+  border: "1px solid rgba(0,255,136,0.35)",
+  marginTop: 6,
+};
+
 /** Svi dostupni retci su točan artikl (barkod/naziv) — ne sličan tip. */
 function allExactMatches(lines) {
   if (!Array.isArray(lines)) return false;
@@ -641,7 +682,7 @@ export function CartPage() {
             style={{ background: "#EF9F27", border: "1px solid rgba(99,56,6,0.15)" }}
           >
             <CjenkoFace size={48} showTag />
-            <div>
+            <div className="min-w-0">
               <p className="font-black" style={{ color: "#633806", fontSize: 14, lineHeight: 1.35 }}>
                 Košarica u {results.primary.label}
               </p>
@@ -657,6 +698,11 @@ export function CartPage() {
                     Pronađeno {x} od {y} artikala
                   </p>
                 );
+              })()}
+              {(() => {
+                const badge = primarySummaryBadge(results);
+                if (!badge) return null;
+                return <span style={PRIMARY_SUMMARY_BADGE_STYLE}>{badge}</span>;
               })()}
             </div>
           </div>
