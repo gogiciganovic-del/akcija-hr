@@ -39,7 +39,7 @@ async function addProductToList(entry) {
   });
 }
 
-export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFavorite }) {
+export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFavorite, onGoCart }) {
   const { history, loading } = usePriceHistory(product?.barcode, product?.chain);
   const dateLabel = productDateLabel(product);
   const [listFeedback, setListFeedback] = useState(null); // 'ok' | string error
@@ -57,9 +57,11 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
 
   useEffect(() => {
     if (listFeedback !== "ok") return;
+    // Ako postoji CTA "Idi u košaricu", ostavi "Dodano" dok sheet ostane otvoren.
+    if (onGoCart) return;
     const t = setTimeout(() => setListFeedback(null), 1800);
     return () => clearTimeout(t);
-  }, [listFeedback]);
+  }, [listFeedback, onGoCart]);
 
   useEffect(() => {
     if (!isOpen || !product) return;
@@ -247,6 +249,24 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
             {addedOk ? <Check size={18} strokeWidth={2.5} /> : <ListPlus size={18} strokeWidth={2.2} />}
             {addedOk ? "Dodano na popis" : adding ? "Dodajem…" : "Dodaj na popis"}
           </button>
+          {addedOk && onGoCart && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose?.();
+                onGoCart();
+              }}
+              className="w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 mb-2"
+              style={{
+                background: "rgba(0,255,136,0.1)",
+                border: "1px solid rgba(0,255,136,0.28)",
+                color: "#00ff88",
+                fontSize: 13,
+              }}
+            >
+              Idi u košaricu i izračunaj
+            </button>
+          )}
           <p
             style={{
               color: "rgba(255,255,255,0.38)",

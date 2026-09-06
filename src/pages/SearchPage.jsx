@@ -1035,6 +1035,7 @@ export function SearchPage({
                   p={p}
                   highlightQuery={query}
                   onSelect={onProductSelect}
+                  onAddToCart={handleAddToCart}
                   showMeta
                 />
               ))}

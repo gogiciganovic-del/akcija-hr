@@ -222,6 +222,10 @@ export default function App() {
         onClose={handleCloseSheet}
         isFavorite={selectedProduct ? isFav(selectedProduct.id) : false}
         onToggleFavorite={toggle}
+        onGoCart={() => {
+          handleCloseSheet();
+          goTab("cart");
+        }}
       />
       {scanToast?.message && (
         <div
