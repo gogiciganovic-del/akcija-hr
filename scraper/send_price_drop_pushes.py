@@ -28,6 +28,32 @@ load_dotenv(ROOT / ".env")
 FETCH_BATCH = 500
 SUB_BARCODE_CHUNK = 200
 DEFAULT_URL = "#fav"
+
+
+def emit_push_stats(
+    *,
+    ok: bool = True,
+    sent: int = 0,
+    gone: int = 0,
+    failed: int = 0,
+    skipped_dedup: int = 0,
+    candidates: int = 0,
+    dry_run: bool = False,
+    limit: int | None = None,
+) -> None:
+    """Jedan red za GHA grep — ne dira send logiku."""
+    payload = {
+        "ok": ok,
+        "sent": sent,
+        "gone": gone,
+        "failed": failed,
+        "skipped_dedup": skipped_dedup,
+        "candidates": candidates,
+        "dry_run": dry_run,
+        "limit": limit,
+    }
+    print(f"PUSH_STATS={json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}")
+    sys.stdout.flush()
 NAME_MAX_LEN = 45
 
 
@@ -695,6 +721,7 @@ def main() -> int:
 
     if not drops:
         print("Nothing to send.")
+        emit_push_stats(ok=True, dry_run=args.dry_run, limit=args.limit)
         return 0
 
     drops, skipped_threshold = filter_drops_by_threshold(
@@ -707,6 +734,7 @@ def main() -> int:
 
     if not drops:
         print("Nothing to send after min threshold.")
+        emit_push_stats(ok=True, dry_run=args.dry_run, limit=args.limit)
         return 0
 
     name_lookup, name_stats = fetch_product_names(client, drops, batch_size)
@@ -742,6 +770,12 @@ def main() -> int:
 
     if not jobs:
         print("Nothing to send after filters.")
+        emit_push_stats(
+            ok=True,
+            dry_run=args.dry_run,
+            limit=args.limit,
+            candidates=0,
+        )
         return 0
 
     vapid_private = ""
@@ -813,6 +847,16 @@ def main() -> int:
     print(
         f"Done. sent_or_dry={sent} skipped_dedup={skipped_dedup} failed={failed} "
         f"gone_deleted={gone} (candidates_this_run={len(jobs)})"
+    )
+    emit_push_stats(
+        ok=True,
+        sent=sent,
+        gone=gone,
+        failed=failed,
+        skipped_dedup=skipped_dedup,
+        candidates=len(jobs),
+        dry_run=args.dry_run,
+        limit=args.limit,
     )
     return 0
 

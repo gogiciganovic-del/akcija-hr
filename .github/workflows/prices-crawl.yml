@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: '0 5 * * 1'
 
+env:
+  # Soft warning only (import emits price_changes_high). Tune after a few runs.
+  IMPORT_PRICE_CHANGES_MAX_WARN: "15000"
+
 jobs:
   crawl-and-import:
     runs-on: ubuntu-latest
@@ -46,12 +50,15 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          IMPORT_PRICE_CHANGES_MAX_WARN: ${{ env.IMPORT_PRICE_CHANGES_MAX_WARN }}
         run: |
+          set -o pipefail
           DATE_DIR=$(ls -1 /tmp/cijene-out | head -n 1)
           echo "Importing from /tmp/cijene-out/${DATE_DIR}"
           python scraper/import_regular_prices.py \
             --input "/tmp/cijene-out/${DATE_DIR}" \
-            --chains lidl,konzum,kaufland,spar,plodine,eurospin,tommy,studenac,dm
+            --chains lidl,konzum,kaufland,spar,plodine,eurospin,tommy,studenac,dm \
+            2>&1 | tee /tmp/import.log
 
       # --limit 1 dok lokalni pravi send nije potvrđen na uređaju; makni limit kasnije
       - name: Send price-drop push notifications
@@ -61,6 +68,15 @@ jobs:
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
         run: |
+          set -o pipefail
           python scraper/send_price_drop_pushes.py \
             --since "${{ steps.push_since.outputs.since }}" \
-            --limit 1
+            --limit 1 \
+            2>&1 | tee /tmp/push.log
+
+      - name: Write monitoring job summary
+        if: always()
+        run: |
+          python scraper/ci_write_job_summary.py \
+            --import-log /tmp/import.log \
+            --push-log /tmp/push.log

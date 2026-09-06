@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
 import re
 import sys
@@ -48,6 +49,53 @@ CHAIN_LABEL = {
 BATCH_SIZE = 500
 # Zanemari sitne razlike (zaokruživanje / parser šum)
 MIN_QTY_CHANGE_RATIO = 0.02
+
+# CI monitoring — soft warnings only (override: IMPORT_PRICE_CHANGES_MAX_WARN)
+DEFAULT_PRICE_CHANGES_MAX_WARN = 15_000
+
+
+def _price_changes_max_warn() -> int:
+    raw = (os.getenv("IMPORT_PRICE_CHANGES_MAX_WARN") or "").strip()
+    if not raw:
+        return DEFAULT_PRICE_CHANGES_MAX_WARN
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return DEFAULT_PRICE_CHANGES_MAX_WARN
+
+
+def emit_import_stats(
+    *,
+    ok: bool,
+    chains: list[str],
+    upserted: int,
+    price_changes: int,
+    size_changes: int,
+    price_changes_by_chain: dict[str, int] | None = None,
+    size_changes_by_chain: dict[str, int] | None = None,
+    extra_warnings: list[str] | None = None,
+) -> None:
+    """Jedan red za GHA grep — ne dira import logiku."""
+    warnings: list[str] = list(extra_warnings or [])
+    if ok:
+        if price_changes == 0:
+            warnings.append("price_changes_zero")
+        max_warn = _price_changes_max_warn()
+        if price_changes > max_warn:
+            warnings.append("price_changes_high")
+    payload = {
+        "ok": ok,
+        "chains": chains,
+        "upserted": upserted,
+        "price_changes": price_changes,
+        "size_changes": size_changes,
+        "price_changes_by_chain": dict(price_changes_by_chain or {}),
+        "size_changes_by_chain": dict(size_changes_by_chain or {}),
+        "warnings": warnings,
+        "price_changes_max_warn": _price_changes_max_warn(),
+    }
+    print(f"IMPORT_STATS={json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}")
+    sys.stdout.flush()
 MIN_PRICE_CHANGE_RATIO = 0.01
 _EAN_RE = re.compile(r"^\d{8,14}$")
 
@@ -385,6 +433,14 @@ def main() -> int:
 
     if not all_rows:
         print("No rows to import.")
+        emit_import_stats(
+            ok=False,
+            chains=chains,
+            upserted=0,
+            price_changes=0,
+            size_changes=0,
+            extra_warnings=["no_rows"],
+        )
         return 1
 
     # Deduplicate across accidental overlaps (same chain+barcode)
@@ -404,6 +460,7 @@ def main() -> int:
     for c in size_changes:
         size_by_chain[c["chain"]] += 1
 
+    size_history_warn: list[str] = []
     if size_changes:
         try:
             n = insert_size_history(client, size_changes)
@@ -414,6 +471,7 @@ def main() -> int:
                 "Primijeni migraciju 013 u Supabase SQL Editoru.",
                 file=sys.stderr,
             )
+            size_history_warn.append("size_history_insert_failed")
     else:
         print("product_size_history: 0 size changes (očekivano na prvom prolazu / isti snapshot)")
 
@@ -429,6 +487,7 @@ def main() -> int:
     for c in price_changes:
         price_by_chain[c["chain"]] += 1
 
+    price_history_warn: list[str] = []
     if price_changes:
         try:
             n = insert_price_history(client, price_changes)
@@ -439,6 +498,7 @@ def main() -> int:
                 "Primijeni migraciju 014 u Supabase SQL Editoru.",
                 file=sys.stderr,
             )
+            price_history_warn.append("price_history_insert_failed")
     else:
         print("price_history: 0 price changes (očekivano na prvom prolazu / isti snapshot)")
 
@@ -452,6 +512,16 @@ def main() -> int:
     print(f"Upserting {len(deduped)} rows into regular_prices ...")
     upsert_batches(client, deduped)
     print("Done.")
+    emit_import_stats(
+        ok=True,
+        chains=chains,
+        upserted=len(deduped),
+        price_changes=len(price_changes),
+        size_changes=len(size_changes),
+        price_changes_by_chain=dict(price_by_chain),
+        size_changes_by_chain=dict(size_by_chain),
+        extra_warnings=size_history_warn + price_history_warn,
+    )
     return 0
 
 
