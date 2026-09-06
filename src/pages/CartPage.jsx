@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Plus, X, Trash2, Loader2, ChevronDown, Share2, MapPin } from "lucide-react";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { analyzeChainCart, REGULAR_PRICE_CHAINS, unavailableReasonLabel } from "../lib/cartCompare";
@@ -14,6 +14,7 @@ import {
   formatPricePerUnit,
 } from "../lib/quantityParse";
 import { normalizeImageUrl } from "../lib/productImage";
+import { applyDisplayOverrides, overrideKey } from "../lib/cartDisplayOverrides";
 
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -96,6 +97,13 @@ function MatchByHint({ matchedBy, productTypeLabel }) {
     return (
       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.28)", flexShrink: 0 }}>
         po nazivu
+      </span>
+    );
+  }
+  if (matchedBy === "manual") {
+    return (
+      <span style={{ fontSize: 10, color: "rgba(0,255,136,0.65)", flexShrink: 0 }}>
+        ručno odabrano
       </span>
     );
   }
@@ -199,6 +207,163 @@ function SourceBadge({ source }) {
   );
 }
 
+/** Sheet za ručni odabir zamjene u jednom lancu — samo UI. */
+function SubstitutePickerSheet({ chain, chainLabel, cartName, onClose, onPick }) {
+  const [query, setQuery] = useState("");
+  const { suggestions, loading } = useProductSuggestions(query, chain);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      style={{ background: "rgba(0,0,0,0.55)" }}
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="w-full max-w-lg rounded-t-2xl p-4 pb-8"
+        style={{
+          background: "#0d1f3a",
+          border: "1px solid rgba(255,255,255,0.1)",
+          maxHeight: "78vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Zamjena u ${chainLabel}`}
+      >
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0">
+            <p className="font-black text-white" style={{ fontSize: 15 }}>
+              Zamjena u {chainLabel}
+            </p>
+            <p
+              className="truncate mt-0.5"
+              style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}
+              title={cartName}
+            >
+              Za: {cartName || "—"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg flex-shrink-0"
+            style={{ color: "rgba(255,255,255,0.55)" }}
+            aria-label="Zatvori"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Pretraži proizvod u ovom lancu…"
+          className="w-full rounded-xl px-3 py-2.5 mb-3 outline-none"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            color: "#fff",
+            fontSize: 14,
+          }}
+        />
+
+        <div className="overflow-y-auto min-h-0 flex-1 space-y-1.5">
+          {loading && (
+            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }} className="py-2">
+              Tražim…
+            </p>
+          )}
+          {!loading && query.trim().length >= 2 && suggestions.length === 0 && (
+            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }} className="py-2">
+              Nema pogodaka u {chainLabel}
+            </p>
+          )}
+          {!loading &&
+            suggestions.map((s) => (
+              <button
+                key={`${s.source}-${s.name}-${s.barcode || ""}`}
+                type="button"
+                onClick={() => onPick(s)}
+                className="w-full text-left rounded-xl px-3 py-2.5"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="truncate text-white font-medium" style={{ fontSize: 13 }}>
+                    {s.name}
+                  </span>
+                  <SourceBadge source={s.source === "sale" ? "sale" : "regular"} />
+                </div>
+                <p className="tabular-nums mt-0.5" style={{ color: "#00ff88", fontSize: 13 }}>
+                  {fmtEur(s.price)}
+                </p>
+              </button>
+            ))}
+          {query.trim().length < 2 && (
+            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }} className="py-1">
+              Upiši barem 2 znaka za pretragu.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubstituteLineActions({ hasOverride, onOpen, onClear }) {
+  return (
+    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="font-bold rounded-lg px-2.5 py-1"
+        style={{
+          fontSize: 11,
+          color: "#00ff88",
+          background: "rgba(0,255,136,0.1)",
+          border: "1px solid rgba(0,255,136,0.28)",
+        }}
+      >
+        {hasOverride ? "Promijeni zamjenu" : "Odaberi zamjenu"}
+      </button>
+      {hasOverride && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="font-semibold rounded-lg px-2 py-1"
+          style={{
+            fontSize: 11,
+            color: "rgba(255,255,255,0.45)",
+            background: "transparent",
+            border: "1px solid rgba(255,255,255,0.12)",
+          }}
+        >
+          Ukloni zamjenu
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function CartPage() {
   const initialDraft = loadCartDraft();
   const [selectedChain, setSelectedChain] = useState(initialDraft.selectedChain);
@@ -206,6 +371,8 @@ export function CartPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
+  const [lineOverrides, setLineOverrides] = useState({});
+  const [substitutePicker, setSubstitutePicker] = useState(null);
   const [error, setError] = useState(null);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [chainMenuOpen, setChainMenuOpen] = useState(false);
@@ -218,6 +385,11 @@ export function CartPage() {
 
   const { suggestions } = useProductSuggestions(input, selectedChain);
 
+  const displayResults = useMemo(
+    () => applyDisplayOverrides(results, lineOverrides),
+    [results, lineOverrides]
+  );
+
   // Persist draft (tab switch / sken → košarica). Ne dira izračun.
   useEffect(() => {
     saveCartDraft({ selectedChain, items });
@@ -226,9 +398,43 @@ export function CartPage() {
   const clearCartState = useCallback(() => {
     setItems([]);
     setResults(null);
+    setLineOverrides({});
+    setSubstitutePicker(null);
     setError(null);
     setInput("");
   }, []);
+
+  const openSubstitutePicker = useCallback((chain, chainLabel, lineIndex, cartName) => {
+    setSubstitutePicker({ chain, chainLabel, lineIndex, cartName });
+  }, []);
+
+  const clearLineOverride = useCallback((chain, lineIndex) => {
+    const key = overrideKey(chain, lineIndex);
+    setLineOverrides((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  const applySubstitutePick = useCallback((suggestion) => {
+    if (!substitutePicker || !suggestion?.name || suggestion.price == null) return;
+    const { chain, lineIndex } = substitutePicker;
+    const key = overrideKey(chain, lineIndex);
+    setLineOverrides((prev) => ({
+      ...prev,
+      [key]: {
+        name: String(suggestion.name).trim(),
+        price: suggestion.price,
+        originalPrice: suggestion.originalPrice ?? suggestion.price,
+        barcode: suggestion.barcode || null,
+        priceSource: suggestion.source === "sale" ? "sale" : "regular",
+        imageUrl: suggestion.image_url || null,
+      },
+    }));
+    setSubstitutePicker(null);
+  }, [substitutePicker]);
 
   const handleSelectChain = useCallback(
     (chainId) => {
@@ -275,6 +481,8 @@ export function CartPage() {
       setInput("");
       setSuggestionsOpen(false);
       setResults(null);
+      setLineOverrides({});
+      setSubstitutePicker(null);
       setError(null);
       inputRef.current?.focus();
     },
@@ -284,6 +492,8 @@ export function CartPage() {
   const removeItem = useCallback((id) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
     setResults(null);
+    setLineOverrides({});
+    setSubstitutePicker(null);
   }, []);
 
   const clearAll = useCallback(() => {
@@ -295,6 +505,8 @@ export function CartPage() {
     setLoading(true);
     setError(null);
     setResults(null);
+    setLineOverrides({});
+    setSubstitutePicker(null);
     setShareFeedback(null);
     setSuggestionsOpen(false);
     try {
@@ -311,7 +523,7 @@ export function CartPage() {
   }, [selectedChain, items]);
 
   const handleShareSavings = useCallback(async () => {
-    const primary = results?.primary;
+    const primary = displayResults?.primary;
     if (!primary || !((primary.savings ?? 0) >= MIN_SAVINGS_HIGHLIGHT)) return;
 
     const text =
@@ -349,7 +561,7 @@ export function CartPage() {
       setShareFeedback("Kopiranje nije uspjelo");
       window.setTimeout(() => setShareFeedback(null), 2000);
     }
-  }, [results]);
+  }, [displayResults]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
@@ -620,7 +832,7 @@ export function CartPage() {
                 onClick={() => removeItem(item.id)}
                 className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                 style={{ background: "rgba(255,255,255,0.08)" }}
-                aria-label="Ukloni"
+                aria-label="Ukloni stavku"
               >
                 <X size={14} style={{ color: "rgba(255,255,255,0.5)" }} />
               </button>
@@ -675,7 +887,7 @@ export function CartPage() {
       )}
 
       {/* Korak 3 + 4: sažetak i druga mjesta */}
-      {results?.primary && (
+      {displayResults?.primary && (
         <div className="px-4 pb-8">
           <div
             className="rounded-2xl p-4 mb-4 flex items-center gap-3"
@@ -684,14 +896,14 @@ export function CartPage() {
             <CjenkoFace size={48} showTag />
             <div className="min-w-0">
               <p className="font-black" style={{ color: "#633806", fontSize: 14, lineHeight: 1.35 }}>
-                Košarica u {results.primary.label}
+                Košarica u {displayResults.primary.label}
               </p>
               <p style={{ color: "rgba(99,56,6,0.75)", fontSize: 12, marginTop: 2 }}>
-                Ukupno {fmtEur(results.primary.total)}
+                Ukupno {fmtEur(displayResults.primary.total)}
               </p>
               {(() => {
-                const y = results.itemCount || results.primary.lines?.length || 0;
-                const x = countFound(results.primary.lines);
+                const y = displayResults.itemCount || displayResults.primary.lines?.length || 0;
+                const x = countFound(displayResults.primary.lines);
                 if (!y || x >= y) return null;
                 return (
                   <p style={{ color: "rgba(99,56,6,0.65)", fontSize: 11, marginTop: 4 }}>
@@ -723,22 +935,22 @@ export function CartPage() {
             >
               {PRICE_DISCLAIMER} Ušteda ovisi o trenutnim akcijama u bazi.
             </p>
-            {(results.primary.savings ?? 0) >= MIN_SAVINGS_HIGHLIGHT ? (
+            {(displayResults.primary.savings ?? 0) >= MIN_SAVINGS_HIGHLIGHT ? (
               <>
                 <p style={{ color: "rgba(0,255,136,0.75)", fontSize: 13, marginBottom: 4 }}>
-                  Ušteda na akcijama u {results.primary.label}
+                  Ušteda na akcijama u {displayResults.primary.label}
                 </p>
                 <p
                   className="font-black tabular-nums"
                   style={{ color: "#00ff88", fontSize: 34, letterSpacing: "-0.03em", lineHeight: 1.1 }}
                 >
-                  {fmtEur(results.primary.savings)}
+                  {fmtEur(displayResults.primary.savings)}
                 </p>
                 <p
                   className="tabular-nums"
                   style={{ color: "rgba(255,255,255,0.45)", fontSize: 14, marginTop: 6 }}
                 >
-                  Ukupno {fmtEur(results.primary.total)}
+                  Ukupno {fmtEur(displayResults.primary.total)}
                 </p>
                 <div className="mt-3">
                   <button
@@ -760,7 +972,7 @@ export function CartPage() {
             ) : (
               <>
                 <p className="font-black text-white tabular-nums" style={{ fontSize: 22 }}>
-                  {fmtEur(results.primary.total)}
+                  {fmtEur(displayResults.primary.total)}
                 </p>
                 <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, marginTop: 4 }}>
                   Nema dodatne uštede na akcijama u ovoj košarici
@@ -768,13 +980,15 @@ export function CartPage() {
               </>
             )}
             <ul className="mt-3 space-y-2">
-              {results.primary.lines.map((line, idx) => {
+              {displayResults.primary.lines.map((line, idx) => {
                 const perHint = line.available
                   ? unitPriceHint(line.name || line.cartName, line.price)
                   : null;
                 const reason = line.available
                   ? null
                   : unavailableReasonLabel(line.unavailableReason);
+                const isManual = line.matchedBy === "manual";
+                const chainId = displayResults.primary.chain;
                 return (
                 <li
                   key={`primary-${idx}-${line.cartName}`}
@@ -805,6 +1019,20 @@ export function CartPage() {
                           </span>
                         )}
                       </div>
+                      {isManual && (
+                        <SubstituteLineActions
+                          hasOverride
+                          onOpen={() =>
+                            openSubstitutePicker(
+                              chainId,
+                              displayResults.primary.label,
+                              idx,
+                              line.cartName
+                            )
+                          }
+                          onClear={() => clearLineOverride(chainId, idx)}
+                        />
+                      )}
                     </>
                   ) : (
                     <>
@@ -821,6 +1049,18 @@ export function CartPage() {
                       >
                         {reason}
                       </p>
+                      <SubstituteLineActions
+                        hasOverride={false}
+                        onOpen={() =>
+                          openSubstitutePicker(
+                            chainId,
+                            displayResults.primary.label,
+                            idx,
+                            line.cartName
+                          )
+                        }
+                        onClear={() => clearLineOverride(chainId, idx)}
+                      />
                     </>
                   )}
                 </li>
@@ -828,11 +1068,11 @@ export function CartPage() {
               })}
             </ul>
             <div className="mt-3">
-              <OpenInMapsButton chainLabel={results.primary.label} requestLocation={requestLocation} />
+              <OpenInMapsButton chainLabel={displayResults.primary.label} requestLocation={requestLocation} />
             </div>
           </div>
 
-          {results.others?.length > 0 && (
+          {displayResults.others?.length > 0 && (
             <div>
               <p className="font-bold mb-1 px-0.5" style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
                 ISTA KOŠARICA DRUGDJE
@@ -841,7 +1081,7 @@ export function CartPage() {
                 className="mb-2 px-0.5"
                 style={{ fontSize: 11, color: "rgba(255,255,255,0.32)", lineHeight: 1.4 }}
               >
-                Zbroj je samo za pronađene artikle (X od {results.itemCount}). Nije cijela košarica
+                Zbroj je samo za pronađene artikle (X od {displayResults.itemCount}). Nije cijela košarica
                 ako fali stavka. Kompletne košarice su prikazane prve. Ako nema točnog artikla,
                 može se pokazati sličan tip (npr. Kruh) po €/kg — to nije nužno isti proizvod.
               </p>
@@ -849,10 +1089,10 @@ export function CartPage() {
                 className="rounded-2xl overflow-hidden"
                 style={{ border: "1px solid rgba(255,255,255,0.08)" }}
               >
-                {[...results.others]
+                {[...displayResults.others]
                   .sort((a, b) => {
-                    const ya = results.itemCount || a.lines?.length || 0;
-                    const yb = results.itemCount || b.lines?.length || 0;
+                    const ya = displayResults.itemCount || a.lines?.length || 0;
+                    const yb = displayResults.itemCount || b.lines?.length || 0;
                     const xa = countFound(a.lines);
                     const xb = countFound(b.lines);
                     const ca = ya > 0 && xa >= ya;
@@ -862,18 +1102,18 @@ export function CartPage() {
                     return (a.total ?? 0) - (b.total ?? 0);
                   })
                   .map((row, i) => {
-                  const y = results.itemCount || row.lines?.length || 0;
+                  const y = displayResults.itemCount || row.lines?.length || 0;
                   const x = countFound(row.lines);
                   const complete = x >= y && y > 0;
                   const none = x === 0;
                   const exactComplete = complete && allExactMatches(row.lines);
                   const primaryY =
-                    results.itemCount || results.primary?.lines?.length || 0;
-                  const primaryX = countFound(results.primary?.lines);
+                    displayResults.itemCount || displayResults.primary?.lines?.length || 0;
+                  const primaryX = countFound(displayResults.primary?.lines);
                   const primaryComplete = primaryY > 0 && primaryX >= primaryY;
                   const cheaperBy =
                     primaryComplete && complete
-                      ? (results.primary?.total ?? 0) - (row.total ?? 0)
+                      ? (displayResults.primary?.total ?? 0) - (row.total ?? 0)
                       : 0;
                   const firstRowBadge =
                     i === 0 && complete
@@ -958,6 +1198,7 @@ export function CartPage() {
                           const thumb = line.available
                             ? normalizeImageUrl(line.imageUrl)
                             : null;
+                          const isManual = line.matchedBy === "manual";
                           return (
                           <li key={`${row.chain}-${idx}`} className="py-0.5" style={{ fontSize: 12 }}>
                             {line.available ? (
@@ -1014,6 +1255,20 @@ export function CartPage() {
                                       </>
                                     )}
                                   </div>
+                                  {isManual && (
+                                    <SubstituteLineActions
+                                      hasOverride
+                                      onOpen={() =>
+                                        openSubstitutePicker(
+                                          row.chain,
+                                          row.label,
+                                          idx,
+                                          line.cartName
+                                        )
+                                      }
+                                      onClear={() => clearLineOverride(row.chain, idx)}
+                                    />
+                                  )}
                                 </div>
                               </div>
                             ) : (
@@ -1038,6 +1293,18 @@ export function CartPage() {
                                 >
                                   {reason}
                                 </p>
+                                <SubstituteLineActions
+                                  hasOverride={false}
+                                  onOpen={() =>
+                                    openSubstitutePicker(
+                                      row.chain,
+                                      row.label,
+                                      idx,
+                                      line.cartName
+                                    )
+                                  }
+                                  onClear={() => clearLineOverride(row.chain, idx)}
+                                />
                               </>
                             )}
                           </li>
@@ -1052,6 +1319,17 @@ export function CartPage() {
           )}
         </div>
       )}
+
+      {substitutePicker && (
+        <SubstitutePickerSheet
+          chain={substitutePicker.chain}
+          chainLabel={substitutePicker.chainLabel}
+          cartName={substitutePicker.cartName}
+          onClose={() => setSubstitutePicker(null)}
+          onPick={applySubstitutePick}
+        />
+      )}
+
     </div>
   );
 }
