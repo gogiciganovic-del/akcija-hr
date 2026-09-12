@@ -1,5 +1,5 @@
 ﻿import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Plus, ShoppingCart } from "lucide-react";
+import { X, Plus, ShoppingCart, Heart } from "lucide-react";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { BarcodeScannerModal, ScanBarcodeButton } from "../components/BarcodeScannerModal";
 import { useProducts } from "../hooks/useProducts";
@@ -176,13 +176,66 @@ function unitPriceLabel(p) {
   return formatPricePerUnit(info.perUnit, info.unitLabel);
 }
 
+/** Pravi EAN — internu šifru / UUID ne šaljemo u lookup ni u favorite za push. */
+function stableEan(code) {
+  const trimmed = String(code || "").trim();
+  if (trimmed.length < 8) return null;
+  if (trimmed.includes("-") || trimmed.includes(":")) return null;
+  return trimmed;
+}
+
 /** Samo redovna cijena s pravim EAN-om — internu šifru / UUID ne šaljemo u lookup. */
 function catalogBarcodeForLookup(p) {
   if (!p || p.priceSource !== "regular") return null;
-  const code = String(p.barcode || "").trim();
-  if (code.length < 8) return null;
-  if (code.includes("-") || code.includes(":")) return null;
-  return code;
+  return stableEan(p.barcode);
+}
+
+/** Jedan favorit po barkodu — ne veže EAN na letak, ne dodaje po lancu. */
+function trackProductFromScan(code, offIdentity, prices, cheapestPrice) {
+  const barcode = stableEan(code);
+  if (!barcode) return null;
+  if (!prices?.length && !offIdentity) return null;
+  const best =
+    (cheapestPrice != null && prices?.find((p) => p.salePrice === cheapestPrice)) ||
+    prices?.[0] ||
+    null;
+  return {
+    id: barcode,
+    barcode,
+    name: offIdentity?.name || best?.name || barcode,
+    chain: best?.chain ?? chainFromStoreName(best?.store) ?? null,
+    store: best?.store || best?.chain || null,
+    salePrice: best?.salePrice,
+    originalPrice: best?.originalPrice ?? best?.salePrice,
+    priceSource: best?.priceSource || "regular",
+    category: best?.category || null,
+    image: offIdentity?.imageUrl || best?.image || null,
+  };
+}
+
+function TrackPriceButton({ tracking, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2"
+      style={{
+        background: tracking ? "rgba(255,255,255,0.05)" : "rgba(0,255,136,0.1)",
+        border: tracking
+          ? "1px solid rgba(255,255,255,0.12)"
+          : "1px solid rgba(0,255,136,0.28)",
+        color: tracking ? "rgba(255,255,255,0.7)" : "#00ff88",
+        fontSize: 13,
+      }}
+    >
+      <Heart
+        size={15}
+        fill={tracking ? "#ff6b6b" : "none"}
+        stroke={tracking ? "#ff6b6b" : "#00ff88"}
+      />
+      {tracking ? "Prati se u favoritima" : "Prati cijenu"}
+    </button>
+  );
 }
 
 function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta, isCheapest }) {
@@ -325,6 +378,9 @@ export function SearchPage({
   onPendingOpenScannerConsumed,
   onCartFeedback,
   onGoCart,
+  onToggleFavorite,
+  isBarcodeFavorite,
+  onGoFav,
 }) {
   const [query, setQuery] = useState("");
   const [sortMode, setSort] = useState("relevance");
@@ -589,6 +645,19 @@ export function SearchPage({
         })()
       : null;
 
+  const trackProduct = !scanLoading
+    ? trackProductFromScan(scanBarcode, scanOffIdentity, scanSorted, cheapestPrice)
+    : null;
+  const trackingPrice = !!(trackProduct && isBarcodeFavorite?.(trackProduct.barcode));
+  const handleTrackPrice = () => {
+    if (!trackProduct) return;
+    if (trackingPrice) {
+      onGoFav?.();
+      return;
+    }
+    onToggleFavorite?.(trackProduct);
+  };
+
   return (
     <div className="flex-1 min-h-0 h-full overflow-y-auto" style={{ scrollbarWidth: "none" }}>
       <div className="px-4 pt-8 pb-4">
@@ -832,6 +901,9 @@ export function SearchPage({
                 Znamo što je skenirano, ali u našoj bazi nema cijene za taj artikl.
               </p>
               <div className="flex flex-col items-center gap-2">
+                {trackProduct && (
+                  <TrackPriceButton tracking={trackingPrice} onClick={handleTrackPrice} />
+                )}
                 <button
                   type="button"
                   onClick={searchOffName}
@@ -893,6 +965,9 @@ export function SearchPage({
                 >
                   {cheapestBanner}
                 </p>
+              )}
+              {trackProduct && (
+                <TrackPriceButton tracking={trackingPrice} onClick={handleTrackPrice} />
               )}
               {scanSorted.map((p) => (
                 <ProductResultCard

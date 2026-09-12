@@ -194,6 +194,16 @@ export default function App() {
         onPendingOpenScannerConsumed={handlePendingOpenScannerConsumed}
         onCartFeedback={handleCartFeedback}
         onGoCart={() => goTab("cart")}
+        onToggleFavorite={toggle}
+        isBarcodeFavorite={(code) => {
+          const c = String(code || "").trim();
+          if (!c) return false;
+          for (const p of favorites.values()) {
+            if (String(p.barcode || "").trim() === c) return true;
+          }
+          return false;
+        }}
+        onGoFav={() => goTab("fav")}
       />
     ),
     cart: <CartPage onProductSelect={handleProductSelect} />,
