@@ -326,7 +326,7 @@ export function SearchPage({
 }) {
   const [query, setQuery] = useState("");
   const [sortMode, setSort] = useState("relevance");
-  const [catFilter, setCat] = useState("Sve");
+  const [sourceFilter, setSourceFilter] = useState("Sve");
   const [regularProducts, setRegularProducts] = useState([]);
   const [regularLoading, setRegularLoading] = useState(false);
   const inputRef = useRef(null);
@@ -547,7 +547,11 @@ export function SearchPage({
           ];
 
   const results =
-    catFilter !== "Sve" ? merged.filter((p) => p.category === catFilter) : merged;
+    sourceFilter === "Akcija"
+      ? merged.filter((p) => p.priceSource === "sale")
+      : sourceFilter === "Redovna"
+        ? merged.filter((p) => p.priceSource === "regular")
+        : merged;
 
   const showingScan =
     scanResults !== null || scanLoading || scanNotFound || !!scanOffIdentity;
@@ -623,17 +627,17 @@ export function SearchPage({
         </div>
 
         <div className="flex gap-2 overflow-x-auto mb-2" style={{ scrollbarWidth: "none" }}>
-          {["Sve"].map((c) => (
+          {["Sve", "Akcija", "Redovna"].map((c) => (
             <button
               key={c}
               type="button"
-              onClick={() => setCat(c)}
+              onClick={() => setSourceFilter(c)}
               className="whitespace-nowrap px-3 py-1.5 rounded-full text-[11px] font-semibold flex-shrink-0 transition-all duration-200"
               style={{
-                background: catFilter === c ? "rgba(0,255,136,0.1)" : "rgba(255,255,255,0.04)",
+                background: sourceFilter === c ? "rgba(0,255,136,0.1)" : "rgba(255,255,255,0.04)",
                 border:
-                  catFilter === c ? "1px solid rgba(0,255,136,0.3)" : "1px solid rgba(255,255,255,0.07)",
-                color: catFilter === c ? "#00ff88" : "rgba(255,255,255,0.45)",
+                  sourceFilter === c ? "1px solid rgba(0,255,136,0.3)" : "1px solid rgba(255,255,255,0.07)",
+                color: sourceFilter === c ? "#00ff88" : "rgba(255,255,255,0.45)",
               }}
             >
               {c}
