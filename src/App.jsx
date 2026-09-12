@@ -46,6 +46,7 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [homeResetSignal, setHomeResetSignal] = useState(0);
   const [pendingBarcode, setPendingBarcode] = useState(null);
+  const [pendingOpenScanner, setPendingOpenScanner] = useState(false);
   const [scanToast, setScanToast] = useState(null);
 
   const activeTabRef = useRef(activeTab);
@@ -147,6 +148,15 @@ export default function App() {
     setPendingBarcode(null);
   }, []);
 
+  const handleGoScanFromFavorites = useCallback(() => {
+    setPendingOpenScanner(true);
+    goTab("search");
+  }, [goTab]);
+
+  const handlePendingOpenScannerConsumed = useCallback(() => {
+    setPendingOpenScanner(false);
+  }, []);
+
   const handleCartFeedback = useCallback((payload) => {
     if (typeof payload === "string") {
       setScanToast({ message: payload });
@@ -180,6 +190,8 @@ export default function App() {
         onProductSelect={handleProductSelect}
         pendingBarcode={pendingBarcode}
         onPendingBarcodeConsumed={handlePendingBarcodeConsumed}
+        pendingOpenScanner={pendingOpenScanner}
+        onPendingOpenScannerConsumed={handlePendingOpenScannerConsumed}
         onCartFeedback={handleCartFeedback}
         onGoCart={() => goTab("cart")}
       />
@@ -193,6 +205,7 @@ export default function App() {
         onClearAll={clear}
         onProductSelect={handleProductSelect}
         onGoHome={() => goTab("home")}
+        onGoScan={handleGoScanFromFavorites}
         pushStatus={pushStatus}
         pushBusy={pushBusy}
         pushError={pushError}

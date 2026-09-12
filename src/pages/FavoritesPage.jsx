@@ -286,6 +286,7 @@ export function FavoritesPage({
   onClearAll,
   onProductSelect,
   onGoHome,
+  onGoScan,
   pushStatus = "prompt",
   pushBusy = false,
   pushError = null,
@@ -512,21 +513,27 @@ export function FavoritesPage({
                   </span>
                 )}
                 {!trackable && (
-                  <span
+                  <button
+                    type="button"
                     className="absolute z-10 px-1.5 py-0.5 rounded font-semibold"
                     style={{
                       top: expiring ? 28 : 8,
                       left: 8,
                       fontSize: 8,
                       letterSpacing: "0.03em",
-                      color: "rgba(255,255,255,0.7)",
+                      color: "rgba(255,255,255,0.85)",
                       background: "rgba(2,6,23,0.72)",
-                      border: "1px solid rgba(255,255,255,0.18)",
+                      border: "1px solid rgba(0,255,136,0.35)",
                     }}
-                    title="Nema barkoda — pad cijene se ne prati"
+                    title="Nema barkoda — skeniraj da pratiš pad cijene"
+                    aria-label="Skeniraj barkod da pratiš pad cijene"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onGoScan?.();
+                    }}
                   >
-                    Ne prati se
-                  </span>
+                    Ne prati se · Skeniraj
+                  </button>
                 )}
                 <ProductCard
                   product={p}

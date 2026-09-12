@@ -321,6 +321,8 @@ export function SearchPage({
   onProductSelect,
   pendingBarcode = null,
   onPendingBarcodeConsumed,
+  pendingOpenScanner = false,
+  onPendingOpenScannerConsumed,
   onCartFeedback,
   onGoCart,
 }) {
@@ -459,6 +461,12 @@ export function SearchPage({
     runBarcodeLookup(pendingBarcode);
     onPendingBarcodeConsumed?.();
   }, [pendingBarcode, runBarcodeLookup, onPendingBarcodeConsumed]);
+
+  useEffect(() => {
+    if (!pendingOpenScanner) return;
+    setScannerOpen(true);
+    onPendingOpenScannerConsumed?.();
+  }, [pendingOpenScanner, onPendingOpenScannerConsumed]);
 
   useEffect(() => {
     if (searchTerm.length < 2) {
