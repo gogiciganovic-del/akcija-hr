@@ -401,8 +401,10 @@ export function SearchPage({
   const [history, setHistory] = useState(() => loadScanHistory());
 
   const searchTerm = query.trim();
+  const saleSearch = searchTerm.length >= 2 ? searchTerm : undefined;
   const { products: saleProducts, loading: saleLoading } = useProducts({
-    search: searchTerm || undefined,
+    search: saleSearch,
+    enabled: !!saleSearch,
     sortBy:
       sortMode === "unit_price_asc" || sortMode === "relevance" ? "price_asc" : sortMode,
   });

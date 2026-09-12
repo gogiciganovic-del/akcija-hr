@@ -24,17 +24,54 @@ const DEALS_SELECT = `
   )
 `
 
-export function useProducts({ category, search, sortBy, chain } = {}) {
+function escapeIlike(s) {
+  return String(s || '').replace(/[%_,]/g, '')
+}
+
+function applySort(query, sortBy) {
+  if (sortBy === 'price_asc') return query.order('price', { ascending: true })
+  if (sortBy === 'price_desc') return query.order('price', { ascending: false })
+  return query.order('discount_pct', { ascending: false })
+}
+
+export function useProducts({ category, search, sortBy, chain, enabled = true } = {}) {
   const [products, setProducts] = useState([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState(null)
 
   useEffect(() => {
+    if (!enabled) {
+      setProducts([])
+      setLoading(false)
+      setError(null)
+      return
+    }
+
+    let cancelled = false
+
     async function fetchProducts() {
       setLoading(true)
       setError(null)
 
       try {
+        const needle = escapeIlike(search).trim()
+
+        // Pretraga po imenu: active_deals (name/brand kolone).
+        // deals + products.name.or() često vrati sve (do 1000) ili padne na fallback.
+        if (needle) {
+          let fallback = supabase.from('active_deals').select('*')
+          if (category) fallback = fallback.eq('category', category)
+          if (chain) fallback = fallback.ilike('store_name', `${chain}%`)
+          fallback = fallback.or(`name.ilike.%${needle}%,brand.ilike.%${needle}%`)
+          fallback = applySort(fallback, sortBy)
+
+          const { data: viewData, error: viewError } = await fallback
+          if (viewError) throw viewError
+          if (cancelled) return
+          setProducts((viewData || []).map(adaptDeal))
+          return
+        }
+
         let query = supabase
           .from('deals')
           .select(DEALS_SELECT)
@@ -42,18 +79,8 @@ export function useProducts({ category, search, sortBy, chain } = {}) {
           .gt('valid_until', new Date().toISOString())
 
         if (category) query = query.eq('products.category', category)
-
         if (chain) query = query.ilike('stores.name', `${chain}%`)
-
-        if (search) {
-          query = query.or(
-            `products.name.ilike.%${search}%,products.brand.ilike.%${search}%`
-          )
-        }
-
-        if (sortBy === 'price_asc') query = query.order('price', { ascending: true })
-        else if (sortBy === 'price_desc') query = query.order('price', { ascending: false })
-        else query = query.order('discount_pct', { ascending: false })
+        query = applySort(query, sortBy)
 
         const { data, error: dealsError } = await query
 
@@ -61,29 +88,29 @@ export function useProducts({ category, search, sortBy, chain } = {}) {
           let fallback = supabase.from('active_deals').select('*')
           if (category) fallback = fallback.eq('category', category)
           if (chain) fallback = fallback.ilike('store_name', `${chain}%`)
-          if (search) {
-            fallback = fallback.or(`name.ilike.%${search}%,brand.ilike.%${search}%`)
-          }
-          if (sortBy === 'price_asc') fallback = fallback.order('price', { ascending: true })
-          else if (sortBy === 'price_desc') fallback = fallback.order('price', { ascending: false })
-          else fallback = fallback.order('discount_pct', { ascending: false })
+          fallback = applySort(fallback, sortBy)
 
           const { data: viewData, error: viewError } = await fallback
           if (viewError) throw viewError
+          if (cancelled) return
           setProducts((viewData || []).map(adaptDeal))
           return
         }
 
+        if (cancelled) return
         setProducts((data || []).map(adaptDealRow))
       } catch (err) {
-        setError(err.message)
+        if (!cancelled) setError(err.message)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchProducts()
-  }, [category, search, sortBy, chain])
+    return () => {
+      cancelled = true
+    }
+  }, [category, search, sortBy, chain, enabled])
 
   return { products, loading, error }
 }
