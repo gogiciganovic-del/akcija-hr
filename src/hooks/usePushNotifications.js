@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   barcodesFromFavorites,
   enablePushNotifications,
@@ -51,10 +51,13 @@ export function usePushNotifications(favorites, favoritesLoading = false) {
 
   // Sinkroniziraj barkodove kad se favoriti mijenjaju (localStorage ostaje u useFavorites).
   // Čekaj kraj učitavanja — inače mount s praznim Mapom upisuje tracked_barcodes=[].
+  const initialSyncDoneRef = useRef(false);
   useEffect(() => {
     if (favoritesLoading) return;
     if (!(favorites instanceof Map)) return;
-    syncPushTrackedBarcodes(favorites);
+    const isInitialLoad = !initialSyncDoneRef.current;
+    initialSyncDoneRef.current = true;
+    syncPushTrackedBarcodes(favorites, { isInitialLoad });
   }, [favorites, favoritesLoading]);
 
   const enable = useCallback(async () => {

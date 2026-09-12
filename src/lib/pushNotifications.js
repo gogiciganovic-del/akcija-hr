@@ -1,6 +1,20 @@
 import { supabase } from "./supabase";
+import {
+  barcodesFromFavorites,
+  favoriteHasTrackableBarcode,
+  isTrackableBarcode,
+  planTrackedBarcodesUpdate,
+} from "./pushTrackedBarcodes";
+
+export {
+  barcodesFromFavorites,
+  favoriteHasTrackableBarcode,
+  isTrackableBarcode,
+  planTrackedBarcodesUpdate,
+};
 
 const ENDPOINT_STORAGE_KEY = "cjenko_push_endpoint";
+const LAST_TRACKED_KEY = "cjenko_push_tracked_barcodes";
 
 /**
  * @param {string} base64String
@@ -26,23 +40,27 @@ export function isPushSupported() {
   );
 }
 
-/**
- * @param {Map<string, { barcode?: string|null }> | Iterable<{ barcode?: string|null }>} favorites
- * @returns {string[]}
- */
-export function barcodesFromFavorites(favorites) {
-  const values =
-    favorites instanceof Map
-      ? [...favorites.values()]
-      : favorites
-        ? [...favorites]
-        : [];
-  const set = new Set();
-  for (const p of values) {
-    const bc = String(p?.barcode || "").trim();
-    if (bc.length >= 8) set.add(bc);
+function readLastSyncedBarcodes() {
+  try {
+    const raw = localStorage.getItem(LAST_TRACKED_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((b) => String(b || "").trim()).filter(isTrackableBarcode);
+  } catch {
+    return [];
   }
-  return [...set].slice(0, 500);
+}
+
+function writeLastSyncedBarcodes(barcodes) {
+  try {
+    localStorage.setItem(
+      LAST_TRACKED_KEY,
+      JSON.stringify((barcodes || []).slice(0, 500))
+    );
+  } catch {
+    // ignore
+  }
 }
 
 /**
@@ -140,21 +158,24 @@ export async function enablePushNotifications(trackedBarcodes = []) {
     throw new Error("Push pretplata nema potpune ključeve");
   }
 
+  const tracked = trackedBarcodes.slice(0, 500);
   await upsertPushSubscription({
     endpoint,
     p256dh,
     auth,
-    tracked_barcodes: trackedBarcodes.slice(0, 500),
+    tracked_barcodes: tracked,
   });
   rememberEndpoint(endpoint);
+  writeLastSyncedBarcodes(tracked);
   return sub;
 }
 
 /**
  * Sinkroniziraj tracked_barcodes ako postoji aktivna pretplata.
  * @param {Map<string, any>} favorites
+ * @param {{ isInitialLoad?: boolean }} [opts]
  */
-export async function syncPushTrackedBarcodes(favorites) {
+export async function syncPushTrackedBarcodes(favorites, opts = {}) {
   if (!isPushSupported()) return;
   if (Notification.permission !== "granted") return;
 
@@ -164,8 +185,14 @@ export async function syncPushTrackedBarcodes(favorites) {
     const endpoint = sub?.endpoint || getRememberedEndpoint();
     if (!endpoint) return;
 
-    const barcodes = barcodesFromFavorites(favorites);
-    await updateTrackedBarcodes(endpoint, barcodes);
+    const plan = planTrackedBarcodesUpdate(favorites, {
+      ...opts,
+      previousSynced: readLastSyncedBarcodes(),
+    });
+    if (!plan.apply) return;
+
+    await updateTrackedBarcodes(endpoint, plan.barcodes);
+    writeLastSyncedBarcodes(plan.barcodes);
   } catch {
     // tiho — sync nije kritičan za UI
   }

@@ -4,6 +4,7 @@ import { ProductCard } from "../components/ProductCard";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { CjenkoShrug } from "../components/CjenkoShrug";
 import { isExpiringTodayProduct } from "../lib/dealDates";
+import { favoriteHasTrackableBarcode } from "../lib/pushTrackedBarcodes";
 
 const fmtEur = (v) =>
   (Number.isFinite(v) ? v : 0).toLocaleString("hr-HR", {
@@ -92,7 +93,8 @@ function PushNotifyBanner({ status, busy, error, onEnable }) {
       >
         <BellRing size={18} style={{ color: "#00ff88", flexShrink: 0 }} />
         <p style={{ color: "rgba(0,255,136,0.9)", fontSize: 13, lineHeight: 1.4 }}>
-          Obavijesti o padu cijene uključene — pratimo tvoje favorite.
+          Obavijesti o padu cijene uključene. Pratimo samo favorite s barkodom
+          (pad redovne cijene u cjeniku).
         </p>
       </div>
     );
@@ -113,7 +115,8 @@ function PushNotifyBanner({ status, busy, error, onEnable }) {
             Obavijesti o padu cijene
           </p>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, lineHeight: 1.45, marginTop: 4 }}>
-            Javit ćemo ti kad favoritima padne cijena.
+            Javimo ti kad padne redovna cijena. Radi samo za favorite s barkodom —
+            većina akcija s letka trenutno nema barkod.
           </p>
         </div>
       </div>
@@ -475,6 +478,7 @@ export function FavoritesPage({
           {items.map((p) => {
             const expiring = isExpiringTodayProduct(p);
             const barcodeKey = String(p.barcode || "").trim();
+            const trackable = favoriteHasTrackableBarcode(p);
             const isGlowing = glowBarcode && barcodeKey === glowBarcode;
             return (
               <div
@@ -505,6 +509,23 @@ export function FavoritesPage({
                     }}
                   >
                     Danas
+                  </span>
+                )}
+                {!trackable && (
+                  <span
+                    className="absolute z-10 px-1.5 py-0.5 rounded font-semibold"
+                    style={{
+                      top: expiring ? 28 : 8,
+                      left: 8,
+                      fontSize: 8,
+                      letterSpacing: "0.03em",
+                      color: "rgba(255,255,255,0.7)",
+                      background: "rgba(2,6,23,0.72)",
+                      border: "1px solid rgba(255,255,255,0.18)",
+                    }}
+                    title="Nema barkoda — pad cijene se ne prati"
+                  >
+                    Ne prati se
                   </span>
                 )}
                 <ProductCard
