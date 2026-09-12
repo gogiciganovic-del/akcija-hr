@@ -176,6 +176,15 @@ function unitPriceLabel(p) {
   return formatPricePerUnit(info.perUnit, info.unitLabel);
 }
 
+/** Samo redovna cijena s pravim EAN-om — internu šifru / UUID ne šaljemo u lookup. */
+function catalogBarcodeForLookup(p) {
+  if (!p || p.priceSource !== "regular") return null;
+  const code = String(p.barcode || "").trim();
+  if (code.length < 8) return null;
+  if (code.includes("-") || code.includes(":")) return null;
+  return code;
+}
+
 function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta, isCheapest }) {
   const isRegular = p.priceSource === "regular";
   const storeLabel = p.chain ?? chainFromStoreName(p.store);
@@ -395,6 +404,18 @@ export function SearchPage({
       runBarcodeLookup(code);
     },
     [runBarcodeLookup]
+  );
+
+  const handleSelectSearchResult = useCallback(
+    (p) => {
+      const code = catalogBarcodeForLookup(p);
+      if (code) {
+        runBarcodeLookup(code);
+        return;
+      }
+      onProductSelect?.(p);
+    },
+    [runBarcodeLookup, onProductSelect]
   );
 
   const handleAddToCart = useCallback(
@@ -1034,7 +1055,7 @@ export function SearchPage({
                   key={p.id}
                   p={p}
                   highlightQuery={query}
-                  onSelect={onProductSelect}
+                  onSelect={handleSelectSearchResult}
                   onAddToCart={handleAddToCart}
                   showMeta
                 />
