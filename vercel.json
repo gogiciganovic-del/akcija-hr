@@ -10,6 +10,20 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "cjenko.app" }],
+      "destination": "https://www.cjenko.app/",
+      "permanent": false
+    },
+    {
+      "source": "/((?!\\.well-known/).*)",
+      "has": [{ "type": "host", "value": "cjenko.app" }],
+      "destination": "https://www.cjenko.app/$1",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/privacy-policy", "destination": "/privacy-policy.html" },
     { "source": "/privacy-policy/", "destination": "/privacy-policy.html" },
