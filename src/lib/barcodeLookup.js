@@ -22,46 +22,29 @@ function escapeIlike(s) {
 const DEAL_COLS =
   "deal_id, product_id, name, brand, barcode, store_name, price, original_price, discount_pct, image_url, category, valid_until, scraped_at";
 
-/**
- * Pronađi akciju za lanac: prvo točan naziv, zatim soft match.
- * Ne dira cartCompare — samo skener lookup.
- */
-async function findSaleForChain(name, chain) {
-  const exactName = (name || "").trim();
-  if (!exactName) return null;
+function saleNeedleForName(name) {
+  const normTarget = normalizeProductName(name);
+  if (normTarget.length < 4) return null;
+  const words = normTarget.split(" ").filter(Boolean).slice(0, 3);
+  const needle = escapeIlike(words.join(" "));
+  if (needle.length < 3) return null;
+  return needle;
+}
 
-  const { data: exactRows, error: exactErr } = await supabase
-    .from("active_deals")
-    .select(DEAL_COLS)
-    .eq("name", exactName)
-    .order("price", { ascending: true })
-    .limit(40);
-
-  if (exactErr) throw exactErr;
-
+function matchExactSale(exactRows, exactName, chain) {
   for (const row of exactRows || []) {
+    if ((row.name || "").trim() !== exactName) continue;
     if (chainFromStoreName(row.store_name) !== chain) continue;
     const price = parseFloat(row.price);
     if (Number.isNaN(price)) continue;
     return { row, match: "exact" };
   }
+  return null;
+}
 
+function matchSoftSale(softRows, exactName, chain) {
   const normTarget = normalizeProductName(exactName);
   if (normTarget.length < 4) return null;
-
-  const words = normTarget.split(" ").filter(Boolean).slice(0, 3);
-  const needle = escapeIlike(words.join(" "));
-  if (needle.length < 3) return null;
-
-  const { data: softRows, error: softErr } = await supabase
-    .from("active_deals")
-    .select(DEAL_COLS)
-    .ilike("name", `%${needle}%`)
-    .order("price", { ascending: true })
-    .limit(40);
-
-  if (softErr) throw softErr;
-
   for (const row of softRows || []) {
     if (chainFromStoreName(row.store_name) !== chain) continue;
     if (normalizeProductName(row.name) !== normTarget) continue;
@@ -69,8 +52,80 @@ async function findSaleForChain(name, chain) {
     if (Number.isNaN(price)) continue;
     return { row, match: "soft" };
   }
-
   return null;
+}
+
+/**
+ * Akcija po nazivu za letke bez EAN-a: jedan exact .in(name), pa po potrebi jedan ILIKE.
+ * Filtriranje lanca ostaje u JS-u — ista semantika kao stari findSaleForChain.
+ */
+async function findSalesByNameBatched(needNameRows) {
+  const uniqueNames = [
+    ...new Set(
+      needNameRows
+        .map((row) => (row.name || "").trim())
+        .filter(Boolean)
+    ),
+  ];
+
+  let exactRows = [];
+  if (uniqueNames.length) {
+    const { data, error } = await supabase
+      .from("active_deals")
+      .select(DEAL_COLS)
+      .in("name", uniqueNames)
+      .order("price", { ascending: true })
+      .limit(Math.min(1000, Math.max(80, uniqueNames.length * 40)));
+    if (error) throw error;
+    exactRows = data || [];
+  }
+
+  /** @type {Map<string, { row: object, match: string }>} */
+  const foundByChain = new Map();
+  const missing = [];
+  for (const row of needNameRows) {
+    const chain = row.chain;
+    const exactName = (row.name || "").trim();
+    if (!exactName) continue;
+    const exact = matchExactSale(exactRows, exactName, chain);
+    if (exact) foundByChain.set(chain, exact);
+    else missing.push({ chain, exactName });
+  }
+
+  if (!missing.length) return foundByChain;
+
+  const needles = [
+    ...new Set(missing.map((m) => saleNeedleForName(m.exactName)).filter(Boolean)),
+  ];
+  let softRows = [];
+  if (needles.length === 1) {
+    const { data, error } = await supabase
+      .from("active_deals")
+      .select(DEAL_COLS)
+      .ilike("name", `%${needles[0]}%`)
+      .order("price", { ascending: true })
+      .limit(Math.min(1000, 40 * needles.length));
+    if (error) throw error;
+    softRows = data || [];
+  } else if (needles.length > 1) {
+    const orFilter = needles.map((n) => `name.ilike."%${n}%"`).join(",");
+    const { data, error } = await supabase
+      .from("active_deals")
+      .select(DEAL_COLS)
+      .or(orFilter)
+      .order("price", { ascending: true })
+      .limit(Math.min(1000, 40 * needles.length));
+    if (error) throw error;
+    softRows = data || [];
+  }
+
+  for (const { chain, exactName } of missing) {
+    if (foundByChain.has(chain)) continue;
+    const soft = matchSoftSale(softRows, exactName, chain);
+    if (soft) foundByChain.set(chain, soft);
+  }
+
+  return foundByChain;
 }
 
 function pushSaleResult(results, found, chain, code, i) {
@@ -221,25 +276,24 @@ export async function lookupByBarcode(barcode) {
     const seenChains = new Set();
     let i = 0;
 
-    const lookedUp = await Promise.all(
-      regRows.map(async (row) => {
-        const chain = row.chain;
-        const byBarcode = saleByBarcodeChain.get(chain);
-        if (byBarcode) {
-          return { row, chain, byBarcode, found: null };
-        }
-        const exactName = (row.name || "").trim();
-        const found = exactName ? await findSaleForChain(exactName, chain) : null;
-        return { row, chain, byBarcode: null, found };
-      })
-    );
+    const needNameRows = [];
+    for (const row of regRows) {
+      if (saleByBarcodeChain.has(row.chain)) continue;
+      needNameRows.push(row);
+    }
+    const foundByName = needNameRows.length
+      ? await findSalesByNameBatched(needNameRows)
+      : new Map();
 
-    for (const { row, chain, byBarcode, found } of lookedUp) {
+    for (const row of regRows) {
+      const chain = row.chain;
       seenChains.add(chain);
+      const byBarcode = saleByBarcodeChain.get(chain);
       if (byBarcode) {
         pushSaleResult(results, byBarcode, chain, code, i++);
         continue;
       }
+      const found = foundByName.get(chain) || null;
       if (found) {
         pushSaleResult(results, found, chain, code, i++);
       } else {
