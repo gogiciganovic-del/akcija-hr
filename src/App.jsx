@@ -9,6 +9,7 @@ import { Admin }         from "./pages/Admin";
 import { useFavorites }  from "./hooks/useFavorites";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { CjenkoPeek }    from "./components/CjenkoPeek";
+import { UpdateBanner } from "./components/UpdateBanner";
 
 const VALID_TABS = new Set(["home", "search", "cart", "fav"]);
 
@@ -239,6 +240,7 @@ export default function App() {
         onHomeClick={handleHomeClick}
         favCount={favorites.size}
       />
+      <UpdateBanner />
       <ProductSheet
         product={selectedProduct}
         isOpen={!!selectedProduct}
