@@ -5,7 +5,7 @@ import { analyzeChainCart, REGULAR_PRICE_CHAINS, unavailableReasonLabel } from "
 import { useProductSuggestions } from "../hooks/useProductSuggestions";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { STORES } from "../lib/constants";
-import { loadCartDraft, saveCartDraft } from "../lib/cartDraft";
+import { loadCartDraft, saveCartDraft, reindexLineOverrides } from "../lib/cartDraft";
 import { enrichItemsWithBarcodes, resolveUniqueBarcode } from "../lib/resolveCartBarcode";
 import { PRICE_DISCLAIMER } from "../lib/priceTrust";
 import {
@@ -371,7 +371,7 @@ export function CartPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
-  const [lineOverrides, setLineOverrides] = useState({});
+  const [lineOverrides, setLineOverrides] = useState(initialDraft.lineOverrides);
   const [substitutePicker, setSubstitutePicker] = useState(null);
   const [error, setError] = useState(null);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
@@ -392,8 +392,8 @@ export function CartPage() {
 
   // Persist draft (tab switch / sken → košarica). Ne dira izračun.
   useEffect(() => {
-    saveCartDraft({ selectedChain, items });
-  }, [selectedChain, items]);
+    saveCartDraft({ selectedChain, items, lineOverrides });
+  }, [selectedChain, items, lineOverrides]);
 
   const clearCartState = useCallback(() => {
     setItems([]);
@@ -481,7 +481,6 @@ export function CartPage() {
       setInput("");
       setSuggestionsOpen(false);
       setResults(null);
-      setLineOverrides({});
       setSubstitutePicker(null);
       setError(null);
       inputRef.current?.focus();
@@ -490,11 +489,13 @@ export function CartPage() {
   );
 
   const removeItem = useCallback((id) => {
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx < 0) return;
     setItems((prev) => prev.filter((i) => i.id !== id));
+    setLineOverrides((prev) => reindexLineOverrides(prev, idx));
     setResults(null);
-    setLineOverrides({});
     setSubstitutePicker(null);
-  }, []);
+  }, [items]);
 
   const clearAll = useCallback(() => {
     clearCartState();
@@ -505,7 +506,6 @@ export function CartPage() {
     setLoading(true);
     setError(null);
     setResults(null);
-    setLineOverrides({});
     setSubstitutePicker(null);
     setShareFeedback(null);
     setSuggestionsOpen(false);

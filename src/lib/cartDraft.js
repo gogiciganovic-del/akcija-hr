@@ -11,25 +11,53 @@ function safeParse(raw, fallback) {
   }
 }
 
-/** Spremljena košarica (lanac + stavke) — preživljava promjenu taba. Ne dira izračun. */
+function normalizeLineOverrides(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return { ...raw };
+}
+
+/**
+ * Nakon brisanja stavke na `removedIndex`: obriši overridee tog retka na svim
+ * lancima i pomakni veće indekse za -1 (`${chain}:${i+1}` → `${chain}:${i}`).
+ */
+export function reindexLineOverrides(overrides, removedIndex) {
+  const src = normalizeLineOverrides(overrides);
+  if (!Number.isInteger(removedIndex) || removedIndex < 0) return src;
+  const next = {};
+  for (const [key, value] of Object.entries(src)) {
+    const sep = key.lastIndexOf(":");
+    if (sep < 0) continue;
+    const chain = key.slice(0, sep);
+    const idx = Number(key.slice(sep + 1));
+    if (!Number.isInteger(idx) || idx < 0) continue;
+    if (idx === removedIndex) continue;
+    const newIdx = idx > removedIndex ? idx - 1 : idx;
+    next[`${chain}:${newIdx}`] = value;
+  }
+  return next;
+}
+
+/** Spremljena košarica (lanac + stavke + ručne zamjene) — preživljava tab. Ne dira izračun. */
 export function loadCartDraft() {
   const data = safeParse(localStorage.getItem(DRAFT_KEY), null);
   if (!data || typeof data !== "object") {
-    return { selectedChain: null, items: [] };
+    return { selectedChain: null, items: [], lineOverrides: {} };
   }
   return {
     selectedChain: data.selectedChain || null,
     items: Array.isArray(data.items) ? data.items : [],
+    lineOverrides: normalizeLineOverrides(data.lineOverrides),
   };
 }
 
-export function saveCartDraft({ selectedChain, items }) {
+export function saveCartDraft({ selectedChain, items, lineOverrides }) {
   try {
     localStorage.setItem(
       DRAFT_KEY,
       JSON.stringify({
         selectedChain: selectedChain || null,
         items: Array.isArray(items) ? items : [],
+        lineOverrides: normalizeLineOverrides(lineOverrides),
       })
     );
   } catch {
@@ -74,7 +102,11 @@ export async function enqueueCartAdd(entry) {
 
   const nextChain = draft.selectedChain || chain || null;
   const nextItems = [...draft.items, item];
-  saveCartDraft({ selectedChain: nextChain, items: nextItems });
+  saveCartDraft({
+    selectedChain: nextChain,
+    items: nextItems,
+    lineOverrides: draft.lineOverrides,
+  });
 
   return { ok: true, selectedChain: nextChain, itemCount: nextItems.length };
 }
