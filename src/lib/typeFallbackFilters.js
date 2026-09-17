@@ -459,6 +459,18 @@ const CHEESE_SOFT_RE =
 const CHEESE_HARD_RE =
   /\b(tvrdi|tvrda|zreli|zrela|gauda|gouda|edam(ac)?|trapist|grana|parmezan|parmigiano|pecorino|cheddar|emmental|maasdam|tilsit|istarski\s+tvrdi)\b/i
 
+/** Dječja hrana s keksom — nije keks. */
+const KEKS_BABY_FOOD_RE = /\b(ka[sš]ic\w*|ka[sš]a\b|nutrino|hipp)\b/i
+
+const KEKS_KREKER_RE = /\bkreker/i
+const KEKS_VAFEL_RE = /\b(vafel|vafl)\b/i
+const KEKS_NAPOLITAN_RE = /\bnapolitan/i
+const KEKS_WORD_RE = /\bkeks/i
+const KEKS_BISKVIT_WORD_RE = /\bbiskvit/i
+/** Biskvit-kolač (rolada / plum cake / kolač) — nije keks. Ne hvata „kolačiće“. */
+const KEKS_BISKVIT_KOLAC_RE =
+  /\b(rolad\w*|plum\s*cake|kola[cč](?:e|a|u|em|ima|i)?)(?!\p{L})/iu
+
 /** Mesni sir = kobasica, ne sir. */
 const CHEESE_MESNI_RE = /\bmesni\s+sir\b/i
 
@@ -554,6 +566,80 @@ export function queryWantsNaturalHardCheese(name) {
 }
 
 /**
+ * @param {string | null | undefined} name
+ */
+export function isKeksBabyFoodProduct(name) {
+  return KEKS_BABY_FOOD_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isKeksBiskvitKolacProduct(name) {
+  return KEKS_BISKVIT_KOLAC_RE.test(String(name || ''))
+}
+
+/**
+ * Obitelj unutar tipa keks: kreker | vafel | napolitanke | biskvit_kolac | keks.
+ * @param {string | null | undefined} name
+ * @returns {'kreker' | 'vafel' | 'napolitanke' | 'biskvit_kolac' | 'keks'}
+ */
+export function keksFamilyId(name) {
+  const n = String(name || '')
+  if (KEKS_KREKER_RE.test(n)) return 'kreker'
+  if (KEKS_VAFEL_RE.test(n)) return 'vafel'
+  if (KEKS_NAPOLITAN_RE.test(n)) return 'napolitanke'
+  if (isKeksBiskvitKolacProduct(n)) return 'biskvit_kolac'
+  return 'keks'
+}
+
+function queryHasExplicitKeksSubtype(name) {
+  const n = String(name || '')
+  return (
+    KEKS_KREKER_RE.test(n) ||
+    KEKS_VAFEL_RE.test(n) ||
+    KEKS_NAPOLITAN_RE.test(n) ||
+    KEKS_BISKVIT_WORD_RE.test(n)
+  )
+}
+
+/**
+ * Query eksplicitno traži kreker.
+ * @param {string | null | undefined} name
+ */
+export function queryWantsKreker(name) {
+  return KEKS_KREKER_RE.test(String(name || ''))
+}
+
+/**
+ * Generički keks (KEKS/KEKSI) bez podvrste u nazivu.
+ * @param {string | null | undefined} name
+ */
+export function queryWantsGenericKeks(name) {
+  const n = String(name || '')
+  return KEKS_WORD_RE.test(n) && !queryHasExplicitKeksSubtype(n)
+}
+
+/**
+ * Podvrsta keksa ne odgovara queryju — preskoči kandidata (nema fallbacka na kreker/vafel).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function keksSubtypeMismatch(queryName, candidateName) {
+  if (isKeksBabyFoodProduct(candidateName)) return true
+  if (isKeksBiskvitKolacProduct(candidateName)) return true
+  if (queryWantsKreker(queryName)) return keksFamilyId(candidateName) !== 'kreker'
+  if (queryWantsGenericKeks(queryName)) {
+    const fam = keksFamilyId(candidateName)
+    if (fam === 'kreker' || fam === 'vafel' || fam === 'napolitanke' || fam === 'biskvit_kolac') {
+      return true
+    }
+    if (KEKS_BISKVIT_WORD_RE.test(String(candidateName || ''))) return true
+  }
+  return false
+}
+
+/**
  * Preferiraj istu teksturu sira; ako nema, dopusti fallback na sve.
  * @template T
  * @param {T[]} candidates
@@ -637,6 +723,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   if (typeKey === 'mlijeko') {
     if (isMlijekoCosmeticProduct(name)) return true
   }
+  if (typeKey === 'keks') {
+    if (keksSubtypeMismatch(queryName, name)) return true
+  }
   if (typeKey === 'sir') {
     if (isMesniSirProduct(name)) return true
     if (isCheesePetOrSnackProduct(name)) return true
@@ -659,6 +748,7 @@ export function shouldSkipTypeFallbackQuery(name) {
   if (hasProcessedForm(name)) return true
   if (isReadyMealOrMeatProduct(name)) return true
   if (isPetFood(name)) return true
+  if (isKeksBabyFoodProduct(name)) return true
   if (isMlijekoCosmeticProduct(name)) return true
   if (isMesniSirProduct(name)) return true
   if (isCheesePetOrSnackProduct(name)) return true
