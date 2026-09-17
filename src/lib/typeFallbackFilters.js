@@ -279,19 +279,31 @@ export function isChocolateOrFestiveEggProduct(name) {
 const PROCESSED_POTATO_RE =
   /\b(pommes|pomfrit|frites|predpr[žz]|kroketi|valoviti\s+pommes)\b/i
 
-/** Kokice s okusom maslaca — nije maslac. */
-const POPCORN_RE = /\bkokic/i
+/** Kokice / grickalice s okusom maslaca — nije maslac. */
+const POPCORN_RE = /\b(?:kokic|popcorn|smokic|flips)/i
 
-/** Kikiriki namaz pogrešno označen kao maslac. */
-const PEANUT_MASLAC_RE = /maslac.*kikiriki|kikiriki.*maslac/i
+/** Kikiriki namaz (uklj. kraticu kik. npr. Loacker, i KIKIRI). */
+const PEANUT_MASLAC_RE =
+  /kikiri|kik\.|peanut|ara[sš]id/i
 
-/** Kozmetika / njega (maslac za tijelo, usne, dren…). */
+/** Kozmetika / njega (maslac za tijelo, usne, dren…). Ne hvata SPAR (\bspa\b). */
 const MASLAC_COSMETIC_RE =
-  /\b(za\s+(tijelo|tij\.|usne|usna|ruke|lice)|maslac\s+za\s+(tij|usn|ruk|lic)|\bdren\b|deodorant|njeg[aeu]\s+ko[zs]e|body\s+butter|sol\s+de\s+janeiro)\b/i
+  /(?:za\s+(?:tijelo|tij\.|usne|usna|ruke|lice|tamnjen)|maslac\s+za\s+(?:tij|usn|ruk|lic|tamn)|\btij\b|\bdren\b|deodorant|njeg[aeu]\s+ko[zs]e|body\s*(?:butter|hug)|sol\s+de\s+janeiro|\bspa\b|afrodita|nivea|garnier|karite|shea|\bbalm\b|maska\s+za\s+kos|tamnjen|divlji\s+cvit|\bkrema\b|\bcream\b)/i
 
-/** Aromatizirani maslac (začinsko bilje) — druga namjena od običnog. */
+/** Aromatizirani maslac (začinsko bilje / trio). Slani / morska sol nisu ovdje. */
 const FLAVORED_MASLAC_RE =
-  /za[cč]in\.?\s*bilj|bilj.*za[cč]in|za[cč]insk|trio\s+za[cč]in/i
+  /za[cč]in\.?\s*bilj|bilj.*za[cč]in|za[cč]insk|\bza[cč]in|\bzacin|trio\s+za[cč]in|\btrio\b/i
+
+/** Orašasti namaz — nije kikiriki (taj je PEANUT_MASLAC_RE). */
+const ORASASTI_MASLAC_RE =
+  /\b(badem|lje[sš]njak|pistac|indijsk|ora[sš]ast|ora[sš][cč]|cashew|almond|hazelnut)/i
+
+const GHEE_MASLAC_RE = /\bghee\b/i
+
+/** Maslac kao sastojak (keks, pecivo, čips) — nije maslac. */
+const MASLAC_INGREDIENT_RE =
+  /\b(keks|madeleine|baklava|kroas|cips|vafl)/i
+const MASLAC_TOAST_RE = /\b(tost|toast)\b/i
 
 /** Punjena / njoki / lasagne / gotova jela — nije suha tjestenina. */
 const STUFFED_PASTA_RE = /\bpunjen/i
@@ -344,10 +356,17 @@ export function isPeanutMaslacProduct(name) {
  */
 export function isMaslacCosmeticProduct(name) {
   const n = String(name || '')
+  if (GHEE_MASLAC_RE.test(n)) return false
   if (MASLAC_COSMETIC_RE.test(n)) return true
-  // mali ml + maslac bez % mm → često kozmetika (npr. 75 ml dren)
-  if (/maslac/i.test(n) && /\b\d+\s*ml\b/i.test(n) && !/\b\d+\s*g\b/i.test(n) && !/\bmm\b/i.test(n)) {
-    if (/\b(za\s+tij|dren|shea|kokos\s*&\s*shea|njeg)/i.test(n)) return true
+  // ml bez g i bez % mm / m.m. — kozmetika; mliječni maslac je u g
+  if (
+    /maslac/i.test(n) &&
+    /\b\d+\s*ml\b/i.test(n) &&
+    !/\b\d+([.,]\d+)?\s*g\b/i.test(n) &&
+    !/\bmm\b/i.test(n) &&
+    !/\bm\.m/i.test(n)
+  ) {
+    return true
   }
   return false
 }
@@ -357,6 +376,86 @@ export function isMaslacCosmeticProduct(name) {
  */
 export function isFlavoredHerbMaslacProduct(name) {
   return FLAVORED_MASLAC_RE.test(String(name || ''))
+}
+
+/**
+ * Keks / pecivo / čips gdje je maslac sastojak, ne proizvod.
+ * @param {string | null | undefined} name
+ */
+export function isMaslacIngredientProduct(name) {
+  const n = String(name || '')
+  if (MASLAC_INGREDIENT_RE.test(n)) return true
+  if (MASLAC_TOAST_RE.test(n) && /maslac/i.test(n)) return true
+  return false
+}
+
+/**
+ * Obitelj unutar tipa maslac: kikiriki | orasasti | ghee | aromatizirani | mlijecni.
+ * @param {string | null | undefined} name
+ * @returns {'kikiriki' | 'orasasti' | 'ghee' | 'aromatizirani' | 'mlijecni'}
+ */
+export function maslacFamilyId(name) {
+  const n = String(name || '')
+  if (isPeanutMaslacProduct(n)) return 'kikiriki'
+  if (ORASASTI_MASLAC_RE.test(n)) return 'orasasti'
+  if (GHEE_MASLAC_RE.test(n)) return 'ghee'
+  if (isFlavoredHerbMaslacProduct(n)) return 'aromatizirani'
+  return 'mlijecni'
+}
+
+/** @param {string | null | undefined} name */
+export function queryWantsKikirikiMaslac(name) {
+  return isPeanutMaslacProduct(name)
+}
+
+/** @param {string | null | undefined} name */
+export function queryWantsOrasastiMaslac(name) {
+  return ORASASTI_MASLAC_RE.test(String(name || '')) && !isPeanutMaslacProduct(name)
+}
+
+/** @param {string | null | undefined} name */
+export function queryWantsGheeMaslac(name) {
+  return GHEE_MASLAC_RE.test(String(name || ''))
+}
+
+/** @param {string | null | undefined} name */
+export function queryWantsAromatiziraniMaslac(name) {
+  return isFlavoredHerbMaslacProduct(name)
+}
+
+/**
+ * Generički mliječni maslac — bez kikiriki / orašasto / ghee / začin.
+ * Slani / Camargue / light / bez laktoze / kozji ostaju ovdje.
+ * @param {string | null | undefined} name
+ */
+export function queryWantsGenericDairyMaslac(name) {
+  const n = String(name || '')
+  if (!/maslac/i.test(n)) return false
+  if (queryWantsKikirikiMaslac(n)) return false
+  if (queryWantsOrasastiMaslac(n)) return false
+  if (queryWantsGheeMaslac(n)) return false
+  if (queryWantsAromatiziraniMaslac(n)) return false
+  return true
+}
+
+/**
+ * Podvrsta maslaca ne odgovara queryju — prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function maslacSubtypeMismatch(queryName, candidateName) {
+  if (isMaslacCosmeticProduct(candidateName)) return true
+  if (isPopcornProduct(candidateName)) return true
+  if (isMaslacIngredientProduct(candidateName)) return true
+  const fam = maslacFamilyId(candidateName)
+  if (queryWantsKikirikiMaslac(queryName)) return fam !== 'kikiriki'
+  if (queryWantsOrasastiMaslac(queryName)) return fam !== 'orasasti'
+  if (queryWantsGheeMaslac(queryName)) return fam !== 'ghee'
+  if (queryWantsAromatiziraniMaslac(queryName)) return fam !== 'aromatizirani'
+  if (queryWantsGenericDairyMaslac(queryName) || !queryName) {
+    return fam !== 'mlijecni'
+  }
+  return false
 }
 
 /**
@@ -711,10 +810,7 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   if (typeKey === 'krumpir' && isProcessedPotatoProduct(name)) return true
   if (typeKey === 'papir' && queryName && papirSubtypeMismatch(queryName, name)) return true
   if (typeKey === 'maslac') {
-    if (isPopcornProduct(name)) return true
-    if (isPeanutMaslacProduct(name)) return true
-    if (isMaslacCosmeticProduct(name)) return true
-    if (isFlavoredHerbMaslacProduct(name)) return true
+    if (maslacSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'tjestenina') {
     if (isNonDryPastaProduct(name)) return true
@@ -752,6 +848,11 @@ export function shouldSkipTypeFallbackQuery(name) {
   if (isMlijekoCosmeticProduct(name)) return true
   if (isMesniSirProduct(name)) return true
   if (isCheesePetOrSnackProduct(name)) return true
+  if (/maslac/i.test(String(name || ''))) {
+    if (isMaslacCosmeticProduct(name)) return true
+    if (isPopcornProduct(name)) return true
+    if (isMaslacIngredientProduct(name)) return true
+  }
   return false
 }
 
