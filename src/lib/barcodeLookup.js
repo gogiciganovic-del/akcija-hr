@@ -221,19 +221,25 @@ export async function lookupByBarcode(barcode) {
     const seenChains = new Set();
     let i = 0;
 
-    for (const row of regRows) {
-      const chain = row.chain;
-      seenChains.add(chain);
-      const byBarcode = saleByBarcodeChain.get(chain);
+    const lookedUp = await Promise.all(
+      regRows.map(async (row) => {
+        const chain = row.chain;
+        const byBarcode = saleByBarcodeChain.get(chain);
+        if (byBarcode) {
+          return { row, chain, byBarcode, found: null };
+        }
+        const exactName = (row.name || "").trim();
+        const found = exactName ? await findSaleForChain(exactName, chain) : null;
+        return { row, chain, byBarcode: null, found };
+      })
+    );
 
+    for (const { row, chain, byBarcode, found } of lookedUp) {
+      seenChains.add(chain);
       if (byBarcode) {
         pushSaleResult(results, byBarcode, chain, code, i++);
         continue;
       }
-
-      const exactName = (row.name || "").trim();
-      const found = exactName ? await findSaleForChain(exactName, chain) : null;
-
       if (found) {
         pushSaleResult(results, found, chain, code, i++);
       } else {
