@@ -19,6 +19,10 @@ import {
 import { matchProductType } from "../lib/productTypes";
 import { sortBySearchRelevance } from "../lib/searchRelevance";
 
+const HIGHLIGHT_GLOW_MS = 3000;
+const HIGHLIGHT_GLOW_SHADOW =
+  "0 0 0 2px rgba(0,255,136,0.85), 0 0 24px rgba(0,255,136,0.35)";
+
 function highlight(text, query) {
   if (!query) return text;
   const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
@@ -399,6 +403,9 @@ export function SearchPage({
   const [scanSort, setScanSort] = useState("price_asc");
   const [scanSaleOnly, setScanSaleOnly] = useState(false);
   const [history, setHistory] = useState(() => loadScanHistory());
+  const [glowScanId, setGlowScanId] = useState(null);
+  const scanRowRefs = useRef(new Map());
+  const glowTimerRef = useRef(null);
 
   const searchTerm = query.trim();
   const saleSearch = searchTerm.length >= 2 ? searchTerm : undefined;
@@ -578,7 +585,18 @@ export function SearchPage({
     setScanOffIdentity(null);
     setScanLoading(false);
     setScanSaleOnly(false);
+    setGlowScanId(null);
+    if (glowTimerRef.current) {
+      window.clearTimeout(glowTimerRef.current);
+      glowTimerRef.current = null;
+    }
   };
+
+  useEffect(() => {
+    return () => {
+      if (glowTimerRef.current) window.clearTimeout(glowTimerRef.current);
+    };
+  }, []);
 
   const searchOffName = () => {
     const name = scanOffIdentity?.name || "";
@@ -636,16 +654,34 @@ export function SearchPage({
   const scanOnlyRegular =
     !scanLoading && !scanNotFound && (scanResults || []).length > 0 && !scanHasSale;
 
-  const cheapestBanner =
-    !scanLoading &&
-    scanSorted.length > 1 &&
-    cheapestPrice != null
-      ? (() => {
-          const best = scanSorted.find((p) => p.salePrice === cheapestPrice);
-          const label = best?.chain ?? chainFromStoreName(best?.store);
-          return label ? `Najjeftinije: ${label} · ${fmt(cheapestPrice)}` : null;
-        })()
+  const cheapestScanProduct =
+    !scanLoading && scanSorted.length > 1 && cheapestPrice != null
+      ? scanSorted.find((p) => p.salePrice === cheapestPrice) || null
       : null;
+  const cheapestBanner = cheapestScanProduct
+    ? (() => {
+        const label =
+          cheapestScanProduct.chain ?? chainFromStoreName(cheapestScanProduct.store);
+        return label ? `Najjeftinije: ${label} · ${fmt(cheapestPrice)}` : null;
+      })()
+    : null;
+
+  const scrollToCheapestScan = () => {
+    const id = cheapestScanProduct?.id;
+    if (!id) return;
+    setGlowScanId(id);
+    window.requestAnimationFrame(() => {
+      scanRowRefs.current.get(id)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+    if (glowTimerRef.current) window.clearTimeout(glowTimerRef.current);
+    glowTimerRef.current = window.setTimeout(() => {
+      setGlowScanId(null);
+      glowTimerRef.current = null;
+    }, HIGHLIGHT_GLOW_MS);
+  };
 
   const trackProduct = !scanLoading
     ? trackProductFromScan(scanBarcode, scanOffIdentity, scanSorted, cheapestPrice)
@@ -955,8 +991,10 @@ export function SearchPage({
                 </p>
               )}
               {cheapestBanner && (
-                <p
-                  className="rounded-xl px-3 py-2 mb-1"
+                <button
+                  type="button"
+                  onClick={scrollToCheapestScan}
+                  className="rounded-xl px-3 py-2 mb-1 text-left w-full"
                   style={{
                     fontSize: 12,
                     fontWeight: 700,
@@ -966,24 +1004,37 @@ export function SearchPage({
                   }}
                 >
                   {cheapestBanner}
-                </p>
+                </button>
               )}
               {trackProduct && (
                 <TrackPriceButton tracking={trackingPrice} onClick={handleTrackPrice} />
               )}
               {scanSorted.map((p) => (
-                <ProductResultCard
+                <div
                   key={p.id}
-                  p={p}
-                  onSelect={onProductSelect}
-                  onAddToCart={handleAddToCart}
-                  showMeta
-                  isCheapest={
-                    cheapestPrice != null &&
-                    Number.isFinite(p.salePrice) &&
-                    p.salePrice === cheapestPrice
+                  ref={(el) => {
+                    if (el) scanRowRefs.current.set(p.id, el);
+                    else scanRowRefs.current.delete(p.id);
+                  }}
+                  className="rounded-2xl transition-shadow duration-300"
+                  style={
+                    glowScanId === p.id
+                      ? { boxShadow: HIGHLIGHT_GLOW_SHADOW }
+                      : undefined
                   }
-                />
+                >
+                  <ProductResultCard
+                    p={p}
+                    onSelect={onProductSelect}
+                    onAddToCart={handleAddToCart}
+                    showMeta
+                    isCheapest={
+                      cheapestPrice != null &&
+                      Number.isFinite(p.salePrice) &&
+                      p.salePrice === cheapestPrice
+                    }
+                  />
+                </div>
               ))}
               {!scanLoading && scanSorted.length > 0 && (
                 <button
