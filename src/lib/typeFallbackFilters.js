@@ -738,6 +738,162 @@ export function keksSubtypeMismatch(queryName, candidateName) {
   return false
 }
 
+/** Toast / tost kruh — nije štruca. Ne hvata „tostirani“. */
+const KRUH_TOAST_RE = /\b(?:toast|tost)(?!ir)/i
+const KRUH_BAGUETTE_RE = /\b(?:baguette|baget)/i
+const KRUH_BEZGLUTEN_RE = /\b(?:bez\s*glu|gluten\s*free)/i
+const KRUH_SLATKI_RE =
+  /\b(?:meden|marcipan|slatk|cimet|krafna|kroas|peciv|smokv)/i
+const KRUH_HRSKAVI_RE = /\b(?:hrskav|kn[aä]cke|knacke|crisp)/i
+const KRUH_FLOUR_RE = /\bbra[sš]no\b.*\bkruh|\bkruh\b.*\bbra[sš]no/i
+const KRUH_POLUBIJELI_RE = /\bpolubijel/i
+const KRUH_CRNI_RE =
+  /\b(?:integral|integ\.?|ra[zž]en|graham|cjelovit|tamni|\bcrni\b)/i
+const KRUH_KUKURUZ_RE = /\bkukuruz/i
+const KRUH_BIJELI_RE = /\bbijel/i
+const KRUH_WORD_RE = /\bkruh\b/i
+
+/** @param {string | null | undefined} name */
+export function isKruhToastProduct(name) {
+  return KRUH_TOAST_RE.test(String(name || ''))
+}
+
+/** @param {string | null | undefined} name */
+export function isKruhBaguetteProduct(name) {
+  return KRUH_BAGUETTE_RE.test(String(name || ''))
+}
+
+/** @param {string | null | undefined} name */
+export function isKruhBezglutenProduct(name) {
+  return KRUH_BEZGLUTEN_RE.test(String(name || ''))
+}
+
+/** @param {string | null | undefined} name */
+export function isKruhSlatkiProduct(name) {
+  return KRUH_SLATKI_RE.test(String(name || ''))
+}
+
+/** @param {string | null | undefined} name */
+export function isKruhHrskaviProduct(name) {
+  return KRUH_HRSKAVI_RE.test(String(name || ''))
+}
+
+/** Brašno za kruh — nije kruh. */
+export function isKruhFlourProduct(name) {
+  return KRUH_FLOUR_RE.test(String(name || ''))
+}
+
+/**
+ * Obitelj unutar tipa kruh.
+ * Redoslijed: toast → baguette → bezgluten → slatki → hrskavi → polubijeli → crni → kukuruz → bijeli.
+ * @param {string | null | undefined} name
+ * @returns {'toast' | 'baguette' | 'bezgluten' | 'slatki' | 'hrskavi' | 'polubijeli' | 'crni_integral' | 'kukuruzni' | 'bijeli' | 'ostalo'}
+ */
+export function kruhFamilyId(name) {
+  const n = String(name || '')
+  if (isKruhToastProduct(n)) return 'toast'
+  if (isKruhBaguetteProduct(n)) return 'baguette'
+  if (isKruhBezglutenProduct(n)) return 'bezgluten'
+  if (isKruhSlatkiProduct(n)) return 'slatki'
+  if (isKruhHrskaviProduct(n)) return 'hrskavi'
+  if (KRUH_POLUBIJELI_RE.test(n)) return 'polubijeli'
+  if (KRUH_CRNI_RE.test(n)) return 'crni_integral'
+  if (KRUH_KUKURUZ_RE.test(n)) return 'kukuruzni'
+  if (KRUH_BIJELI_RE.test(n)) return 'bijeli'
+  return 'ostalo'
+}
+
+/** @param {string | null | undefined} name */
+export function queryWantsKruhToast(name) {
+  return isKruhToastProduct(name)
+}
+
+/** @param {string | null | undefined} name */
+export function queryWantsKruhBaguette(name) {
+  return isKruhBaguetteProduct(name) && !isKruhToastProduct(name)
+}
+
+/** @param {string | null | undefined} name */
+export function queryWantsKruhBezgluten(name) {
+  return isKruhBezglutenProduct(name)
+}
+
+/** @param {string | null | undefined} name */
+export function queryWantsKruhPolubijeli(name) {
+  return KRUH_POLUBIJELI_RE.test(String(name || ''))
+}
+
+/** @param {string | null | undefined} name */
+export function queryWantsKruhCrni(name) {
+  const n = String(name || '')
+  if (isKruhToastProduct(n)) return false
+  return KRUH_CRNI_RE.test(n)
+}
+
+/** @param {string | null | undefined} name */
+export function queryWantsKruhKukuruz(name) {
+  return KRUH_KUKURUZ_RE.test(String(name || ''))
+}
+
+/**
+ * Bijeli štruca — ne polubijeli, ne toast, ne baguette.
+ * @param {string | null | undefined} name
+ */
+export function queryWantsKruhBijeli(name) {
+  const n = String(name || '')
+  if (!KRUH_BIJELI_RE.test(n)) return false
+  if (queryWantsKruhPolubijeli(n)) return false
+  if (isKruhToastProduct(n)) return false
+  if (isKruhBaguetteProduct(n)) return false
+  if (queryWantsKruhCrni(n)) return false
+  return true
+}
+
+/**
+ * Generički kruh bez boje / toast / baguette.
+ * @param {string | null | undefined} name
+ */
+export function queryWantsGenericKruh(name) {
+  const n = String(name || '')
+  if (!KRUH_WORD_RE.test(n) && !isKruhToastProduct(n) && !isKruhBaguetteProduct(n)) {
+    return false
+  }
+  if (queryWantsKruhToast(n) || queryWantsKruhBaguette(n)) return false
+  if (queryWantsKruhBezgluten(n)) return false
+  if (queryWantsKruhPolubijeli(n) || queryWantsKruhBijeli(n)) return false
+  if (queryWantsKruhCrni(n) || queryWantsKruhKukuruz(n)) return false
+  return KRUH_WORD_RE.test(n)
+}
+
+/**
+ * Podvrsta kruha ne odgovara queryju — prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function kruhSubtypeMismatch(queryName, candidateName) {
+  if (isKruhFlourProduct(candidateName)) return true
+  if (isKruhSlatkiProduct(candidateName)) return true
+  if (isKruhHrskaviProduct(candidateName)) return true
+  const fam = kruhFamilyId(candidateName)
+  if (queryWantsKruhToast(queryName)) return fam !== 'toast'
+  if (queryWantsKruhBaguette(queryName)) return fam !== 'baguette'
+  if (queryWantsKruhBezgluten(queryName)) return fam !== 'bezgluten'
+  if (queryWantsKruhPolubijeli(queryName)) return fam !== 'polubijeli'
+  if (queryWantsKruhCrni(queryName)) return fam !== 'crni_integral'
+  if (queryWantsKruhKukuruz(queryName)) return fam !== 'kukuruzni'
+  if (queryWantsKruhBijeli(queryName)) return fam !== 'bijeli'
+  if (queryWantsGenericKruh(queryName) || !queryName) {
+    return (
+      fam === 'toast' ||
+      fam === 'baguette' ||
+      fam === 'bezgluten' ||
+      fam === 'slatki' ||
+      fam === 'hrskavi'
+    )
+  }
+  return false
+}
+
 /**
  * Preferiraj istu teksturu sira; ako nema, dopusti fallback na sve.
  * @template T
@@ -822,6 +978,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   if (typeKey === 'keks') {
     if (keksSubtypeMismatch(queryName, name)) return true
   }
+  if (typeKey === 'kruh') {
+    if (kruhSubtypeMismatch(queryName, name)) return true
+  }
   if (typeKey === 'sir') {
     if (isMesniSirProduct(name)) return true
     if (isCheesePetOrSnackProduct(name)) return true
@@ -852,6 +1011,11 @@ export function shouldSkipTypeFallbackQuery(name) {
     if (isMaslacCosmeticProduct(name)) return true
     if (isPopcornProduct(name)) return true
     if (isMaslacIngredientProduct(name)) return true
+  }
+  if (/kruh/i.test(String(name || ''))) {
+    if (isKruhFlourProduct(name)) return true
+    if (isKruhSlatkiProduct(name)) return true
+    if (isKruhHrskaviProduct(name)) return true
   }
   return false
 }
