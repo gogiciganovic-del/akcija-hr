@@ -305,9 +305,9 @@ const MASLAC_INGREDIENT_RE =
   /\b(keks|madeleine|baklava|kroas|cips|vafl)/i
 const MASLAC_TOAST_RE = /\b(tost|toast)\b/i
 
-/** Punjena / njoki / lasagne / gotova jela — nije suha tjestenina. */
+/** Punjena / lasagne / gotova jela / juha — nije suha tjestenina. Njoki je zasebna obitelj. */
 const STUFFED_PASTA_RE = /\bpunjen/i
-const GNOCCHI_RE = /\bnjok/i
+const GNOCCHI_RE = /\b(?:njok|gnocch)/i
 const LASAGNE_MEAL_RE = /\blasagn/i
 const READY_PASTA_MEAL_RE = /\bgotov/i
 const PASTA_SOUP_RE = /\bjuha\b.*\btjest|\btjest.*\bjuha\b/i
@@ -459,17 +459,38 @@ export function maslacSubtypeMismatch(queryName, candidateName) {
 }
 
 /**
+ * Njoki / gnocchi — zasebna obitelj unutar tipa tjestenina.
+ * @param {string | null | undefined} name
+ */
+export function isNjokiProduct(name) {
+  return GNOCCHI_RE.test(String(name || ''))
+}
+
+/**
+ * Punjena / lasagne / gotovo / juha — nije suha tjestenina.
+ * Njoki nije ovdje: query njoki smije vidjeti njoki kandidate.
  * @param {string | null | undefined} name
  */
 export function isNonDryPastaProduct(name) {
   const n = String(name || '')
   return (
     STUFFED_PASTA_RE.test(n) ||
-    GNOCCHI_RE.test(n) ||
     LASAGNE_MEAL_RE.test(n) ||
     READY_PASTA_MEAL_RE.test(n) ||
     PASTA_SOUP_RE.test(n)
   )
+}
+
+/**
+ * Query njoki → samo njoki; suha → ne njoki. Prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function tjesteninaSubtypeMismatch(queryName, candidateName) {
+  if (isNonDryPastaProduct(candidateName)) return true
+  const candNjoki = isNjokiProduct(candidateName)
+  if (isNjokiProduct(queryName)) return !candNjoki
+  return candNjoki
 }
 
 /**
@@ -969,7 +990,7 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
     if (maslacSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'tjestenina') {
-    if (isNonDryPastaProduct(name)) return true
+    if (tjesteninaSubtypeMismatch(queryName, name)) return true
     if (queryName && pastaShapeMismatch(queryName, name)) return true
   }
   if (typeKey === 'mlijeko') {
