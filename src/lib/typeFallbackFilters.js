@@ -571,6 +571,12 @@ function isToiletPaperName(name) {
 const MLIJEKO_COSMETIC_RE =
   /\b(za\s+sun[cč]anj\w*|za\s+tijelo|za\s+tij\.|za\s+lice|za\s+[cč]i[sš][cć]en\w*|body\s*(milk|lotion|butter)|losion|maska|spf\b|zf\s*\d|nivea|ziaja|sunlove|afrodita)\b/i
 
+/** Čokoladno / vanilija — ne bijelo mlijeko. Bez kakao (vafel). Bez `\b` pred Č. */
+const MLIJEKO_FLAVORED_RE = /(?:čokolad|cokolad|vanil|čok\b|cok\b)/i
+
+/** Bez laktoze uklj. skraćenicu „LAKT.“ */
+const MLIJEKO_LACTOSE_FREE_RE = /(?:bez\s*laktoz|lactose\s*free|bezlakt|laktoz|lakt\.)/i
+
 /** Meki / svježi sirevi. */
 const CHEESE_SOFT_RE =
   /\b(svje[zž]|meki|meka|posni|posna|kremast|krem\s*sir|ricotta|skuta|cottage|quark|mascarpone|labne|zrnati|feta)\b/i
@@ -612,6 +618,35 @@ const CHEESE_PET_OR_SNACK_RE =
  */
 export function isMlijekoCosmeticProduct(name) {
   return MLIJEKO_COSMETIC_RE.test(String(name || ''))
+}
+
+/**
+ * Čokoladno / vanilija mlijeko za piće.
+ * @param {string | null | undefined} name
+ */
+export function isMlijekoFlavoredProduct(name) {
+  return MLIJEKO_FLAVORED_RE.test(String(name || ''))
+}
+
+/**
+ * Bez laktoze (uklj. „BEZ LAKT.“).
+ * @param {string | null | undefined} name
+ */
+export function isMlijekoLactoseFreeProduct(name) {
+  return MLIJEKO_LACTOSE_FREE_RE.test(String(name || ''))
+}
+
+/**
+ * Čokoladno i bez laktoze su zatvorene obitelji. Kozmetika uvijek skip.
+ * Prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function mlijekoSubtypeMismatch(queryName, candidateName) {
+  if (isMlijekoCosmeticProduct(candidateName)) return true
+  if (isMlijekoFlavoredProduct(queryName)) return !isMlijekoFlavoredProduct(candidateName)
+  if (isMlijekoLactoseFreeProduct(queryName)) return !isMlijekoLactoseFreeProduct(candidateName)
+  return isMlijekoFlavoredProduct(candidateName) || isMlijekoLactoseFreeProduct(candidateName)
 }
 
 /**
@@ -1036,7 +1071,7 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
     if (queryName && pastaShapeMismatch(queryName, name)) return true
   }
   if (typeKey === 'mlijeko') {
-    if (isMlijekoCosmeticProduct(name)) return true
+    if (mlijekoSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'keks') {
     if (keksSubtypeMismatch(queryName, name)) return true
