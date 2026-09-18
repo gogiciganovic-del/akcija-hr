@@ -597,6 +597,12 @@ const CHEESE_MESNI_RE = /\bmesni\s+sir\b/i
 /** Topljeni sir (uklj. skraćenice tipa „TOPLJ LIST“). */
 const CHEESE_TOPLJENI_RE = /\btoplj/i
 
+/** Mozzarella — ista obitelj (kugla / mini / ribana). */
+const CHEESE_MOZZARELLA_RE = /\bmozzarell/i
+
+/** Svježi/krem bez strogog `\b` na kraju — hvata SVJEZI. */
+const CHEESE_SVJEZI_PREFIX_RE = /\bsvje[zž]/i
+
 /** Pet / snack koji lažno uđu u tip sir. */
 const CHEESE_PET_OR_SNACK_RE =
   /\b(dreamies|posl\.?\s*ma[cč]|hrana\s+za\s+(ma[cč]k|pse)|doritos|nacho)\b/i
@@ -683,6 +689,42 @@ export function queryWantsNaturalHardCheese(name) {
   const n = String(name || '')
   if (isTopljeniSirProduct(n)) return false
   return CHEESE_HARD_RE.test(n)
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isMozzarellaProduct(name) {
+  return CHEESE_MOZZARELLA_RE.test(String(name || ''))
+}
+
+/**
+ * Svježi / krem / feta / zrnati — ne mozzarella, ne topljeni.
+ * @param {string | null | undefined} name
+ */
+export function isSvjeziMekiSirProduct(name) {
+  const n = String(name || '')
+  if (isMozzarellaProduct(n) || isTopljeniSirProduct(n)) return false
+  return CHEESE_SOFT_RE.test(n) || CHEESE_SVJEZI_PREFIX_RE.test(n)
+}
+
+/**
+ * Mozzarella i topljeni su zatvorene obitelji; tvrdi query skipa i svježi/krem.
+ * Prazan pool ostaje prazan (no_similar). Feta ostaje u mekom razredu.
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function sirSubtypeMismatch(queryName, candidateName) {
+  if (isTopljeniSirProduct(queryName)) return !isTopljeniSirProduct(candidateName)
+  if (isMozzarellaProduct(queryName)) return !isMozzarellaProduct(candidateName)
+  if (queryWantsNaturalHardCheese(queryName)) {
+    return (
+      isTopljeniSirProduct(candidateName) ||
+      isMozzarellaProduct(candidateName) ||
+      isSvjeziMekiSirProduct(candidateName)
+    )
+  }
+  return isTopljeniSirProduct(candidateName) || isMozzarellaProduct(candidateName)
 }
 
 /**
@@ -1006,7 +1048,7 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
     if (isMesniSirProduct(name)) return true
     if (isCheesePetOrSnackProduct(name)) return true
     if (isPetFood(name)) return true
-    if (queryName && queryWantsNaturalHardCheese(queryName) && isTopljeniSirProduct(name)) return true
+    if (sirSubtypeMismatch(queryName, name)) return true
   }
   if (isMeatType(typeKey)) {
     if (isReadyMealOrMeatProduct(name)) return true
