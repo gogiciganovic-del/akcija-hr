@@ -649,6 +649,44 @@ export function mlijekoSubtypeMismatch(queryName, candidateName) {
   return isMlijekoFlavoredProduct(candidateName) || isMlijekoLactoseFreeProduct(candidateName)
 }
 
+/** Voćni jogurt uklj. kratice „VOĆ.“ / „JAG.“ / „VAN.“. Prefiks voć|voc (ne samo voćn). Bez `\b` pred Č. */
+const JOGURT_FLAVORED_RE =
+  /(?:voć|voc|jagod|\bjag\b|jag\.|borov|breskv|trešnj|tresnj|malin|banan|vanil|van\.|čokolad|cokolad|lje[šs]nik|okus|šljiv|sljiv|jabuk|smokv|višnj|visnj|yuzu|kokos|kava|marelic)/i
+
+/** Tekući / za piti. `\btek\b` hvata „TEK ACTIVE“ (ne TEKUCI). */
+const JOGURT_DRINK_RE = /(?:teku[cć]|tekuc|\btek\b|tek\.|za\s+piti|pitki|drink|lassi)/i
+
+/**
+ * Voćni / okusni jogurt (čaša), ne ravni natur.
+ * @param {string | null | undefined} name
+ */
+export function isJogurtFlavoredProduct(name) {
+  return JOGURT_FLAVORED_RE.test(String(name || ''))
+}
+
+/**
+ * Tekući jogurt / drink, ne čaša.
+ * @param {string | null | undefined} name
+ */
+export function isJogurtDrinkProduct(name) {
+  return JOGURT_DRINK_RE.test(String(name || ''))
+}
+
+/**
+ * Piće i voćni su zatvorene obitelji. Piće prvo (oblik, oba smjera).
+ * Prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function jogurtSubtypeMismatch(queryName, candidateName) {
+  const qDrink = isJogurtDrinkProduct(queryName)
+  const cDrink = isJogurtDrinkProduct(candidateName)
+  if (qDrink !== cDrink) return true
+  if (qDrink) return false
+  if (isJogurtFlavoredProduct(queryName)) return !isJogurtFlavoredProduct(candidateName)
+  return isJogurtFlavoredProduct(candidateName)
+}
+
 /**
  * Postotak masti iz naziva mlijeka (npr. 2,8 → 2.8), ili null.
  * @param {string | null | undefined} name
@@ -1072,6 +1110,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   }
   if (typeKey === 'mlijeko') {
     if (mlijekoSubtypeMismatch(queryName, name)) return true
+  }
+  if (typeKey === 'jogurt') {
+    if (jogurtSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'keks') {
     if (keksSubtypeMismatch(queryName, name)) return true
