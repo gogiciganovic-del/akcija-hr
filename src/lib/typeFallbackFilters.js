@@ -740,6 +740,38 @@ export function pecivoSubtypeMismatch(queryName, candidateName) {
   return isPecivoKrafnaProduct(candidateName) || isPecivoCroissantProduct(candidateName)
 }
 
+/** Pršut / prosciutto — ne kuhana šunka. Bez `\b` pred Š u sredini. */
+const SUNKA_PRSUT_RE = /(?:pr[šs]ut|prosciutt)/i
+
+/** Slanina — ne šunka narezak. */
+const SUNKA_SLANINA_RE = /(?:slanin)/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isSunkaPrsutProduct(name) {
+  return SUNKA_PRSUT_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isSunkaSlaninaProduct(name) {
+  return SUNKA_SLANINA_RE.test(String(name || ''))
+}
+
+/**
+ * Pršut i slanina su zatvorene obitelji. Generička šunka skipa obje.
+ * Prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function sunkaSubtypeMismatch(queryName, candidateName) {
+  if (isSunkaPrsutProduct(queryName)) return !isSunkaPrsutProduct(candidateName)
+  if (isSunkaSlaninaProduct(queryName)) return !isSunkaSlaninaProduct(candidateName)
+  return isSunkaPrsutProduct(candidateName) || isSunkaSlaninaProduct(candidateName)
+}
+
 /**
  * Postotak masti iz naziva mlijeka (npr. 2,8 → 2.8), ili null.
  * @param {string | null | undefined} name
@@ -1172,6 +1204,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   }
   if (typeKey === 'pecivo') {
     if (pecivoSubtypeMismatch(queryName, name)) return true
+  }
+  if (typeKey === 'sunka') {
+    if (sunkaSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'keks') {
     if (keksSubtypeMismatch(queryName, name)) return true
