@@ -687,6 +687,27 @@ export function jogurtSubtypeMismatch(queryName, candidateName) {
   return isJogurtFlavoredProduct(candidateName)
 }
 
+/** Šlag / slatko vrhnje. `patiss` hvata Creme Patisserie bez riječi šlag. Bez `\b` pred Š. */
+const VRHNJE_WHIP_RE = /(?:šlag|slag|slatk|whip|patiss)/i
+
+/**
+ * Vrhnje za šlag / slatko / patisserie, ne kuhanje.
+ * @param {string | null | undefined} name
+ */
+export function isVrhnjeWhipProduct(name) {
+  return VRHNJE_WHIP_RE.test(String(name || ''))
+}
+
+/**
+ * Šlag je zatvorena obitelj. Prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function vrhnjeSubtypeMismatch(queryName, candidateName) {
+  if (isVrhnjeWhipProduct(queryName)) return !isVrhnjeWhipProduct(candidateName)
+  return isVrhnjeWhipProduct(candidateName)
+}
+
 /**
  * Postotak masti iz naziva mlijeka (npr. 2,8 → 2.8), ili null.
  * @param {string | null | undefined} name
@@ -1113,6 +1134,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   }
   if (typeKey === 'jogurt') {
     if (jogurtSubtypeMismatch(queryName, name)) return true
+  }
+  if (typeKey === 'vrhnje') {
+    if (vrhnjeSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'keks') {
     if (keksSubtypeMismatch(queryName, name)) return true
