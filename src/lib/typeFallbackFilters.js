@@ -988,6 +988,38 @@ export function cajSubtypeMismatch(queryName, candidateName) {
   return false
 }
 
+/** Smoothie — nije sok/nektar u boci. */
+const SOK_SMOOTHIE_RE = /(?:smoothie)/i
+
+/** Nektar — nije 100% sok. */
+const SOK_NEKTAR_RE = /(?:nektar)/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isSokSmoothieProduct(name) {
+  return SOK_SMOOTHIE_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isSokNektarProduct(name) {
+  return SOK_NEKTAR_RE.test(String(name || ''))
+}
+
+/**
+ * Smoothie i nektar su zatvorene obitelji u generic sok.
+ * Prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function sokSubtypeMismatch(queryName, candidateName) {
+  if (isSokSmoothieProduct(queryName)) return !isSokSmoothieProduct(candidateName)
+  if (isSokNektarProduct(queryName)) return !isSokNektarProduct(candidateName)
+  return isSokSmoothieProduct(candidateName) || isSokNektarProduct(candidateName)
+}
+
 /**
  * Postotak masti iz naziva mlijeka (npr. 2,8 → 2.8), ili null.
  * @param {string | null | undefined} name
@@ -1435,6 +1467,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   }
   if (typeKey === 'caj') {
     if (cajSubtypeMismatch(queryName, name)) return true
+  }
+  if (typeKey === 'sok') {
+    if (sokSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'keks') {
     if (keksSubtypeMismatch(queryName, name)) return true
