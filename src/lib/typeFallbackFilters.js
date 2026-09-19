@@ -1020,6 +1020,38 @@ export function sokSubtypeMismatch(queryName, candidateName) {
   return isSokSmoothieProduct(candidateName) || isSokNektarProduct(candidateName)
 }
 
+/** Banana čips — nije svježe voće. */
+const BANANA_CIPS_RE = /(?:[čc]ips|chips)/i
+
+/** Kašica / Hipp / baby — nije svježa banana. */
+const BANANA_KASICA_RE = /(?:ka[šs]ic|pire|puree|hipp|baby)/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isBananaCipsProduct(name) {
+  return BANANA_CIPS_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isBananaKasicaProduct(name) {
+  return BANANA_KASICA_RE.test(String(name || ''))
+}
+
+/**
+ * Čips i kašica su zatvorene obitelji u generic banana.
+ * Prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function bananaSubtypeMismatch(queryName, candidateName) {
+  if (isBananaCipsProduct(queryName)) return !isBananaCipsProduct(candidateName)
+  if (isBananaKasicaProduct(queryName)) return !isBananaKasicaProduct(candidateName)
+  return isBananaCipsProduct(candidateName) || isBananaKasicaProduct(candidateName)
+}
+
 /**
  * Postotak masti iz naziva mlijeka (npr. 2,8 → 2.8), ili null.
  * @param {string | null | undefined} name
@@ -1470,6 +1502,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   }
   if (typeKey === 'sok') {
     if (sokSubtypeMismatch(queryName, name)) return true
+  }
+  if (typeKey === 'banana') {
+    if (bananaSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'keks') {
     if (keksSubtypeMismatch(queryName, name)) return true
