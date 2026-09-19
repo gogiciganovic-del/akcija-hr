@@ -555,7 +555,7 @@ function isBakingPaperName(name) {
   return /\b(pe[cč]enj|pe[cč]\.|za\s+pe[cč])/i.test(String(name || ''))
 }
 
-function isToiletPaperName(name) {
+export function isToiletPaperName(name) {
   const n = String(name || '')
   if (isBakingPaperName(n)) return false
   return (
@@ -563,8 +563,20 @@ function isToiletPaperName(name) {
     /\btoal\./i.test(n) ||
     /\btoal\b/i.test(n) ||
     /\bpapir\s+toal/i.test(n) ||
-    /\bt\.?\s*papir/i.test(n)
+    /\bt\.?\s*papir/i.test(n) ||
+    /\bpapir\s*t\b/i.test(n)
   )
+}
+
+/** Vlažni toaletni (uklj. VL. i VLAŽ.) — nije suha rola. Bez CARE. */
+const PAPIR_WET_RE = /(?:vla[žz]|vlazn|\bvl\.)/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isWetToiletPaperName(name) {
+  if (!isToiletPaperName(name)) return false
+  return PAPIR_WET_RE.test(String(name || ''))
 }
 
 /** Kozmetika / njega s riječju „mlijeko“ u nazivu. */
@@ -1411,17 +1423,24 @@ export function preferCheeseTextureCandidates(candidates, queryName, getName) {
 }
 
 /**
- * Toaletni papir ≠ papir za pečenje (i obrnuto).
+ * Toaletni i pečenje su zatvorene obitelji u generic papir.
+ * Vlažni toaletni je zatvoren oba smjera. Prazan pool ostaje prazan (no_similar).
+ * Kuhinjski ubrusi nisu zaseban query.
  * @param {string | null | undefined} queryName
  * @param {string | null | undefined} candidateName
  */
-function papirSubtypeMismatch(queryName, candidateName) {
+export function papirSubtypeMismatch(queryName, candidateName) {
   const qToilet = isToiletPaperName(queryName)
   const qBake = isBakingPaperName(queryName)
+  const qWet = isWetToiletPaperName(queryName)
   const cToilet = isToiletPaperName(candidateName)
   const cBake = isBakingPaperName(candidateName)
-  if (qToilet && cBake && !cToilet) return true
-  if (qBake && cToilet && !cBake) return true
+  const cWet = isWetToiletPaperName(candidateName)
+  if (qToilet) {
+    if (qWet) return !cToilet || !cWet
+    return !cToilet || cWet
+  }
+  if (qBake) return !cBake
   return false
 }
 
