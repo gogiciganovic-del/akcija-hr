@@ -898,6 +898,96 @@ export function rizaSubtypeMismatch(queryName, candidateName) {
   return isRizaArborioProduct(candidateName) || isRizaBasmatiProduct(candidateName)
 }
 
+/** Ledeni čaj / ice tea — piće, nije vrećica. */
+const CAJ_LEDENI_RE = /(?:leden|ice\s*tea|iced)/i
+
+/** Kamilica. */
+const CAJ_KAMILICA_RE = /(?:kamil)/i
+
+/** Menta / mint — ne /ment/ (hvata MOMENTS). mente = genitiv. */
+const CAJ_MENTA_RE = /(?:menta|mente|pepermint|peppermint|\bmint\b)/i
+
+/** Zeleni čaj. */
+const CAJ_ZELENI_RE = /(?:zelen|green\s*tea)/i
+
+/** Crni / breakfast — ne english (English Tea Shop + rooibos). */
+const CAJ_CRNI_RE = /(?:crn[ia]|black\s*tea|breakf)/i
+
+/** Voćni čaj. */
+const CAJ_VOCNI_RE = /(?:vo[ćc]n|jagod|malin|breskv|[šs]umsk|borov|vi[šs]nj|tre[šs]nj|fruit)/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isCajLedeniProduct(name) {
+  return CAJ_LEDENI_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isCajKamilicaProduct(name) {
+  return CAJ_KAMILICA_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isCajMentaProduct(name) {
+  return CAJ_MENTA_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isCajZeleniProduct(name) {
+  return CAJ_ZELENI_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isCajCrniProduct(name) {
+  return CAJ_CRNI_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isCajVocniProduct(name) {
+  return CAJ_VOCNI_RE.test(String(name || ''))
+}
+
+/**
+ * Ledeni je forma (piće). Kamilica je zatvorena.
+ * Crni i voćni ne smiju u zeleni/mentu/kamilicu ni jedno u drugo.
+ * Generic (šipak, kadulja, Earl Grey) ne zatvara imenovane obitelji.
+ * Prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function cajSubtypeMismatch(queryName, candidateName) {
+  if (!isCajLedeniProduct(queryName) && isCajLedeniProduct(candidateName)) return true
+  if (isCajKamilicaProduct(queryName)) return !isCajKamilicaProduct(candidateName)
+  if (isCajCrniProduct(queryName)) {
+    return (
+      isCajZeleniProduct(candidateName) ||
+      isCajKamilicaProduct(candidateName) ||
+      isCajMentaProduct(candidateName) ||
+      isCajVocniProduct(candidateName)
+    )
+  }
+  if (isCajVocniProduct(queryName)) {
+    return (
+      isCajCrniProduct(candidateName) ||
+      isCajZeleniProduct(candidateName) ||
+      isCajKamilicaProduct(candidateName) ||
+      isCajMentaProduct(candidateName)
+    )
+  }
+  return false
+}
+
 /**
  * Postotak masti iz naziva mlijeka (npr. 2,8 → 2.8), ili null.
  * @param {string | null | undefined} name
@@ -1342,6 +1432,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   }
   if (typeKey === 'riza') {
     if (rizaSubtypeMismatch(queryName, name)) return true
+  }
+  if (typeKey === 'caj') {
+    if (cajSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'keks') {
     if (keksSubtypeMismatch(queryName, name)) return true
