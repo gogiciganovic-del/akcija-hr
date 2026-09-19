@@ -819,6 +819,53 @@ export function brasnoSubtypeMismatch(queryName, candidateName) {
   )
 }
 
+/** Smeđi / demerara — nije bijeli kristal. */
+const SECER_SMEDI_RE = /(?:sme[đd]|demerara|muscovado|molasses)/i
+
+/** Šećer u prahu / mljeveni. */
+const SECER_PRAH_RE = /(?:prah|powder|mljeven)/i
+
+/** Želirni šećer za džem — nije stolni kristal. */
+const SECER_ZELIR_RE = /(?:[žz]elir|gelling)/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isSecerSmediProduct(name) {
+  return SECER_SMEDI_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isSecerPrahProduct(name) {
+  return SECER_PRAH_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isSecerZelirProduct(name) {
+  return SECER_ZELIR_RE.test(String(name || ''))
+}
+
+/**
+ * Smeđi, prah i želirni su zatvorene obitelji u generic secer.
+ * Prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function secerSubtypeMismatch(queryName, candidateName) {
+  if (isSecerSmediProduct(queryName)) return !isSecerSmediProduct(candidateName)
+  if (isSecerPrahProduct(queryName)) return !isSecerPrahProduct(candidateName)
+  if (isSecerZelirProduct(queryName)) return !isSecerZelirProduct(candidateName)
+  return (
+    isSecerSmediProduct(candidateName) ||
+    isSecerPrahProduct(candidateName) ||
+    isSecerZelirProduct(candidateName)
+  )
+}
+
 /**
  * Postotak masti iz naziva mlijeka (npr. 2,8 → 2.8), ili null.
  * @param {string | null | undefined} name
@@ -1257,6 +1304,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   }
   if (typeKey === 'brasno') {
     if (brasnoSubtypeMismatch(queryName, name)) return true
+  }
+  if (typeKey === 'secer') {
+    if (secerSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'keks') {
     if (keksSubtypeMismatch(queryName, name)) return true
