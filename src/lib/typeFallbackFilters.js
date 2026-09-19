@@ -866,6 +866,38 @@ export function secerSubtypeMismatch(queryName, candidateName) {
   )
 }
 
+/** Arborio / carnaroli — risotto, nije stolna bijela. */
+const RIZA_ARBORIO_RE = /(?:arborio|carnaroli)/i
+
+/** Basmati. */
+const RIZA_BASMATI_RE = /(?:basmati)/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isRizaArborioProduct(name) {
+  return RIZA_ARBORIO_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isRizaBasmatiProduct(name) {
+  return RIZA_BASMATI_RE.test(String(name || ''))
+}
+
+/**
+ * Arborio i basmati su zatvorene obitelji u generic riza.
+ * Prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function rizaSubtypeMismatch(queryName, candidateName) {
+  if (isRizaArborioProduct(queryName)) return !isRizaArborioProduct(candidateName)
+  if (isRizaBasmatiProduct(queryName)) return !isRizaBasmatiProduct(candidateName)
+  return isRizaArborioProduct(candidateName) || isRizaBasmatiProduct(candidateName)
+}
+
 /**
  * Postotak masti iz naziva mlijeka (npr. 2,8 → 2.8), ili null.
  * @param {string | null | undefined} name
@@ -1307,6 +1339,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   }
   if (typeKey === 'secer') {
     if (secerSubtypeMismatch(queryName, name)) return true
+  }
+  if (typeKey === 'riza') {
+    if (rizaSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'keks') {
     if (keksSubtypeMismatch(queryName, name)) return true
