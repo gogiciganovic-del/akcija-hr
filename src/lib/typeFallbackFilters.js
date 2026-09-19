@@ -772,6 +772,53 @@ export function sunkaSubtypeMismatch(queryName, candidateName) {
   return isSunkaPrsutProduct(candidateName) || isSunkaSlaninaProduct(candidateName)
 }
 
+/** Kukuruzno brašno — nije pšenično. `KUKURUZNO` nije token KUKURUZ. */
+const BRASNO_KUKURUZ_RE = /(?:kukuruz)/i
+
+/** Brašno za pizzu. */
+const BRASNO_PIZZA_RE = /(?:pizz)/i
+
+/** Bezglutensko / Schär mix — ne pšenično integralno. */
+const BRASNO_BEZGLUTEN_RE = /(?:bez\s*glut|gluten\s*free|scha?er|schär)/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isBrasnoKukuruzProduct(name) {
+  return BRASNO_KUKURUZ_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isBrasnoPizzaProduct(name) {
+  return BRASNO_PIZZA_RE.test(String(name || ''))
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isBrasnoBezglutenProduct(name) {
+  return BRASNO_BEZGLUTEN_RE.test(String(name || ''))
+}
+
+/**
+ * Kukuruz, pizza i bezglutena su zatvorene obitelji u generic brasno.
+ * Prazan pool ostaje prazan (no_similar).
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function brasnoSubtypeMismatch(queryName, candidateName) {
+  if (isBrasnoKukuruzProduct(queryName)) return !isBrasnoKukuruzProduct(candidateName)
+  if (isBrasnoPizzaProduct(queryName)) return !isBrasnoPizzaProduct(candidateName)
+  if (isBrasnoBezglutenProduct(queryName)) return !isBrasnoBezglutenProduct(candidateName)
+  return (
+    isBrasnoKukuruzProduct(candidateName) ||
+    isBrasnoPizzaProduct(candidateName) ||
+    isBrasnoBezglutenProduct(candidateName)
+  )
+}
+
 /**
  * Postotak masti iz naziva mlijeka (npr. 2,8 → 2.8), ili null.
  * @param {string | null | undefined} name
@@ -1207,6 +1254,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   }
   if (typeKey === 'sunka') {
     if (sunkaSubtypeMismatch(queryName, name)) return true
+  }
+  if (typeKey === 'brasno') {
+    if (brasnoSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'keks') {
     if (keksSubtypeMismatch(queryName, name)) return true
