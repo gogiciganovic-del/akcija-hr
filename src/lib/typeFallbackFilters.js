@@ -128,11 +128,15 @@ function isMeatType(typeKey) {
 /** Pljeskavica / ćevapi — JS `\\b` ne vidi Ć kao riječ, zato bez vodećeg `\\b`. */
 const MEAT_PATTY_OR_CEVAPI_RE = /(?:pljeskav|[čćc]evap)/i
 
+/** Iza š/s nije slovo — JS `\\b` ne vidi Š kao riječ. */
+const GULAS_WORD_RE = /\bgula[sš](?!\p{L})/iu
+const ZA_GULAS_RE = /\bza\s+gula[sš](?!\p{L})/iu
+
 export function isReadyMealOrMeatProduct(name) {
   const n = String(name || '')
-  if (/\bza\s+gula[sš]\b/i.test(n)) return false
+  if (ZA_GULAS_RE.test(n)) return false
   if (MEAT_PATTY_OR_CEVAPI_RE.test(n)) return true
-  if (/\bgula[sš]\b/i.test(n)) return true
+  if (GULAS_WORD_RE.test(n)) return true
   return READY_MEAL_RE.test(n)
 }
 

@@ -36,6 +36,7 @@ const {
   isPeanutMaslacProduct,
   isPecivoCroissantProduct,
   isPecivoKrafnaProduct,
+  isReadyMealOrMeatProduct,
   isPopcornProduct,
   isRizaArborioProduct,
   isRizaBasmatiProduct,
@@ -1917,6 +1918,20 @@ assert("same cook ok", vrhnjeSubtypeMismatch(Q_COOK, Q_COOK_UHT) === false);
     shouldSkipTypeFallbackCandidate(Q_PATTY, "meso_junetina", Q_MINCE) === true
   );
   assert("cevapi query skipped", shouldSkipTypeFallbackQuery(Q_CEVAPI) === true);
+}
+
+{
+  const Q_GULAS_MEAL = "GULAŠ JUNETINA 500g";
+  const Q_ZA_GULAS_SVIN = "SVINJETINA ZA GULAŠ 500g";
+  const Q_ZA_GULAS_JUNE = "JUNETINA ZA GULAŠ";
+  const Q_PAPRIKAS = "PAPRIKAŠ";
+
+  assert("gulas junetina is ready meal", isReadyMealOrMeatProduct(Q_GULAS_MEAL) === true);
+  assert("gulas junetina query skipped", shouldSkipTypeFallbackQuery(Q_GULAS_MEAL) === true);
+  assert("svinjetina za gulas is not ready meal", isReadyMealOrMeatProduct(Q_ZA_GULAS_SVIN) === false);
+  assert("svinjetina za gulas query not skipped", shouldSkipTypeFallbackQuery(Q_ZA_GULAS_SVIN) === false);
+  assert("junetina za gulas is not ready meal", isReadyMealOrMeatProduct(Q_ZA_GULAS_JUNE) === false);
+  assert("paprikas still ready meal", isReadyMealOrMeatProduct(Q_PAPRIKAS) === true);
 }
 
 await server.close();
