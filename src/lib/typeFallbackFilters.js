@@ -899,6 +899,12 @@ const RIZA_ARBORIO_RE = /(?:arborio|carnaroli)/i
 /** Basmati. */
 const RIZA_BASMATI_RE = /(?:basmati)/i
 
+/** Blond risotti / risotto — nije stolna bijela. */
+const RIZA_RISOTTO_RE = /(?:risotto|risotti)/i
+
+/** Parboiled / predkuhana — nije sirova bijela. */
+const RIZA_PARBOILED_RE = /(?:parboil|predkuh)/i
+
 /**
  * @param {string | null | undefined} name
  */
@@ -913,16 +919,33 @@ export function isRizaBasmatiProduct(name) {
   return RIZA_BASMATI_RE.test(String(name || ''))
 }
 
+/** @param {string | null | undefined} name */
+export function isRizaRisottoProduct(name) {
+  return RIZA_RISOTTO_RE.test(String(name || ''))
+}
+
+/** @param {string | null | undefined} name */
+export function isRizaParboiledProduct(name) {
+  return RIZA_PARBOILED_RE.test(String(name || ''))
+}
+
 /**
- * Arborio i basmati su zatvorene obitelji u generic riza.
- * Prazan pool ostaje prazan (no_similar).
+ * Arborio, basmati, risotto i parboiled su zatvorene obitelji u generic riza.
+ * Jasmin ostaje u generic poolu. Prazan pool ostaje prazan (no_similar).
  * @param {string | null | undefined} queryName
  * @param {string | null | undefined} candidateName
  */
 export function rizaSubtypeMismatch(queryName, candidateName) {
   if (isRizaArborioProduct(queryName)) return !isRizaArborioProduct(candidateName)
   if (isRizaBasmatiProduct(queryName)) return !isRizaBasmatiProduct(candidateName)
-  return isRizaArborioProduct(candidateName) || isRizaBasmatiProduct(candidateName)
+  if (isRizaRisottoProduct(queryName)) return !isRizaRisottoProduct(candidateName)
+  if (isRizaParboiledProduct(queryName)) return !isRizaParboiledProduct(candidateName)
+  return (
+    isRizaArborioProduct(candidateName) ||
+    isRizaBasmatiProduct(candidateName) ||
+    isRizaRisottoProduct(candidateName) ||
+    isRizaParboiledProduct(candidateName)
+  )
 }
 
 /** Ledeni čaj / ice tea — piće, nije vrećica. */

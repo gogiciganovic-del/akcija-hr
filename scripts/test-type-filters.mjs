@@ -42,6 +42,8 @@ const {
   isPopcornProduct,
   isRizaArborioProduct,
   isRizaBasmatiProduct,
+  isRizaParboiledProduct,
+  isRizaRisottoProduct,
   isSecerPrahProduct,
   isSecerSmediProduct,
   isSecerZelirProduct,
@@ -1252,6 +1254,12 @@ assert("carnaroli", isRizaArborioProduct(Q_CARNAROLI) === true);
 assert("bijela not arborio", isRizaArborioProduct(Q_BIJELA) === false);
 assert("originario not arborio", isRizaArborioProduct(Q_ORIGINARIO) === false);
 assert("risotti not arborio", isRizaArborioProduct("RIŽA BLOND RISOTTI 1kg GAL") === false);
+assert("risotti word", isRizaRisottoProduct("RIŽA BLOND RISOTTI 1kg GAL") === true);
+assert("risotto word", isRizaRisottoProduct("RIŽA RISOTTO 1kg") === true);
+assert("bijela not risotto", isRizaRisottoProduct(Q_BIJELA) === false);
+assert("parboiled word", isRizaParboiledProduct("RIŽA PARBOILED 1kg") === true);
+assert("predkuhana word", isRizaParboiledProduct("RIŽA PREDKUHANA 1kg") === true);
+assert("bijela not parboiled", isRizaParboiledProduct(Q_BIJELA) === false);
 
 assert("basmati word", isRizaBasmatiProduct(Q_BASMATI) === true);
 assert("bijela not basmati", isRizaBasmatiProduct(Q_BIJELA) === false);
@@ -1278,8 +1286,28 @@ assert(
   shouldSkipTypeFallbackCandidate(Q_ENCIAN_SMEDA, "riza", Q_BIJELA) === false
 );
 assert(
+  "bijela skips risotto",
+  shouldSkipTypeFallbackCandidate("RIŽA BLOND RISOTTI 1kg GAL", "riza", Q_BIJELA) === true
+);
+assert(
+  "bijela skips parboiled",
+  shouldSkipTypeFallbackCandidate("RIŽA PARBOILED 1kg", "riza", Q_BIJELA) === true
+);
+assert(
   "bijela keeps jasmin leftover",
   shouldSkipTypeFallbackCandidate(Q_JASMIN, "riza", Q_RIBE) === false
+);
+assert(
+  "risotto keeps risotto",
+  shouldSkipTypeFallbackCandidate("RIZA BLOND RISOTTI 1 KG RISO GALLO", "riza", "RIŽA BLOND RISOTTI 1kg GAL") === false
+);
+assert(
+  "risotto skips bijela",
+  shouldSkipTypeFallbackCandidate(Q_RIBE, "riza", "RIŽA BLOND RISOTTI 1kg GAL") === true
+);
+assert(
+  "risotto skips parboiled",
+  shouldSkipTypeFallbackCandidate("RIŽA PARBOILED 1kg", "riza", "RIŽA BLOND RISOTTI 1kg GAL") === true
 );
 assert(
   "bijela keeps originario leftover",
