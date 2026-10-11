@@ -1932,6 +1932,10 @@ assert("same cook ok", vrhnjeSubtypeMismatch(Q_COOK, Q_COOK_UHT) === false);
   assert("svinjetina za gulas query not skipped", shouldSkipTypeFallbackQuery(Q_ZA_GULAS_SVIN) === false);
   assert("junetina za gulas is not ready meal", isReadyMealOrMeatProduct(Q_ZA_GULAS_JUNE) === false);
   assert("paprikas still ready meal", isReadyMealOrMeatProduct(Q_PAPRIKAS) === true);
+  assert(
+    "gulasarija is not ready meal",
+    isReadyMealOrMeatProduct("GULAŠARIJA") === false
+  );
 }
 
 await server.close();
