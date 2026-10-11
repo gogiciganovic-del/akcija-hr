@@ -1685,7 +1685,8 @@ const Q_ALMOND_EN = "Almond drink unsweetened 1L";
 const Q_KOKOS = "NAPITAK KOKOS 800 ML ADEZ";
 const Q_COCONUT_EN = "Coconut drink 1L";
 const Q_BLEND = "NAPITAK ALPRO KOKOS/BADEM 1 l";
-const Q_UNKNOWN = "NAPITAK KALCIJ BIO 1 L RISO SCOTTI";
+const Q_RISO_CALCIUM = "NAPITAK KALCIJ BIO 1 L RISO SCOTTI";
+const Q_ZOB_RISO = "NAPITAK ZOB RISO SCOTTI";
 const Q_FANTA = "NAPITAK GAZ.LIMUN 1 L FANTA";
 
 assert("base riza", napitakPlantBases(Q_RIZA).join(",") === "riza");
@@ -1699,7 +1700,8 @@ assert("base almond en", napitakPlantBases(Q_ALMOND_EN).join(",") === "badem");
 assert("base kokos", napitakPlantBases(Q_KOKOS).join(",") === "kokos");
 assert("base coconut en", napitakPlantBases(Q_COCONUT_EN).join(",") === "kokos");
 assert("base blend kokos+badem", napitakPlantBases(Q_BLEND).sort().join(",") === "badem,kokos");
-assert("base unknown empty", napitakPlantBases(Q_UNKNOWN).length === 0);
+assert("base riso calcium is riza", napitakPlantBases(Q_RISO_CALCIUM).join(",") === "riza");
+assert("base zob riso stays zob", napitakPlantBases(Q_ZOB_RISO).join(",") === "zob");
 assert("base fanta empty", napitakPlantBases(Q_FANTA).length === 0);
 
 assert(
@@ -1711,8 +1713,8 @@ assert(
   shouldSkipTypeFallbackCandidate(Q_ZOB, "napitak", Q_RIZA) === true
 );
 assert(
-  "riza skips unknown calcium",
-  shouldSkipTypeFallbackCandidate(Q_UNKNOWN, "napitak", Q_RIZA) === true
+  "riza keeps riso calcium",
+  shouldSkipTypeFallbackCandidate(Q_RISO_CALCIUM, "napitak", Q_RIZA) === false
 );
 assert(
   "riza keeps riza",
@@ -1741,6 +1743,8 @@ assert(
 assert("riza query not skipped", shouldSkipTypeFallbackQuery(Q_RIZA) === false);
 assert("mismatch riza vs soja", napitakSubtypeMismatch(Q_RIZA, Q_SOJA) === true);
 assert("same riza ok", napitakSubtypeMismatch(Q_RIZA, Q_RICE_EN) === false);
+assert("riza vs riso calcium ok", napitakSubtypeMismatch(Q_RIZA, Q_RISO_CALCIUM) === false);
+assert("zob vs zob riso ok", napitakSubtypeMismatch(Q_ZOB, Q_ZOB_RISO) === false);
 }
 
 // --- sunka ---

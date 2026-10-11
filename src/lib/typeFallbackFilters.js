@@ -1057,6 +1057,8 @@ export function napitakPlantBases(name) {
   for (const b of NAPITAK_PLANT_BASES) {
     if (b.re.test(n)) ids.push(b.id)
   }
+  // RISO SCOTTI je i marka — riža samo kad nema druge biljne baze.
+  if (!ids.length && /\briso\b/i.test(n)) ids.push('riza')
   return ids
 }
 
