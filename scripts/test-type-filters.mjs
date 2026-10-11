@@ -31,6 +31,8 @@ const {
   isMlijekoFlavoredProduct,
   isMlijekoLactoseFreeProduct,
   isMozzarellaProduct,
+  napitakPlantBases,
+  napitakSubtypeMismatch,
   isNjokiProduct,
   isNonDryPastaProduct,
   isPeanutMaslacProduct,
@@ -1640,6 +1642,77 @@ assert("smoothie query not skipped", shouldSkipTypeFallbackQuery(Q_SMOOTHIE) ===
 assert("mismatch naranča vs nektar", sokSubtypeMismatch(Q_NARANCA, Q_NEKTAR) === true);
 assert("same smoothie ok", sokSubtypeMismatch(Q_SMOOTHIE, Q_SMOOTHIE_MANGO) === false);
 assert("other typeKey ignores sok", shouldSkipTypeFallbackCandidate(Q_NEKTAR, "caj", Q_NARANCA) === false);
+}
+
+// --- napitak ---
+{
+const Q_RIZA = "NAPITAK OD RIŽE BIO 1l";
+const Q_RICE_EN = "Organic rice drink 1L";
+const Q_SOJA = "NAPITAK OD SOJE BIO 1l";
+const Q_SOY_EN = "KVeg. Bio napitak od soje 1L vg.";
+const Q_ZOB = "NAPITAK ZOB BIO BEZ DOD Š 1 l BRIDGE";
+const Q_OAT_EN = "Alpro oat drink 1 l";
+const Q_BADEM = "NAPITAK BIO BADEM BIO VRT 1 l";
+const Q_ALMOND_EN = "Almond drink unsweetened 1L";
+const Q_KOKOS = "NAPITAK KOKOS 800 ML ADEZ";
+const Q_COCONUT_EN = "Coconut drink 1L";
+const Q_BLEND = "NAPITAK ALPRO KOKOS/BADEM 1 l";
+const Q_UNKNOWN = "NAPITAK KALCIJ BIO 1 L RISO SCOTTI";
+const Q_FANTA = "NAPITAK GAZ.LIMUN 1 L FANTA";
+
+assert("base riza", napitakPlantBases(Q_RIZA).join(",") === "riza");
+assert("base rice en", napitakPlantBases(Q_RICE_EN).join(",") === "riza");
+assert("base soja", napitakPlantBases(Q_SOJA).join(",") === "soja");
+assert("base soy en", napitakPlantBases(Q_SOY_EN).join(",") === "soja");
+assert("base zob", napitakPlantBases(Q_ZOB).join(",") === "zob");
+assert("base oat en", napitakPlantBases(Q_OAT_EN).join(",") === "zob");
+assert("base badem", napitakPlantBases(Q_BADEM).join(",") === "badem");
+assert("base almond en", napitakPlantBases(Q_ALMOND_EN).join(",") === "badem");
+assert("base kokos", napitakPlantBases(Q_KOKOS).join(",") === "kokos");
+assert("base coconut en", napitakPlantBases(Q_COCONUT_EN).join(",") === "kokos");
+assert("base blend kokos+badem", napitakPlantBases(Q_BLEND).sort().join(",") === "badem,kokos");
+assert("base unknown empty", napitakPlantBases(Q_UNKNOWN).length === 0);
+assert("base fanta empty", napitakPlantBases(Q_FANTA).length === 0);
+
+assert(
+  "riza skips soja",
+  shouldSkipTypeFallbackCandidate(Q_SOJA, "napitak", Q_RIZA) === true
+);
+assert(
+  "riza skips zob",
+  shouldSkipTypeFallbackCandidate(Q_ZOB, "napitak", Q_RIZA) === true
+);
+assert(
+  "riza skips unknown calcium",
+  shouldSkipTypeFallbackCandidate(Q_UNKNOWN, "napitak", Q_RIZA) === true
+);
+assert(
+  "riza keeps riza",
+  shouldSkipTypeFallbackCandidate("NAPITAK OD RIŽE BIO 1l SCOTTI", "napitak", Q_RIZA) === false
+);
+assert(
+  "riza keeps rice en",
+  shouldSkipTypeFallbackCandidate(Q_RICE_EN, "napitak", Q_RIZA) === false
+);
+assert(
+  "zob keeps oat en",
+  shouldSkipTypeFallbackCandidate(Q_OAT_EN, "napitak", Q_ZOB) === false
+);
+assert(
+  "kokos skips blend kokos/badem",
+  shouldSkipTypeFallbackCandidate(Q_BLEND, "napitak", Q_KOKOS) === true
+);
+assert(
+  "kokos skips zob kokos mix",
+  shouldSkipTypeFallbackCandidate("NAPITAK ZOB KOKOS EKO 1L BOOM BOX", "napitak", Q_KOKOS) === true
+);
+assert(
+  "fanta does not close plant drinks",
+  shouldSkipTypeFallbackCandidate(Q_ZOB, "napitak", Q_FANTA) === false
+);
+assert("riza query not skipped", shouldSkipTypeFallbackQuery(Q_RIZA) === false);
+assert("mismatch riza vs soja", napitakSubtypeMismatch(Q_RIZA, Q_SOJA) === true);
+assert("same riza ok", napitakSubtypeMismatch(Q_RIZA, Q_RICE_EN) === false);
 }
 
 // --- sunka ---

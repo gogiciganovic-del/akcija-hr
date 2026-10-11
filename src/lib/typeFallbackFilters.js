@@ -1015,6 +1015,43 @@ export function cajSubtypeMismatch(queryName, candidateName) {
   return false
 }
 
+/** Biljna baza napitka — HR + EN aliasi. */
+const NAPITAK_PLANT_BASES = [
+  { id: 'riza', re: /(?:ri[zž]e|ri[zž]a|\brice\b)/i },
+  { id: 'soja', re: /(?:soj[ae]?|\bsoy\b|\bsoya\b)/i },
+  { id: 'zob', re: /(?:zob|\boat\b)/i },
+  { id: 'badem', re: /(?:badem|\balmond\b)/i },
+  { id: 'kokos', re: /(?:kokos|\bcoconut\b)/i },
+]
+
+/**
+ * @param {string | null | undefined} name
+ * @returns {string[]}
+ */
+export function napitakPlantBases(name) {
+  const n = String(name || '')
+  const ids = []
+  for (const b of NAPITAK_PLANT_BASES) {
+    if (b.re.test(n)) ids.push(b.id)
+  }
+  return ids
+}
+
+/**
+ * „Napitak od X“ traži istu biljnu bazu. Nepoznata baza kandidata = no_similar.
+ * Fanta / izotonik (nema baze) ne zatvara pool.
+ * @param {string | null | undefined} queryName
+ * @param {string | null | undefined} candidateName
+ */
+export function napitakSubtypeMismatch(queryName, candidateName) {
+  const q = napitakPlantBases(queryName)
+  if (!q.length) return false
+  const c = napitakPlantBases(candidateName)
+  if (!c.length) return true
+  if (q.length !== c.length) return true
+  return q.some((id) => !c.includes(id))
+}
+
 /** Smoothie — nije sok/nektar u boci. */
 const SOK_SMOOTHIE_RE = /(?:smoothie)/i
 
@@ -1536,6 +1573,9 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
   }
   if (typeKey === 'sok') {
     if (sokSubtypeMismatch(queryName, name)) return true
+  }
+  if (typeKey === 'napitak') {
+    if (napitakSubtypeMismatch(queryName, name)) return true
   }
   if (typeKey === 'banana') {
     if (bananaSubtypeMismatch(queryName, name)) return true
