@@ -6,7 +6,12 @@ import {
   isPushSupported,
   syncPushTrackedBarcodes,
 } from "../lib/pushNotifications";
-import { trackPushKlik, trackPushOdbijen, trackPushUkljucen } from "../lib/usageEvents";
+import {
+  trackPushGreska,
+  trackPushKlik,
+  trackPushOdbijen,
+  trackPushUkljucen,
+} from "../lib/usageEvents";
 
 /**
  * @param {Map<string, any>} favorites
@@ -73,11 +78,17 @@ export function usePushNotifications(favorites, favoritesLoading = false) {
       trackPushUkljucen();
     } catch (e) {
       const code = e?.code || Notification.permission;
-      if (code === "denied" || Notification.permission === "denied") {
+      const denied =
+        code === "denied" ||
+        code === "default" ||
+        Notification.permission === "denied";
+      if (denied) {
         setStatus("denied");
+        trackPushOdbijen();
+      } else {
+        trackPushGreska();
       }
       setError(e?.message || "Pretplata nije uspjela");
-      trackPushOdbijen();
     } finally {
       setBusy(false);
     }

@@ -30,17 +30,16 @@ export function useFavorites() {
 
   const toggle = useCallback((product) => {
     const id = product.id
+    const adding = !favorites.has(id)
     setFavorites((prev) => {
       const next = new Map(prev)
       if (next.has(id)) next.delete(id)
-      else {
-        next.set(id, product)
-        trackFavoritDodan()
-      }
+      else next.set(id, product)
       saveLocalFavorites(next)
       return next
     })
-  }, [])
+    if (adding) trackFavoritDodan()
+  }, [favorites])
 
   const clear = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)

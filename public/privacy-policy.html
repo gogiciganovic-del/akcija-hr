@@ -98,9 +98,10 @@
         Ti podaci ostaju na vašem uređaju i ne šalju se kao korisnički profil.
       </li>
       <li>
-        <strong style="color:#fff">Lokacija (opcionalno)</strong> — samo ako odobrite pristup
-        lokaciji (npr. za trgovine u blizini ili Google Maps). Koordinate se koriste na uređaju
-        za tu funkciju; ne gradimo trajni profil kretanja.
+        <strong style="color:#fff">Lokacija (opcionalno, precizna)</strong> — samo ako
+        odobrite pristup lokaciji i tapnete funkciju koja je treba (npr. otvaranje karte
+        iz košarice). Tada čitamo točne GPS koordinate i <em>ne zaokružujemo</em> ih
+        prije slanja. Koristimo ih samo za tu radnju; ne gradimo trajni profil kretanja.
       </li>
       <li>
         <strong style="color:#fff">Kamera (opcionalno)</strong> — samo za skeniranje barkoda
@@ -121,13 +122,13 @@
         ili dok u aplikaciju ne dodamo gumb za isključivanje. Trenutno takvog gumba nema.
       </li>
       <li>
-        <strong style="color:#fff">Anonimno korištenje (Umami Cloud)</strong> —
+        <strong style="color:#fff">Korištenje (Umami Cloud)</strong> —
         pripremili smo brojanje otvaranja tabova i nekoliko akcija (npr. otvoren skener,
         uspješan sken, izračun košarice, klik na push). Skripta
         <strong style="color:#fff">trenutno nije uključena</strong> i ništa se ne šalje
         Umamiju dok je ne uključimo. Kad bude uključena, slat ćemo samo ime događaja
-        (bez barkoda, naziva proizvoda, lanca i bez kolačića). Umami prema svojoj
-        dokumentaciji prima tehničke podatke preglednika (vidi odjeljak 4).
+        (bez barkoda, naziva proizvoda i lanca). Umami uz to obrađuje tehničke
+        podatke preglednika i gradi anonimni ID sesije (vidi odjeljak 4).
       </li>
     </ul>
 
@@ -156,28 +157,31 @@
       </li>
       <li>
         <strong style="color:#fff">Nominatim (OpenStreetMap)</strong> — samo ako tapnete
-        funkciju u blizini i odobrite lokaciju. Tada šaljemo koordinate (lat/lon) da
-        dobijemo naziv mjesta. Ne gradimo profil kretanja.
+        otvaranje karte (ili sličnu funkciju lokacije) i odobrite pristup. Tada šaljemo
+        točne koordinate (lat/lon), bez zaokruživanja, da dobijemo naziv mjesta.
+        Ne gradimo profil kretanja.
       </li>
       <li>
         <strong style="color:#fff">Google Maps</strong> — samo ako otvorite vanjsku kartu.
       </li>
       <li>
         <strong style="color:#fff">Umami Cloud</strong> — skripta je zasad ugašena.
-        Kad je uključimo, događaji idu na cloud.umami.is. Umami u
-        <a href="https://docs.umami.is/docs/faq">FAQ</a> navodi da prikuplja prikaze
-        stranica, referrer, preglednik, operacijski sustav, tip uređaja i zemlju;
-        da su podaci anonimizirani i da se ne pohranjuju osobni identifikatori;
-        da posjetitelja prepoznaje anonimnim identifikatorom sesije, bez kolačića.
+        Kad je uključimo, događaji idu na cloud.umami.is. Umami ne postavlja kolačiće.
+        Prema <a href="https://docs.umami.is/docs/sessions">dokumentaciji sesija</a>
+        posjetitelja prepoznaje anonimnim identifikatorom sesije izvedenim iz
+        IP adrese, User-Agenta i ID-a stranice (website ID).
         U <a href="https://docs.umami.is/docs/metric-definitions">definicijama metrika</a>
-        stoji da se IP adresa koristi samo za određivanje zemlje/regije/grada i
-        <em>ne pohranjuje</em>; preglednik i OS izvode se iz User-Agenta; sesija se
-        sprema kao UUID; broj posjetitelja računa se hashom (website ID, hostname,
-        User-Agent i sl.) s mjesečno rotirajućom soli. U
-        <a href="https://docs.umami.is/docs/sessions">dokumentaciji sesija</a>
-        hash sesije opisuje se kao kombinacija IP adrese, User-Agenta i website ID-a.
-        Mi ne šaljemo distinct ID, barkod ni ime. Automatski pageview je isključen;
-        šaljemo samo imena događaja. Umami ne koristimo za oglase ni profiliranje.
+        stoji da se IP adresa koristi za zemlju/regiju/grad i <em>ne pohranjuje</em>;
+        iz User-Agenta izvode se preglednik i OS; sesija se sprema kao UUID.
+        <a href="https://docs.umami.is/docs/faq">FAQ</a> navodi još referrer, tip
+        uređaja i zemlju. Automatski pageview je kod nas isključen; šaljemo samo
+        imena događaja, bez barkoda, naziva proizvoda, lanca i bez distinct ID-a.
+        Podaci se pohranjuju na Umami Cloud poslužiteljima u SAD-u i/ili EU
+        (ovisno o regiji računa;
+        <a href="https://docs.umami.is/docs/cloud/faq">Cloud FAQ</a>).
+        Umami objavljuje ugovor o obradi (DPA) na
+        <a href="https://umami.is/dpa">umami.is/dpa</a>.
+        Umami ne koristimo za oglase ni za profiliranje radi reklama.
       </li>
     </ul>
 

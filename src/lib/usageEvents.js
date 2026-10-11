@@ -10,9 +10,12 @@ const TAB_EVENTS = {
   fav: "tab_fav",
 };
 
+const QUEUE_LIMIT = 50;
+const pendingEvents = [];
 const seenTabs = new Set();
 let pushOpenHandled = false;
 let scriptInjected = false;
+let flushTimer = null;
 
 export function isUsageEnabled() {
   return (
@@ -21,15 +24,51 @@ export function isUsageEnabled() {
   );
 }
 
+function umamiTrack() {
+  const umami = typeof window !== "undefined" ? window.umami : null;
+  return umami && typeof umami.track === "function" ? umami.track : null;
+}
+
+function flushQueuedEvents() {
+  const send = umamiTrack();
+  if (!send) return false;
+  while (pendingEvents.length) {
+    send(pendingEvents.shift());
+  }
+  if (flushTimer) {
+    clearInterval(flushTimer);
+    flushTimer = null;
+  }
+  return true;
+}
+
+function scheduleFlush() {
+  if (flushTimer || !isUsageEnabled()) return;
+  let tries = 0;
+  flushTimer = setInterval(() => {
+    tries += 1;
+    if (flushQueuedEvents() || tries >= 40) {
+      if (flushTimer) {
+        clearInterval(flushTimer);
+        flushTimer = null;
+      }
+    }
+  }, 250);
+}
+
 /** Samo ime događaja — bez svojstava, barkoda, naziva, lanca. */
 export function track(name) {
   const eventName = String(name || "").trim();
   if (!eventName) return;
   if (!isUsageEnabled()) return;
-  const umami = typeof window !== "undefined" ? window.umami : null;
-  if (umami && typeof umami.track === "function") {
-    umami.track(eventName);
+  const send = umamiTrack();
+  if (send) {
+    send(eventName);
+    return;
   }
+  if (pendingEvents.length >= QUEUE_LIMIT) return;
+  pendingEvents.push(eventName);
+  scheduleFlush();
 }
 
 /** Jednom po tabu po otvaranju aplikacije (memorija, ne localStorage). */
@@ -75,6 +114,10 @@ export function trackPushUkljucen() {
 
 export function trackPushOdbijen() {
   track("push_odbijen");
+}
+
+export function trackPushGreska() {
+  track("push_greska");
 }
 
 export function trackPushOtvoren() {
@@ -133,6 +176,11 @@ export function initUsageTracking() {
   el.setAttribute("data-exclude-search", "true");
   el.setAttribute("data-exclude-hash", "true");
   el.setAttribute("data-domains", "cjenko.app,www.cjenko.app");
+  el.addEventListener("load", () => {
+    flushQueuedEvents();
+    scheduleFlush();
+  });
   document.head.appendChild(el);
   scriptInjected = true;
+  scheduleFlush();
 }
