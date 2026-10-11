@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:push-tracked": "node scripts/test-push-tracked-barcodes.mjs"
+    "test:push-tracked": "node scripts/test-push-tracked-barcodes.mjs",
+    "test:type-filters": "node scripts/test-type-filters.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
