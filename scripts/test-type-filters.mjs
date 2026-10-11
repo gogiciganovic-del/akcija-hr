@@ -2041,6 +2041,28 @@ assert("same cook ok", vrhnjeSubtypeMismatch(Q_COOK, Q_COOK_UHT) === false);
     "gulasarija is not ready meal",
     isReadyMealOrMeatProduct("GULAŠARIJA") === false
   );
+  assert(
+    "junetina grasak mrkva is ready meal",
+    isReadyMealOrMeatProduct("JUNETINA GRAŠAK MRKVA") === true
+  );
+  assert(
+    "piletina riza povrcem is ready meal",
+    isReadyMealOrMeatProduct("PILETINA I RIŽA S POVRĆEM") === true
+  );
+  assert(
+    "govedina povrce is ready meal",
+    isReadyMealOrMeatProduct("govedina povrće") === true
+  );
+  assert(
+    "piletina riza query skipped",
+    shouldSkipTypeFallbackQuery("PILETINA I RIŽA S POVRĆEM 250g") === true
+  );
+  assert(
+    "govedina povrce candidate skipped",
+    shouldSkipTypeFallbackCandidate("KLC.sp govedina povrće 5 kg", "meso_junetina", "JUNETINA MLJEVENA 540 g") === true
+  );
+  assert("pileci file is not ready meal", isReadyMealOrMeatProduct("PILEĆI FILE") === false);
+  assert("juneci odrezak is not ready meal", isReadyMealOrMeatProduct("JUNEĆI ODREZAK") === false);
 }
 
 await server.close();

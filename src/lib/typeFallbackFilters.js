@@ -132,11 +132,22 @@ const MEAT_PATTY_OR_CEVAPI_RE = /(?:pljeskav|[čćc]evap)/i
 const GULAS_WORD_RE = /\bgula[sš](?!\p{L})/iu
 const ZA_GULAS_RE = /\bza\s+gula[sš](?!\p{L})/iu
 
+/** Meso + prilog (grašak, mrkva, povrće, riža, krumpir, tjestenina) = gotovo jelo. */
+const MEAT_WORD_RE =
+  /(?:piletin|pile[cć]|svinjetin|svinjsk|junetin|june[cć]|govedin|meso|teletin|puretin|janjetin)/i
+const MEAT_SIDE_RE = /(?:gra[sš]ak|mrkv|povr[cć]|ri[zž]a|krumpir|tjestenin)/i
+
+export function isMeatAndSideDish(name) {
+  const n = String(name || '')
+  return MEAT_WORD_RE.test(n) && MEAT_SIDE_RE.test(n)
+}
+
 export function isReadyMealOrMeatProduct(name) {
   const n = String(name || '')
   if (ZA_GULAS_RE.test(n)) return false
   if (MEAT_PATTY_OR_CEVAPI_RE.test(n)) return true
   if (GULAS_WORD_RE.test(n)) return true
+  if (isMeatAndSideDish(n)) return true
   return READY_MEAL_RE.test(n)
 }
 
