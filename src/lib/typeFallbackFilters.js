@@ -125,9 +125,13 @@ function isMeatType(typeKey) {
  * „Svinjetina za gulaš“ = sirovi rez, ne jelo — ostaje dopušteno.
  * @param {string | null | undefined} name
  */
+/** Pljeskavica / ćevapi — JS `\\b` ne vidi Ć kao riječ, zato bez vodećeg `\\b`. */
+const MEAT_PATTY_OR_CEVAPI_RE = /(?:pljeskav|[čćc]evap)/i
+
 export function isReadyMealOrMeatProduct(name) {
   const n = String(name || '')
   if (/\bza\s+gula[sš]\b/i.test(n)) return false
+  if (MEAT_PATTY_OR_CEVAPI_RE.test(n)) return true
   if (/\bgula[sš]\b/i.test(n)) return true
   return READY_MEAL_RE.test(n)
 }
@@ -186,7 +190,7 @@ export function meatCutMatchesQuery(queryName, candidateName) {
 }
 
 /**
- * Suzi skup kandidata na isti rez; ako nema podudarnih, vrati original.
+ * Suzi skup kandidata na isti rez; ako query imenuje rez a nema podudarnih, prazan niz.
  * @template T
  * @param {T[]} candidates
  * @param {string | null | undefined} queryName
@@ -198,19 +202,7 @@ export function preferMeatCutCandidates(candidates, queryName, getName) {
   if (!queryCuts.size || !candidates.length) return candidates
   const matched = candidates.filter((c) => meatCutMatchesQuery(queryName, getName(c)))
   if (matched.length) return matched
-
-  // Mljeveno: nema drugog mljevenog — fallback na druge rezove, ne mast/odreske
-  if (queryCuts.has('mljeven')) {
-    const fallback = candidates.filter((c) => {
-      const n = getName(c) || ''
-      if (isMeatFatProduct(n)) return false
-      if (isOdresciProduct(n)) return false
-      return true
-    })
-    return fallback.length ? fallback : candidates.filter((c) => !isMeatFatProduct(getName(c)))
-  }
-
-  return candidates
+  return []
 }
 
 /**
@@ -218,6 +210,25 @@ export function preferMeatCutCandidates(candidates, queryName, getName) {
  */
 export function hasProcessedForm(name) {
   return PROCESSED_FORM_RE.test(String(name || ''))
+}
+
+/** Voćni pire (PIRE + voće) — nije krumpir ni svježe voće. */
+const FRUIT_PUREE_FRUIT_RE = /(?:jabuk|banan|jagod)/i
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isFruitPureeProduct(name) {
+  const n = String(name || '')
+  if (!/pire/i.test(n)) return false
+  return FRUIT_PUREE_FRUIT_RE.test(n)
+}
+
+/**
+ * @param {string | null | undefined} name
+ */
+export function isSandwichProduct(name) {
+  return /sendvi[cč]/i.test(String(name || ''))
 }
 
 /**
@@ -1551,6 +1562,8 @@ export function shouldSkipTypeFallbackCandidate(name, typeKey, queryName) {
 /** @param {string | null | undefined} name */
 export function shouldSkipTypeFallbackQuery(name) {
   if (hasProcessedForm(name)) return true
+  if (isFruitPureeProduct(name)) return true
+  if (isSandwichProduct(name)) return true
   if (isReadyMealOrMeatProduct(name)) return true
   if (isPetFood(name)) return true
   if (isKeksBabyFoodProduct(name)) return true

@@ -58,6 +58,7 @@ const {
   mlijekoSubtypeMismatch,
   papirSubtypeMismatch,
   pecivoSubtypeMismatch,
+  preferMeatCutCandidates,
   queryWantsNaturalHardCheese,
   rizaSubtypeMismatch,
   secerSubtypeMismatch,
@@ -1887,6 +1888,35 @@ assert("whip query not skipped", shouldSkipTypeFallbackQuery(Q_WHIP) === false);
 assert("mismatch cook vs whip", vrhnjeSubtypeMismatch(Q_COOK, Q_WHIP) === true);
 assert("mismatch whip vs cook", vrhnjeSubtypeMismatch(Q_WHIP, Q_COOK) === true);
 assert("same cook ok", vrhnjeSubtypeMismatch(Q_COOK, Q_COOK_UHT) === false);
+}
+
+{
+  const Q_PUREE = "Fruit&go Pire od jabuke,banan., jag.100g";
+  const Q_SANDWICH = "Sendvič piletina i ruko.140g";
+  const Q_BATAK = "PILEĆI BATAK I ZAB. PODL. PIVKA 500 g";
+  const Q_PRSA = "PILEĆA PRSA 400 g SLIM&FIT PERUTNINA";
+  const Q_MINCE = "JUNETINA MLJEVENA 540 g PIK";
+  const Q_PATTY = "JUNEĆA PLJESKAVICA LUK 450 g";
+  const Q_CEVAPI = "ĆEVAPI JUNETINA SVINJETINA 500g";
+  const Q_POTATO_PIRE = "KRUMPIR PIRE 500g";
+  const Q_FILE = "Piletina file 500 g";
+
+  assert("fruit puree query skipped", shouldSkipTypeFallbackQuery(Q_PUREE) === true);
+  assert("potato pire without fruit not skipped", shouldSkipTypeFallbackQuery(Q_POTATO_PIRE) === false);
+  assert("sandwich query skipped", shouldSkipTypeFallbackQuery(Q_SANDWICH) === true);
+  assert(
+    "batak vs only prsa is empty",
+    preferMeatCutCandidates([{ name: Q_PRSA }], Q_BATAK, (c) => c.name).length === 0
+  );
+  assert(
+    "file keeps prsa same cut group",
+    preferMeatCutCandidates([{ name: Q_PRSA }], Q_FILE, (c) => c.name).length === 1
+  );
+  assert(
+    "mince skips pljeskavica candidate",
+    shouldSkipTypeFallbackCandidate(Q_PATTY, "meso_junetina", Q_MINCE) === true
+  );
+  assert("cevapi query skipped", shouldSkipTypeFallbackQuery(Q_CEVAPI) === true);
 }
 
 await server.close();
