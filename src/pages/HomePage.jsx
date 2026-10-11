@@ -9,6 +9,7 @@ import { useStoreStats } from "../hooks/useStoreStats";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { CATEGORIES, STORES, STORES_ROW_1, STORES_ROW_2 } from "../lib/constants";
 import { isNewProduct, isExpiringTodayProduct } from "../lib/dealDates";
+import { trackSkenOtvoren } from "../lib/usageEvents";
 
 function StoreGrid({ stores, selectedStore, onSelect }) {
   return (
@@ -324,7 +325,12 @@ export function HomePage({
               Traži akcije, proizvode, trgovine…
             </span>
           </div>
-          <ScanBarcodeButton onClick={() => setScannerOpen(true)} />
+          <ScanBarcodeButton
+            onClick={() => {
+              trackSkenOtvoren();
+              setScannerOpen(true);
+            }}
+          />
         </div>
         {!selectedStore && (
           <div className="mx-4 mb-2">

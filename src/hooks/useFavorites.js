@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { trackFavoritDodan } from '../lib/usageEvents'
 
 const STORAGE_KEY = 'akcije_favorites'
 
@@ -32,7 +33,10 @@ export function useFavorites() {
     setFavorites((prev) => {
       const next = new Map(prev)
       if (next.has(id)) next.delete(id)
-      else next.set(id, product)
+      else {
+        next.set(id, product)
+        trackFavoritDodan()
+      }
       saveLocalFavorites(next)
       return next
     })

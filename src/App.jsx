@@ -10,6 +10,7 @@ import { useFavorites }  from "./hooks/useFavorites";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { CjenkoPeek }    from "./components/CjenkoPeek";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { trackTabOnce } from "./lib/usageEvents";
 
 const VALID_TABS = new Set(["home", "search", "cart", "fav"]);
 
@@ -53,6 +54,10 @@ export default function App() {
   const activeTabRef = useRef(activeTab);
   activeTabRef.current = activeTab;
   const sheetOpenRef = useRef(false);
+
+  useEffect(() => {
+    trackTabOnce(activeTab);
+  }, [activeTab]);
 
   /** Promjena taba s history entryjem (korak-po-korak back). */
   const goTab = useCallback((tab) => {

@@ -6,6 +6,7 @@ import {
   isPushSupported,
   syncPushTrackedBarcodes,
 } from "../lib/pushNotifications";
+import { trackPushKlik, trackPushOdbijen, trackPushUkljucen } from "../lib/usageEvents";
 
 /**
  * @param {Map<string, any>} favorites
@@ -62,18 +63,21 @@ export function usePushNotifications(favorites, favoritesLoading = false) {
 
   const enable = useCallback(async () => {
     if (busy) return;
+    trackPushKlik();
     setBusy(true);
     setError(null);
     try {
       const barcodes = barcodesFromFavorites(favorites);
       await enablePushNotifications(barcodes);
       setStatus("subscribed");
+      trackPushUkljucen();
     } catch (e) {
       const code = e?.code || Notification.permission;
       if (code === "denied" || Notification.permission === "denied") {
         setStatus("denied");
       }
       setError(e?.message || "Pretplata nije uspjela");
+      trackPushOdbijen();
     } finally {
       setBusy(false);
     }

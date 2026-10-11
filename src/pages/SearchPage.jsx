@@ -18,6 +18,12 @@ import {
 } from "../lib/quantityParse";
 import { matchProductType } from "../lib/productTypes";
 import { sortBySearchRelevance } from "../lib/searchRelevance";
+import {
+  trackPratiCijenu,
+  trackSkenOtvoren,
+  trackSkenUspjeh,
+  trackTapRedovna,
+} from "../lib/usageEvents";
 
 const HIGHLIGHT_GLOW_MS = 3000;
 const HIGHLIGHT_GLOW_SHADOW =
@@ -56,6 +62,7 @@ function SourceBadge({ source }) {
         color: isRegular ? "rgba(255,255,255,0.85)" : "#633806",
         background: isRegular ? "rgba(255,255,255,0.12)" : "rgba(239,159,39,0.95)",
       }}
+      onClick={isRegular ? () => trackTapRedovna() : undefined}
     >
       {isRegular ? "REDOVNA" : "AKCIJA"}
     </span>
@@ -394,6 +401,10 @@ export function SearchPage({
   const inputRef = useRef(null);
 
   const [scannerOpen, setScannerOpen] = useState(false);
+  const openScanner = useCallback(() => {
+    trackSkenOtvoren();
+    setScannerOpen(true);
+  }, []);
   const [scanResults, setScanResults] = useState(null);
   const [scanBarcode, setScanBarcode] = useState(null);
   const [scanLoading, setScanLoading] = useState(false);
@@ -432,6 +443,7 @@ export function SearchPage({
       if (prices.length) {
         setScanNotFound(false);
         setScanResults(prices);
+        trackSkenUspjeh();
         setHistory(
           pushScanHistory({
             barcode: code,
@@ -529,9 +541,9 @@ export function SearchPage({
 
   useEffect(() => {
     if (!pendingOpenScanner) return;
-    setScannerOpen(true);
+    openScanner();
     onPendingOpenScannerConsumed?.();
-  }, [pendingOpenScanner, onPendingOpenScannerConsumed]);
+  }, [pendingOpenScanner, onPendingOpenScannerConsumed, openScanner]);
 
   useEffect(() => {
     if (searchTerm.length < 2) {
@@ -693,6 +705,7 @@ export function SearchPage({
       onGoFav?.();
       return;
     }
+    trackPratiCijenu();
     onToggleFavorite?.(trackProduct);
   };
 
@@ -738,7 +751,7 @@ export function SearchPage({
               </button>
             )}
           </div>
-          <ScanBarcodeButton onClick={() => setScannerOpen(true)} />
+          <ScanBarcodeButton onClick={openScanner} />
         </div>
 
         <div className="flex gap-2 overflow-x-auto mb-2" style={{ scrollbarWidth: "none" }}>
@@ -893,7 +906,7 @@ export function SearchPage({
               <div className="mt-5 flex flex-col items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setScannerOpen(true)}
+                  onClick={openScanner}
                   className="px-5 py-2.5 rounded-2xl font-bold text-sm"
                   style={{
                     background: "rgba(0,255,136,0.1)",
@@ -956,7 +969,7 @@ export function SearchPage({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setScannerOpen(true)}
+                  onClick={openScanner}
                   className="px-5 py-2.5 rounded-2xl font-bold text-sm"
                   style={{
                     background: "rgba(255,255,255,0.04)",

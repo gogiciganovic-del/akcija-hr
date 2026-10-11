@@ -67,7 +67,7 @@
     <p class="brand">Cjenko</p>
     <h1>Pravila o privatnosti</h1>
     <p class="meta">
-      Posljednje ažuriranje: 15. kolovoza 2026.<br />
+      Posljednje ažuriranje: 11. listopada 2026.<br />
       Aplikacija / web: <a href="https://cjenko.app">cjenko.app</a>
       · <a href="https://www.cjenko.app">www.cjenko.app</a>
     </p>
@@ -112,6 +112,23 @@
         (npr. Supabase) može vidjeti uobičajene tehničke podatke zahtjeva (IP, user-agent),
         kao kod većine web usluga. Ne koristimo to za oglašavanje profila.
       </li>
+      <li>
+        <strong style="color:#fff">Obavijesti o padu cijene (opcionalno)</strong> — ako uključite
+        push, na poslužitelj šaljemo endpoint pretplate i popis barkodova favorita koje pratite.
+        To nije račun ni ime; služi samo da vam pošaljemo obavijest.
+        Ako kasnije isključite obavijesti u postavkama Androida ili preglednika, nove se
+        poruke prestaju slati, ali red pretplate ostaje na poslužitelju dok ga ne obrišemo
+        ili dok u aplikaciju ne dodamo gumb za isključivanje. Trenutno takvog gumba nema.
+      </li>
+      <li>
+        <strong style="color:#fff">Anonimno korištenje (Umami Cloud)</strong> —
+        pripremili smo brojanje otvaranja tabova i nekoliko akcija (npr. otvoren skener,
+        uspješan sken, izračun košarice, klik na push). Skripta
+        <strong style="color:#fff">trenutno nije uključena</strong> i ništa se ne šalje
+        Umamiju dok je ne uključimo. Kad bude uključena, slat ćemo samo ime događaja
+        (bez barkoda, naziva proizvoda, lanca i bez kolačića). Umami prema svojoj
+        dokumentaciji prima tehničke podatke preglednika (vidi odjeljak 4).
+      </li>
     </ul>
 
     <h2>3. Čemu služe podaci</h2>
@@ -120,20 +137,58 @@
       <li>košarica i favoriti na vašem uređaju,</li>
       <li>opcionalno: bliže trgovine ili mapa,</li>
       <li>opcionalno: prepoznavanje proizvoda skeniranjem barkoda,</li>
-      <li>održavanje i sigurnost usluge.</li>
+      <li>održavanje i sigurnost usluge,</li>
+      <li>opcionalno: obavijest kad padne redovna cijena favorita,</li>
+      <li>anonimni brojevi korištenja da vidimo što u aplikaciji pomaže.</li>
     </ul>
 
     <h2>4. Dijeljenje s trećima</h2>
     <p>
       Ne prodajemo osobne podatke. Za rad aplikacije koristimo infrastrukturu trećih strana
-      (npr. hosting, baza cijena). Vanjske usluge (npr. Open Food Facts za informacije o
-      proizvodu, Google Maps ako otvorite kartu) imaju vlastita pravila o privatnosti.
+      (npr. hosting, baza cijena, slanje push obavijesti). Vanjske usluge imaju vlastita
+      pravila o privatnosti.
     </p>
+    <ul>
+      <li>
+        <strong style="color:#fff">Open Food Facts</strong> — kad skenirate ili potražite
+        proizvod po barkodu, barkod šaljemo na njihov javni API da dohvatimo naziv, brand
+        i sliku. Cijenu od njih ne uzimamo.
+      </li>
+      <li>
+        <strong style="color:#fff">Nominatim (OpenStreetMap)</strong> — samo ako tapnete
+        funkciju u blizini i odobrite lokaciju. Tada šaljemo koordinate (lat/lon) da
+        dobijemo naziv mjesta. Ne gradimo profil kretanja.
+      </li>
+      <li>
+        <strong style="color:#fff">Google Maps</strong> — samo ako otvorite vanjsku kartu.
+      </li>
+      <li>
+        <strong style="color:#fff">Umami Cloud</strong> — skripta je zasad ugašena.
+        Kad je uključimo, događaji idu na cloud.umami.is. Umami u
+        <a href="https://docs.umami.is/docs/faq">FAQ</a> navodi da prikuplja prikaze
+        stranica, referrer, preglednik, operacijski sustav, tip uređaja i zemlju;
+        da su podaci anonimizirani i da se ne pohranjuju osobni identifikatori;
+        da posjetitelja prepoznaje anonimnim identifikatorom sesije, bez kolačića.
+        U <a href="https://docs.umami.is/docs/metric-definitions">definicijama metrika</a>
+        stoji da se IP adresa koristi samo za određivanje zemlje/regije/grada i
+        <em>ne pohranjuje</em>; preglednik i OS izvode se iz User-Agenta; sesija se
+        sprema kao UUID; broj posjetitelja računa se hashom (website ID, hostname,
+        User-Agent i sl.) s mjesečno rotirajućom soli. U
+        <a href="https://docs.umami.is/docs/sessions">dokumentaciji sesija</a>
+        hash sesije opisuje se kao kombinacija IP adrese, User-Agenta i website ID-a.
+        Mi ne šaljemo distinct ID, barkod ni ime. Automatski pageview je isključen;
+        šaljemo samo imena događaja. Umami ne koristimo za oglase ni profiliranje.
+      </li>
+    </ul>
 
     <h2>5. Kolačići i praćenje</h2>
     <p>
       Cjenko ne koristi marketinške trackere radi praćenja ponašanja radi oglasa.
-      Lokalna pohrana na uređaju služi funkcijama aplikacije (npr. košarica), ne oglašavanju.
+      Lokalna pohrana na uređaju služi funkcijama aplikacije (npr. košarica, favoriti,
+      sken-povijest, push endpoint), ne oglašavanju. Umami prema svojoj dokumentaciji
+      ne postavlja kolačiće. Tabove, kad brojanje bude uključeno, brojimo jednom po
+      otvaranju aplikacije u radnoj memoriji, ne u localStorage. Dok je skripta ugašena,
+      ništa se Umamiju ne šalje.
     </p>
 
     <h2>6. Djeca</h2>

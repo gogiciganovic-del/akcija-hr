@@ -15,6 +15,7 @@ import {
 } from "../lib/quantityParse";
 import { normalizeImageUrl } from "../lib/productImage";
 import { applyDisplayOverrides, overrideKey } from "../lib/cartDisplayOverrides";
+import { trackKosaricaIzracunaj, trackTapRedovna } from "../lib/usageEvents";
 
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -201,6 +202,7 @@ function SourceBadge({ source }) {
         color: isRegular ? "rgba(255,255,255,0.85)" : "#633806",
         background: isRegular ? "rgba(255,255,255,0.12)" : "rgba(239,159,39,0.95)",
       }}
+      onClick={isRegular ? () => trackTapRedovna() : undefined}
     >
       {isRegular ? "REDOVNA" : "AKCIJA"}
     </span>
@@ -503,6 +505,7 @@ export function CartPage() {
 
   const handleAnalyze = useCallback(async () => {
     if (!selectedChain || items.length === 0) return;
+    trackKosaricaIzracunaj();
     setLoading(true);
     setError(null);
     setResults(null);

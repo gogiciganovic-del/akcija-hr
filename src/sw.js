@@ -71,10 +71,15 @@ self.addEventListener("notificationclick", (event) => {
 
   const rawUrl = event.notification?.data?.url || DEFAULT_URL;
   let targetUrl = rawUrl;
+  let openUrl = rawUrl;
   try {
     targetUrl = new URL(rawUrl, self.location.origin).href;
+    const withFlag = new URL(targetUrl);
+    withFlag.searchParams.set("cjenko_from", "push");
+    openUrl = withFlag.href;
   } catch {
     targetUrl = new URL(DEFAULT_URL, self.location.origin).href;
+    openUrl = new URL(`${DEFAULT_URL}?cjenko_from=push`, self.location.origin).href;
   }
 
   event.waitUntil(
@@ -86,6 +91,11 @@ self.addEventListener("notificationclick", (event) => {
 
       for (const client of allClients) {
         if ("focus" in client) {
+          try {
+            client.postMessage({ type: "CJENKO_PUSH_OPEN" });
+          } catch {
+            // ignore
+          }
           await client.focus();
           if ("navigate" in client && client.url !== targetUrl) {
             try {
@@ -99,7 +109,7 @@ self.addEventListener("notificationclick", (event) => {
       }
 
       if (self.clients.openWindow) {
-        await self.clients.openWindow(targetUrl);
+        await self.clients.openWindow(openUrl);
       }
     })()
   );
