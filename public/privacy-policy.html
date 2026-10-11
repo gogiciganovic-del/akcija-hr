@@ -67,7 +67,7 @@
     <p class="brand">Cjenko</p>
     <h1>Pravila o privatnosti</h1>
     <p class="meta">
-      Posljednje ažuriranje: 15. kolovoza 2026.<br />
+      Posljednje ažuriranje: 11. listopada 2026.<br />
       Aplikacija / web: <a href="https://cjenko.app">cjenko.app</a>
       · <a href="https://www.cjenko.app">www.cjenko.app</a>
     </p>
@@ -80,9 +80,10 @@
 
     <h2>1. Tko smo</h2>
     <p>
-      Cjenko je potrošački alat za pregled i usporedbu cijena. Kontakt u vezi
-      privatnosti: putem kanala navedenih na <a href="https://cjenko.app">cjenko.app</a>
-      ili na adresi e-pošte koju navedete u Google Play konzoli za ovu aplikaciju.
+      Voditelj obrade: <strong style="color:#fff">Goran Ciganović</strong>.
+      Cjenko je potrošački alat za pregled i usporedbu cijena. Baza cijena i pretplata
+      vodi se na Supabaseu u EU (Irska). Kontakt za privatnost:
+      <a href="mailto:cjenkoakcije@gmail.com">cjenkoakcije@gmail.com</a>.
     </p>
 
     <h2>2. Koje podatke obrađujemo</h2>
@@ -90,77 +91,167 @@
     <ul>
       <li>
         <strong style="color:#fff">Cijene i proizvodi</strong> — dohvaćaju se iz javno
-        dostupnih izvora (objavljeni cjenici / baze cijena). To nisu osobni podaci korisnika.
+        dostupnih izvora. To nisu osobni podaci korisnika.
       </li>
       <li>
-        <strong style="color:#fff">Podaci na uređaju</strong> — košarica, favoriti i slične
-        postavke mogu se spremati lokalno u pregledniku / aplikaciji (npr. localStorage).
-        Ti podaci ostaju na vašem uređaju i ne šalju se kao korisnički profil.
+        <strong style="color:#fff">Podaci na uređaju</strong> — košarica, favoriti, povijest
+        skena i slične postavke mogu se spremati lokalno (npr. localStorage). Ostaju na
+        vašem uređaju i ne šalju se kao korisnički profil. Čuvaju se dok ih ne obrišete
+        (podaci aplikacije / pohrana preglednika).
       </li>
       <li>
-        <strong style="color:#fff">Lokacija (opcionalno)</strong> — samo ako odobrite pristup
-        lokaciji (npr. za trgovine u blizini ili Google Maps). Koordinate se koriste na uređaju
-        za tu funkciju; ne gradimo trajni profil kretanja.
+        <strong style="color:#fff">Tekst pretrage</strong> — kad nešto potražite, taj se
+        tekst šalje poslužitelju da vrati rezultate. Ne spremamo ga u vlastitu tablicu
+        pretraga. U uobičajenim tehničkim zapisima usluge (API log) zahtjev može kratko
+        biti vidljiv, kao kod većine web usluga.
       </li>
       <li>
-        <strong style="color:#fff">Kamera (opcionalno)</strong> — samo za skeniranje barkoda
-        proizvoda. Slike se ne koriste za prepoznavanje osoba i ne spremamo video snimke
-        radi praćenja korisnika.
+        <strong style="color:#fff">Barkod</strong> — kad skenirate ili potražite proizvod
+        po barkodu, barkod šaljemo poslužitelju da nađemo cijene, a po potrebi i Open Food
+        Facts radi naziva, branda i slike (cijenu od njih ne uzimamo). Povijest skena
+        ostaje na uređaju. Barkod-upite ne spremamo u vlastitu tablicu.
       </li>
       <li>
-        <strong style="color:#fff">Tehnički zahtjevi</strong> — pri dohvatu cijena poslužitelj
-        (npr. Supabase) može vidjeti uobičajene tehničke podatke zahtjeva (IP, user-agent),
-        kao kod većine web usluga. Ne koristimo to za oglašavanje profila.
+        <strong style="color:#fff">Lokacija (opcionalno, precizna)</strong> — samo ako
+        odobrite pristup lokaciji i tapnete funkciju koja je treba (npr. otvaranje karte
+        iz košarice). Čitamo točne GPS koordinate i ne zaokružujemo ih prije slanja.
+        Koristimo ih samo za tu radnju; ne gradimo trajni profil kretanja.
+      </li>
+      <li>
+        <strong style="color:#fff">Kamera (opcionalno)</strong> — samo za skeniranje barkoda.
+        Slika se ne šalje ni ne sprema.
+      </li>
+      <li>
+        <strong style="color:#fff">Tehnički zahtjevi</strong> — pri dohvatu cijena i pretrazi
+        poslužitelj (Supabase) može vidjeti uobičajene podatke zahtjeva (IP, user-agent).
+        Ne koristimo to za oglašavanje profila.
+      </li>
+      <li>
+        <strong style="color:#fff">Obavijesti o padu cijene (opcionalno)</strong> — ako
+        uključite push, na poslužitelj šaljemo endpoint pretplate i popis barkodova
+        favorita koje pratite. Uz pretplatu ne čuvamo ime, e-mail ni račun, pa je ne
+        možemo povezati s osobom. Zapis čuvamo dok je pretplata aktivna. Ako push servis
+        pri slanju javi da pretplata više ne postoji (HTTP 404 ili 410), red automatski
+        brišemo. Ako isključite obavijesti samo u postavkama Androida ili preglednika,
+        nove se poruke na uređaju prestaju prikazivati, ali zapis na poslužitelju ostaje
+        dok servis ne vrati 404/410 ili dok u aplikaciji ne dodamo gumb Isključi.
+        E-poštom ne možemo pouzdano pronaći i obrisati baš vaš red.
+      </li>
+      <li>
+        <strong style="color:#fff">Korištenje (Umami Cloud)</strong> — pripremili smo
+        brojanje otvaranja tabova i nekoliko akcija u aplikaciji. Skripta je ugašena i
+        ništa se Umamiju ne šalje. Prije uključivanja ažurirat ćemo ovu stranicu.
       </li>
     </ul>
 
     <h2>3. Čemu služe podaci</h2>
     <ul>
       <li>prikaz i usporedba cijena / akcija,</li>
-      <li>košarica i favoriti na vašem uređaju,</li>
-      <li>opcionalno: bliže trgovine ili mapa,</li>
-      <li>opcionalno: prepoznavanje proizvoda skeniranjem barkoda,</li>
-      <li>održavanje i sigurnost usluge.</li>
+      <li>košarica i favoriti na uređaju,</li>
+      <li>opcionalno karta,</li>
+      <li>opcionalno prepoznavanje proizvoda barkodom,</li>
+      <li>održavanje i sigurnost usluge,</li>
+      <li>opcionalno obavijest kad padne redovna cijena favorita.</li>
     </ul>
 
-    <h2>4. Dijeljenje s trećima</h2>
+    <h2>4. Pravna osnova i prava</h2>
+    <p>Obrada se temelji na:</p>
+    <ul>
+      <li>
+        <strong style="color:#fff">privoli</strong> (čl. 6. st. 1. točka (a) GDPR-a) —
+        lokacija, kamera i push obavijesti, samo ako ih uključite;
+      </li>
+      <li>
+        <strong style="color:#fff">legitimnom interesu</strong> (čl. 6. st. 1. točka (f) GDPR-a) —
+        prikaz i usporedba javnih cijena, izvršenje pretrage i barkod-upita koje ste
+        pokrenuli, te tehnički rad i sigurnost usluge (uključujući uobičajene API zapise).
+      </li>
+    </ul>
     <p>
-      Ne prodajemo osobne podatke. Za rad aplikacije koristimo infrastrukturu trećih strana
-      (npr. hosting, baza cijena). Vanjske usluge (npr. Open Food Facts za informacije o
-      proizvodu, Google Maps ako otvorite kartu) imaju vlastita pravila o privatnosti.
+      Imate pravo na pristup, ispravak, brisanje, ograničenje obrade, prigovor na obradu
+      utemeljenu na legitimnom interesu i prenosivost podataka, u mjeri u kojoj se to na
+      Cjenko može primijeniti (nema korisničkog računa; većina podataka o korištenju ostaje
+      na uređaju). Privolu možete povući u bilo kojem trenutku (npr. oduzimanjem dozvole
+      za lokaciju, kameru ili obavijesti), bez utjecaja na zakonitost obrade do povlačenja.
+    </p>
+    <p>
+      Podatke na uređaju brišete brisanjem podataka aplikacije ili lokalne pohrane
+      preglednika. Push pretplatu e-poštom ne možemo pouzdano identificirati. Za ostale
+      upite: <a href="mailto:cjenkoakcije@gmail.com">cjenkoakcije@gmail.com</a>.
+    </p>
+    <p>
+      Imate pravo podnijeti pritužbu Agenciji za zaštitu osobnih podataka (AZOP),
+      Selska cesta 136, 10 000 Zagreb,
+      <a href="https://azop.hr">azop.hr</a>.
     </p>
 
-    <h2>5. Kolačići i praćenje</h2>
+    <h2>5. Dijeljenje s trećima</h2>
     <p>
-      Cjenko ne koristi marketinške trackere radi praćenja ponašanja radi oglasa.
-      Lokalna pohrana na uređaju služi funkcijama aplikacije (npr. košarica), ne oglašavanju.
+      Ne prodajemo osobne podatke. Za rad aplikacije koristimo infrastrukturu trećih strana.
+      Vanjske usluge imaju vlastita pravila o privatnosti.
+    </p>
+    <ul>
+      <li>
+        <strong style="color:#fff">Vercel</strong> — hosting web aplikacije (cjenko.app).
+      </li>
+      <li>
+        <strong style="color:#fff">Supabase</strong> — baza cijena i push pretplata, EU (Irska).
+      </li>
+      <li>
+        <strong style="color:#fff">Push usluge preglednika i Googlea</strong> — isporuka
+        web-push obavijesti na uređaj (npr. Chrome / Android preko Googlea).
+      </li>
+      <li>
+        <strong style="color:#fff">GitHub Actions</strong> — periodično slanje obavijesti
+        o padu cijene (čita pretplate i šalje poruke push usluzi).
+      </li>
+      <li>
+        <strong style="color:#fff">Open Food Facts</strong> — kad skenirate ili potražite
+        proizvod po barkodu, barkod šaljemo na njihov javni API da dohvatimo naziv, brand
+        i sliku. Cijenu od njih ne uzimamo.
+      </li>
+      <li>
+        <strong style="color:#fff">Nominatim (OpenStreetMap)</strong> — samo ako tapnete
+        otvaranje karte (ili sličnu funkciju) i odobrite pristup. Tada šaljemo točne
+        koordinate (lat/lon), bez zaokruživanja, da dobijemo naziv mjesta.
+      </li>
+      <li>
+        <strong style="color:#fff">Google Maps</strong> — samo ako otvorite vanjsku kartu.
+      </li>
+    </ul>
+
+    <h2>6. Kolačići i praćenje</h2>
+    <p>
+      Cjenko ne koristi marketinške trackere radi oglasa. Lokalna pohrana na uređaju služi
+      funkcijama aplikacije (košarica, favoriti, sken-povijest, push endpoint).
+      Umami skripta nije uključena.
     </p>
 
-    <h2>6. Djeca</h2>
+    <h2>7. Djeca</h2>
     <p>
-      Aplikacija nije namijenjena djeci mlađoj od 13 godina. Ne prikupljamo svjesno
-      osobne podatke djece.
-    </p>
-
-    <h2>7. Vaša prava</h2>
-    <p>
-      Budući da većina podataka o korištenju ostaje na uređaju, možete ih obrisati
-      brisanjem podataka aplikacije / lokalne pohrane preglednika. Za upite o privatnosti
-      kontaktirajte nas na način naveden gore.
+      Cjenko je namijenjen osobama od 16 godina i starijima, što odgovara izjavi o
+      ciljnoj publici u Google Playu i dobnoj granici za privolu u Republici Hrvatskoj.
+      Ne prikupljamo svjesno osobne podatke osoba mlađih od 16 godina. Ako ste roditelj
+      ili skrbnik i smatrate da je vaše dijete uključilo push obavijesti ili lokaciju,
+      javite nam se na
+      <a href="mailto:cjenkoakcije@gmail.com">cjenkoakcije@gmail.com</a>
+      i pomoći ćemo koliko je razumno moguće.
     </p>
 
     <h2>8. Izmjene</h2>
     <p>
       Ova pravila možemo povremeno ažurirati. Datum „Posljednje ažuriranje” na vrhu
-      stranice pokazuje verziju. Nastavak korištenja nakon izmjene znači da ste
-      upoznati s ažuriranim tekstom.
+      stranice pokazuje verziju.
     </p>
 
     <h2>9. Sažetak</h2>
     <p>
-      Cjenko prikazuje javne cijene trgovina. Ne zahtijeva login. Lokacija i kamera
-      koriste se samo uz vašu dozvolu i samo za funkcije koje odaberete. Podaci košarice
-      i favorita tipično ostaju na vašem uređaju.
+      Cjenko prikazuje javne cijene trgovina. Ne zahtijeva login. Tekst pretrage i barkod
+      šalju se poslužitelju da dobijete rezultat; ne vodimo inventar tih upita. Lokacija,
+      kamera i push koriste se samo uz vašu privolu. Push pretplata nema ime ni e-mail;
+      red se briše ako push servis vrati 404 ili 410. Umami je zasad ugašen. Voditelj
+      obrade: Goran Ciganović,
+      <a href="mailto:cjenkoakcije@gmail.com">cjenkoakcije@gmail.com</a>.
     </p>
 
     <p style="margin-top: 2rem; font-size: 0.875rem;">
