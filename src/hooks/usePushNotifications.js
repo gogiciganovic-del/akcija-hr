@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { classifyPushEnableFailure } from "../lib/pushEnableFailure";
 import {
   barcodesFromFavorites,
   enablePushNotifications,
@@ -78,16 +79,13 @@ export function usePushNotifications(favorites, favoritesLoading = false) {
       trackPushUkljucen();
     } catch (e) {
       const code = e?.code || Notification.permission;
-      const denied =
-        code === "denied" ||
-        code === "default" ||
-        Notification.permission === "denied";
-      if (denied) {
-        setStatus("denied");
-        trackPushOdbijen();
-      } else {
-        trackPushGreska();
-      }
+      const { setDenied, event } = classifyPushEnableFailure(
+        code,
+        Notification.permission
+      );
+      if (setDenied) setStatus("denied");
+      if (event === "push_odbijen") trackPushOdbijen();
+      else trackPushGreska();
       setError(e?.message || "Pretplata nije uspjela");
     } finally {
       setBusy(false);
