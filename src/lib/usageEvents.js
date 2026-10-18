@@ -29,6 +29,12 @@ function umamiTrack() {
   return umami && typeof umami.track === "function" ? umami.track : null;
 }
 
+/** Čeka umami.track; noviji iznad limita se odbacuju. */
+export function enqueueEvent(queue, name) {
+  if (queue.length >= QUEUE_LIMIT) return;
+  queue.push(name);
+}
+
 function flushQueuedEvents() {
   const send = umamiTrack();
   if (!send) return false;
@@ -66,8 +72,7 @@ export function track(name) {
     send(eventName);
     return;
   }
-  if (pendingEvents.length >= QUEUE_LIMIT) return;
-  pendingEvents.push(eventName);
+  enqueueEvent(pendingEvents, eventName);
   scheduleFlush();
 }
 
