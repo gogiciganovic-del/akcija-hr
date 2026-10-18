@@ -130,12 +130,13 @@
         <strong style="color:#fff">Obavijesti o padu cijene (opcionalno)</strong> — ako
         uključite push, na poslužitelj šaljemo endpoint pretplate i popis barkodova
         favorita koje pratite. Uz pretplatu ne čuvamo ime, e-mail ni račun, pa je ne
-        možemo povezati s osobom. Zapis čuvamo dok je pretplata aktivna. Ako push servis
-        pri slanju javi da pretplata više ne postoji (HTTP 404 ili 410), red automatski
-        brišemo. Ako isključite obavijesti samo u postavkama Androida ili preglednika,
-        nove se poruke na uređaju prestaju prikazivati, ali zapis na poslužitelju ostaje
-        dok servis ne vrati 404/410 ili dok u aplikaciji ne dodamo gumb Isključi.
-        E-poštom ne možemo pouzdano pronaći i obrisati baš vaš red.
+        možemo povezati s osobom. Zapis čuvamo dok je pretplata aktivna. Pretplatu s
+        ovog uređaja brišete gumbom Isključi na Favoritima: odjava u pregledniku i
+        brisanje retka na poslužitelju. Ako push servis pri slanju javi da pretplata
+        više ne postoji (HTTP 404 ili 410), red automatski brišemo. Ako obavijesti
+        isključite samo u postavkama Androida ili preglednika, one se na uređaju
+        prestaju prikazivati, a zapis na poslužitelju ostaje dok ga ne obrišete
+        gumbom Isključi ili dok servis ne vrati 404/410.
       </li>
       <li>
         <strong style="color:#fff">Korištenje (Umami Cloud, EU)</strong> —
@@ -149,7 +150,7 @@
         Zapise čuva do 6 mjeseci. Mi šaljemo samo ime događaja:
         tab_home, tab_search, tab_cart, tab_fav, sken_otvoren, sken_uspjeh,
         favorit_dodan, prati_cijenu, tap_redovna, kosarica_izracunaj, push_klik,
-        push_ukljucen, push_odbijen, push_greska, push_otvoren
+        push_ukljucen, push_odbijen, push_greska, push_otvoren, push_iskljucen
         — bez barkoda, naziva proizvoda i lanca, a uz to Umami automatski prima
         tehničke podatke preglednika: adresu stranice bez parametara i hasha,
         preglednik, operacijski sustav, vrstu uređaja, veličinu zaslona i jezik.
@@ -272,7 +273,7 @@
       Cjenko prikazuje javne cijene trgovina. Ne zahtijeva login. Tekst pretrage i barkod
       šalju se poslužitelju da dobijete rezultat; ne vodimo inventar tih upita. Lokacija,
       kamera i push koriste se samo uz vašu privolu. Push pretplata nema ime ni e-mail;
-      red se briše ako push servis vrati 404 ili 410. Umami Cloud (EU) broji samo imena
+      možete je obrisati gumbom Isključi u aplikaciji. Umami Cloud (EU) broji samo imena
       događaja, bez kolačića i localStorage. Voditelj
       obrade: Goran Ciganović,
       <a href="mailto:cjenkoakcije@gmail.com">cjenkoakcije@gmail.com</a>.
