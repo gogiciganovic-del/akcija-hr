@@ -43,7 +43,7 @@ function favoriteTotals(items) {
   );
 }
 
-function PushNotifyBanner({ status, busy, error, onEnable }) {
+function PushNotifyBanner({ status, busy, error, onEnable, onDisable }) {
   if (status === "unsupported") {
     return (
       <div
@@ -85,17 +85,39 @@ function PushNotifyBanner({ status, busy, error, onEnable }) {
   if (status === "subscribed") {
     return (
       <div
-        className="mx-4 mb-4 rounded-2xl px-4 py-3 flex gap-3 items-center"
+        className="mx-4 mb-4 rounded-2xl px-4 py-3"
         style={{
           background: "rgba(0,255,136,0.06)",
           border: "1px solid rgba(0,255,136,0.2)",
         }}
       >
-        <BellRing size={18} style={{ color: "#00ff88", flexShrink: 0 }} />
-        <p style={{ color: "rgba(0,255,136,0.9)", fontSize: 13, lineHeight: 1.4 }}>
-          Obavijesti o padu cijene uključene. Pratimo samo favorite s barkodom
-          (pad redovne cijene u cjeniku).
-        </p>
+        <div className="flex gap-3 items-start">
+          <BellRing size={18} style={{ color: "#00ff88", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ color: "rgba(0,255,136,0.9)", fontSize: 13, lineHeight: 1.4 }}>
+            Obavijesti o padu cijene uključene. Pratimo samo favorite s barkodom
+            (pad redovne cijene u cjeniku).
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onDisable}
+          disabled={busy}
+          className="w-full mt-3 py-2.5 rounded-xl font-bold"
+          style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            color: "rgba(255,255,255,0.7)",
+            fontSize: 13,
+            opacity: busy ? 0.7 : 1,
+          }}
+        >
+          {busy ? "Isključujem…" : "Isključi"}
+        </button>
+        {error ? (
+          <p className="mt-2" style={{ color: "rgba(255,107,107,0.9)", fontSize: 11, lineHeight: 1.4 }}>
+            {error}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -291,6 +313,7 @@ export function FavoritesPage({
   pushBusy = false,
   pushError = null,
   onEnablePush,
+  onDisablePush,
 }) {
   const items = [...favorites.values()];
   const hasItems = items.length > 0;
@@ -462,6 +485,7 @@ export function FavoritesPage({
         busy={pushBusy}
         error={pushError}
         onEnable={onEnablePush}
+        onDisable={onDisablePush}
       />
 
       {hasItems ? (

@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { disablePushSequence } from "./pushDisable";
 import {
   barcodesFromFavorites,
   favoriteHasTrackableBarcode,
@@ -12,6 +13,7 @@ export {
   isTrackableBarcode,
   planTrackedBarcodesUpdate,
 };
+export { disablePushSequence } from "./pushDisable";
 
 const ENDPOINT_STORAGE_KEY = "cjenko_push_endpoint";
 const LAST_TRACKED_KEY = "cjenko_push_tracked_barcodes";
@@ -168,6 +170,50 @@ export async function enablePushNotifications(trackedBarcodes = []) {
   rememberEndpoint(endpoint);
   writeLastSyncedBarcodes(tracked);
   return sub;
+}
+
+function clearPushLocalState() {
+  rememberEndpoint("");
+  try {
+    localStorage.removeItem(LAST_TRACKED_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Isključi push: unsubscribe, RPC delete, pa očisti localStorage.
+ * Ako RPC padne, lokalno se ipak odjavi i očisti — UI pokaže poruku.
+ * @returns {Promise<{ remoteOk: boolean, endpoint: string }>}
+ */
+export async function disablePushNotifications() {
+  return disablePushSequence({
+    getSubscription: async () => {
+      if (isPushSupported()) {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
+          if (sub) return sub;
+        } catch {
+          // pad na zapamćeni endpoint
+        }
+      }
+      const remembered = getRememberedEndpoint();
+      return remembered ? { endpoint: remembered } : null;
+    },
+    unsubscribe: async (sub) => {
+      if (typeof sub?.unsubscribe === "function") {
+        await sub.unsubscribe();
+      }
+    },
+    deleteRemote: async (endpoint) => {
+      const { error } = await supabase.rpc("delete_push_subscription", {
+        p_endpoint: endpoint,
+      });
+      if (error) throw error;
+    },
+    clearLocal: clearPushLocalState,
+  });
 }
 
 /**

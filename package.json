@@ -10,7 +10,8 @@
     "test:push-tracked": "node scripts/test-push-tracked-barcodes.mjs",
     "test:type-filters": "node scripts/test-type-filters.mjs",
     "test:usage-queue": "node scripts/test-usage-queue.mjs",
-    "test:push-enable-failure": "node scripts/test-push-enable-failure.mjs"
+    "test:push-enable-failure": "node scripts/test-push-enable-failure.mjs",
+    "test:push-disable": "node scripts/test-push-disable.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",

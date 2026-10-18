@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { classifyPushEnableFailure } from "../lib/pushEnableFailure";
 import {
   barcodesFromFavorites,
+  disablePushNotifications,
   enablePushNotifications,
   getNotificationPermission,
   isPushSupported,
@@ -9,6 +10,7 @@ import {
 } from "../lib/pushNotifications";
 import {
   trackPushGreska,
+  trackPushIskljucen,
   trackPushKlik,
   trackPushOdbijen,
   trackPushUkljucen,
@@ -92,5 +94,28 @@ export function usePushNotifications(favorites, favoritesLoading = false) {
     }
   }, [busy, favorites]);
 
-  return { status, busy, error, enable, refreshStatus };
+  const disable = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { remoteOk } = await disablePushNotifications();
+      setStatus("prompt");
+      trackPushIskljucen();
+      if (!remoteOk) {
+        setError(
+          "Brisanje na poslužitelju nije uspjelo. Na ovom uređaju su obavijesti isključene."
+        );
+      }
+    } catch {
+      setStatus("prompt");
+      setError(
+        "Brisanje na poslužitelju nije uspjelo. Na ovom uređaju su obavijesti isključene."
+      );
+    } finally {
+      setBusy(false);
+    }
+  }, [busy]);
+
+  return { status, busy, error, enable, disable, refreshStatus };
 }

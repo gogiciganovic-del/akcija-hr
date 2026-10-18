@@ -1,6 +1,9 @@
 /**
  * Anonimno brojanje korištenja (samo ime događaja).
  * Skripta se ne učitava dok VITE_UMAMI_ENABLED !== "true".
+ * Događaji: tab_home, tab_search, tab_cart, tab_fav, sken_otvoren, sken_uspjeh,
+ * favorit_dodan, prati_cijenu, tap_redovna, kosarica_izracunaj,
+ * push_klik, push_ukljucen, push_odbijen, push_greska, push_otvoren, push_iskljucen.
  */
 
 const TAB_EVENTS = {
@@ -127,6 +130,11 @@ export function trackPushGreska() {
 
 export function trackPushOtvoren() {
   track("push_otvoren");
+}
+
+/** push_iskljucen — korisnik je isključio obavijesti (samo ime događaja). */
+export function trackPushIskljucen() {
+  track("push_iskljucen");
 }
 
 function stripPushOpenParam() {

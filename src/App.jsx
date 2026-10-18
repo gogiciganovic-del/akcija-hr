@@ -43,6 +43,7 @@ export default function App() {
     busy: pushBusy,
     error: pushError,
     enable: enablePush,
+    disable: disablePush,
   } = usePushNotifications(favorites, favoritesLoading);
   const [activeTab, setActiveTab] = useState(() => tabFromLocation());
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -226,6 +227,7 @@ export default function App() {
         pushBusy={pushBusy}
         pushError={pushError}
         onEnablePush={enablePush}
+        onDisablePush={disablePush}
       />
     ),
   };
