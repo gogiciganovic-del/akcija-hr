@@ -67,7 +67,7 @@
     <p class="brand">Cjenko</p>
     <h1>Pravila o privatnosti</h1>
     <p class="meta">
-      Posljednje ažuriranje: 11. listopada 2026.<br />
+      Posljednje ažuriranje: 18. listopada 2026.<br />
       Aplikacija / web: <a href="https://cjenko.app">cjenko.app</a>
       · <a href="https://www.cjenko.app">www.cjenko.app</a>
     </p>
@@ -138,9 +138,22 @@
         E-poštom ne možemo pouzdano pronaći i obrisati baš vaš red.
       </li>
       <li>
-        <strong style="color:#fff">Korištenje (Umami Cloud)</strong> — pripremili smo
-        brojanje otvaranja tabova i nekoliko akcija u aplikaciji. Skripta je ugašena i
-        ništa se Umamiju ne šalje. Prije uključivanja ažurirat ćemo ovu stranicu.
+        <strong style="color:#fff">Korištenje (Umami Cloud, EU)</strong> —
+        Brojimo korištenje aplikacije. Račun je na EU regiji
+        (<a href="https://cloud.umami.is/analytics/eu">cloud.umami.is/analytics/eu</a>).
+        Umami Software, Inc. je američka tvrtka; prijenos pokrivaju standardne ugovorne
+        klauzule iz njihovog DPA-a
+        (<a href="https://umami.is/dpa">umami.is/dpa</a>).
+        Anonimni ID sesije izvodi se iz IP adrese, User-Agenta i ID-a stranice; IP se
+        ne pohranjuje. Umami ne postavlja kolačiće i ništa ne sprema u localStorage.
+        Zapise čuva do 6 mjeseci. Mi šaljemo samo ime događaja:
+        tab_home, tab_search, tab_cart, tab_fav, sken_otvoren, sken_uspjeh,
+        favorit_dodan, prati_cijenu, tap_redovna, kosarica_izracunaj, push_klik,
+        push_ukljucen, push_odbijen, push_greska, push_otvoren
+        — bez barkoda, naziva proizvoda i lanca, a uz to Umami automatski prima
+        tehničke podatke preglednika: adresu stranice bez parametara i hasha,
+        preglednik, operacijski sustav, vrstu uređaja, veličinu zaslona i jezik.
+        Iz IP adrese izvodi državu, regiju i grad; IP se ne pohranjuje.
       </li>
     </ul>
 
@@ -151,6 +164,7 @@
       <li>opcionalno karta,</li>
       <li>opcionalno prepoznavanje proizvoda barkodom,</li>
       <li>održavanje i sigurnost usluge,</li>
+      <li>anonimno brojanje korištenja aplikacije (samo ime događaja),</li>
       <li>opcionalno obavijest kad padne redovna cijena favorita.</li>
     </ul>
 
@@ -164,14 +178,17 @@
       <li>
         <strong style="color:#fff">legitimnom interesu</strong> (čl. 6. st. 1. točka (f) GDPR-a) —
         prikaz i usporedba javnih cijena, izvršenje pretrage i barkod-upita koje ste
-        pokrenuli, te tehnički rad i sigurnost usluge (uključujući uobičajene API zapise).
+        pokrenuli, tehnički rad i sigurnost usluge (uključujući uobičajene API zapise)
+        te statistika korištenja (samo ime događaja).
       </li>
     </ul>
     <p>
       Imate pravo na pristup, ispravak, brisanje, ograničenje obrade, prigovor na obradu
       utemeljenu na legitimnom interesu i prenosivost podataka, u mjeri u kojoj se to na
       Cjenko može primijeniti (nema korisničkog računa; većina podataka o korištenju ostaje
-      na uređaju). Privolu možete povući u bilo kojem trenutku (npr. oduzimanjem dozvole
+      na uređaju). Na statistiku korištenja možete uložiti prigovor e-poštom na
+      <a href="mailto:cjenkoakcije@gmail.com">cjenkoakcije@gmail.com</a>.
+      Privolu možete povući u bilo kojem trenutku (npr. oduzimanjem dozvole
       za lokaciju, kameru ili obavijesti), bez utjecaja na zakonitost obrade do povlačenja.
     </p>
     <p>
@@ -218,13 +235,19 @@
       <li>
         <strong style="color:#fff">Google Maps</strong> — samo ako otvorite vanjsku kartu.
       </li>
+      <li>
+        <strong style="color:#fff">Umami Cloud</strong> — brojanje imenovanih događaja
+        korištenja, EU regija. Operator: Umami Software, Inc. (SAD); DPA i standardne
+        ugovorne klauzule:
+        <a href="https://umami.is/dpa">umami.is/dpa</a>.
+      </li>
     </ul>
 
     <h2>6. Kolačići i praćenje</h2>
     <p>
       Cjenko ne koristi marketinške trackere radi oglasa. Lokalna pohrana na uređaju služi
       funkcijama aplikacije (košarica, favoriti, sken-povijest, push endpoint).
-      Umami skripta nije uključena.
+      Umami ne postavlja kolačiće niti sprema išta u localStorage.
     </p>
 
     <h2>7. Djeca</h2>
@@ -249,7 +272,8 @@
       Cjenko prikazuje javne cijene trgovina. Ne zahtijeva login. Tekst pretrage i barkod
       šalju se poslužitelju da dobijete rezultat; ne vodimo inventar tih upita. Lokacija,
       kamera i push koriste se samo uz vašu privolu. Push pretplata nema ime ni e-mail;
-      red se briše ako push servis vrati 404 ili 410. Umami je zasad ugašen. Voditelj
+      red se briše ako push servis vrati 404 ili 410. Umami Cloud (EU) broji samo imena
+      događaja, bez kolačića i localStorage. Voditelj
       obrade: Goran Ciganović,
       <a href="mailto:cjenkoakcije@gmail.com">cjenkoakcije@gmail.com</a>.
     </p>
