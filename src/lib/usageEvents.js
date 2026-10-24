@@ -2,8 +2,9 @@
  * Anonimno brojanje korištenja (samo ime događaja).
  * Skripta se ne učitava dok VITE_UMAMI_ENABLED !== "true".
  * Događaji: tab_home, tab_search, tab_cart, tab_fav, sken_otvoren, sken_uspjeh,
- * favorit_dodan, prati_cijenu, tap_redovna, kosarica_izracunaj,
- * push_klik, push_ukljucen, push_odbijen, push_greska, push_otvoren, push_iskljucen.
+ * favorit_dodan, prati_cijenu, tap_redovna, kosarica_izracunaj, kosarica_dodan,
+ * push_klik, push_ukljucen, push_odbijen, push_greska, push_otvoren, push_iskljucen,
+ * otvoreno_iz_appa.
  */
 
 const TAB_EVENTS = {
@@ -19,6 +20,10 @@ const seenTabs = new Set();
 let pushOpenHandled = false;
 let scriptInjected = false;
 let flushTimer = null;
+const otvorenoIzAppaState = { seen: false };
+
+/** Chrome TWA / Custom Tab iz APK-a postavlja ovaj referrer (paket, ne display-mode). */
+export const ANDROID_APP_REFERRER_PREFIX = "android-app://app.cjenko.akcije";
 
 export function isUsageEnabled() {
   return (
@@ -112,6 +117,44 @@ export function trackKosaricaIzracunaj() {
   track("kosarica_izracunaj");
 }
 
+/** kosarica_dodan — samo ime; samo kad je stavka stvarno dodana. */
+export function shouldTrackKosaricaDodan(ok) {
+  return ok === true;
+}
+
+export function trackKosaricaDodan() {
+  track("kosarica_dodan");
+}
+
+export function notifyCartAdded(ok) {
+  if (!shouldTrackKosaricaDodan(ok)) return false;
+  trackKosaricaDodan();
+  return true;
+}
+
+/**
+ * Pouzdano za Play TWA / Custom Tab iz app.cjenko.akcije.
+ * display-mode:standalone namjerno nije: broji i PWA s početnog ekrana (Chrome),
+ * a propušta Custom Tab fallback iz istog APK-a.
+ */
+export function isAndroidAppLaunch(referrer) {
+  return String(referrer || "")
+    .trim()
+    .toLowerCase()
+    .startsWith(ANDROID_APP_REFERRER_PREFIX);
+}
+
+export function consumeOtvorenoIzAppa(referrer, state = otvorenoIzAppaState) {
+  if (state.seen) return false;
+  if (!isAndroidAppLaunch(referrer)) return false;
+  state.seen = true;
+  return true;
+}
+
+export function trackOtvorenoIzAppa() {
+  track("otvoreno_iz_appa");
+}
+
 export function trackPushKlik() {
   track("push_klik");
 }
@@ -173,6 +216,9 @@ function onSwMessage(event) {
 export function initUsageTracking() {
   if (typeof window === "undefined") return;
   consumePushOpenFromUrl();
+  if (consumeOtvorenoIzAppa(document.referrer)) {
+    trackOtvorenoIzAppa();
+  }
   if (navigator.serviceWorker) {
     navigator.serviceWorker.addEventListener("message", onSwMessage);
   }

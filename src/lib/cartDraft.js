@@ -1,4 +1,5 @@
 import { resolveUniqueBarcode } from "./resolveCartBarcode";
+import { notifyCartAdded } from "./usageEvents";
 
 const DRAFT_KEY = "cjenko_cart_draft_v1";
 
@@ -108,5 +109,6 @@ export async function enqueueCartAdd(entry) {
     lineOverrides: draft.lineOverrides,
   });
 
+  notifyCartAdded(true);
   return { ok: true, selectedChain: nextChain, itemCount: nextItems.length };
 }

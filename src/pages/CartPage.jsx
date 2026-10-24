@@ -15,7 +15,7 @@ import {
 } from "../lib/quantityParse";
 import { normalizeImageUrl } from "../lib/productImage";
 import { applyDisplayOverrides, overrideKey } from "../lib/cartDisplayOverrides";
-import { trackKosaricaIzracunaj, trackTapRedovna } from "../lib/usageEvents";
+import { notifyCartAdded, trackKosaricaIzracunaj, trackTapRedovna } from "../lib/usageEvents";
 
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -480,6 +480,7 @@ export function CartPage() {
           priceSource: s.source,
         },
       ]);
+      notifyCartAdded(true);
       setInput("");
       setSuggestionsOpen(false);
       setResults(null);
