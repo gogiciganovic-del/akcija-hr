@@ -25,3 +25,11 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      # Faza 0: samo čitanje + FLYER_STATS. Ne šalje push, ne piše, bez VAPID.
+      # continue-on-error: nikad ne ruši scrape.
+      - name: Detect new flyers (dry-run)
+        continue-on-error: true
+        run: python scraper/detect_new_flyers.py --dry-run
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

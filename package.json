@@ -13,7 +13,8 @@
     "test:push-enable-failure": "node scripts/test-push-enable-failure.mjs",
     "test:push-disable": "node scripts/test-push-disable.mjs",
     "test:usage-cart-launch": "node scripts/test-usage-cart-launch.mjs",
-    "test:how-it-works": "node scripts/test-how-it-works-pref.mjs"
+    "test:how-it-works": "node scripts/test-how-it-works-pref.mjs",
+    "test:flyer-detect": "py -3 scripts/test-flyer-detect.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
