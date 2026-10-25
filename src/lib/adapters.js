@@ -21,6 +21,8 @@ export function adaptDealRow(row) {
     valid_until: row.valid_until,
     created_at: row.created_at,
     scraped_at: row.scraped_at,
+    // products.created_at (ugniježđeno) — ne deal.created_at
+    product_created_at: product.created_at ?? null,
   });
 }
 
@@ -43,6 +45,8 @@ export function adaptDeal(deal) {
     validUntil:    deal.valid_until,
     validFrom:     deal.valid_from,
     createdAt:     deal.created_at,
+    // active_deals put nema product_created_at → null (bez fallbacka na deal.created_at)
+    productCreatedAt: deal.product_created_at ?? null,
     scrapedAt:     deal.scraped_at,
     expiresIn:     daysLeftLabel(deal.valid_until),
     expiryUrgency: urgency(deal.valid_until),
@@ -75,6 +79,7 @@ export function adaptRegularPrice(row) {
     validUntil:    null,
     validFrom:     null,
     createdAt:     null,
+    productCreatedAt: null,
     scrapedAt:     null,
     expiresIn:     null,
     expiryUrgency: 'ok',

@@ -16,7 +16,8 @@
     "test:how-it-works": "node scripts/test-how-it-works-pref.mjs",
     "test:flyer-detect": "py -3 scripts/test-flyer-detect.py",
     "test:flyer-push": "py -3 scripts/test-flyer-push.py",
-    "test:flyer-follow": "node scripts/test-flyer-follow.mjs"
+    "test:flyer-follow": "node scripts/test-flyer-follow.mjs",
+    "test:deal-dates-novo": "node scripts/test-deal-dates-novo.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
