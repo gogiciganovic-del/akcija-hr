@@ -10,6 +10,7 @@ import { useUserLocation } from "../hooks/useUserLocation";
 import { CATEGORIES, STORES, STORES_ROW_1, STORES_ROW_2 } from "../lib/constants";
 import { isNewProduct, isExpiringTodayProduct } from "../lib/dealDates";
 import { trackSkenOtvoren } from "../lib/usageEvents";
+import { readHowItWorksOpen, writeHowItWorksOpen } from "../lib/howItWorksPref";
 
 function StoreGrid({ stores, selectedStore, onSelect }) {
   return (
@@ -184,6 +185,7 @@ export function HomePage({
   const [expiringExpanded, setExpiringExpanded] = useState(false);
   const [novoExpanded, setNovoExpanded] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [howOpen, setHowOpen] = useState(readHowItWorksOpen);
 
   useEffect(() => {
     if (!homeResetSignal) return;
@@ -251,6 +253,14 @@ export function HomePage({
 
   const handleNovoExpand = useCallback(() => {
     setNovoExpanded((prev) => !prev);
+  }, []);
+
+  const toggleHowItWorks = useCallback(() => {
+    setHowOpen((prev) => {
+      const next = !prev;
+      writeHowItWorksOpen(next);
+      return next;
+    });
   }, []);
 
   const handleBarcodeDetected = useCallback(
@@ -334,47 +344,69 @@ export function HomePage({
         </div>
         {!selectedStore && (
           <div className="mx-4 mb-2">
-            <p
-              className="font-bold mb-1"
-              style={{ color: "rgba(255,255,255,0.4)", fontSize: 9, letterSpacing: "0.06em" }}
+            <button
+              type="button"
+              aria-expanded={howOpen}
+              onClick={toggleHowItWorks}
+              className="flex w-full items-center justify-between rounded-lg px-2"
+              style={{
+                minHeight: 34,
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.06)",
+              }}
             >
-              KAKO RADI CJENKO
-            </p>
-            <ol className="m-0 p-0 list-none grid grid-cols-2 gap-1">
-              {HOW_IT_WORKS_STEPS.map(({ n, text }) => (
-                <li
-                  key={n}
-                  className="flex items-start gap-1 min-w-0 rounded-lg px-2 py-1.5"
-                  style={{
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                  }}
-                >
-                  <span
-                    className="flex-shrink-0 font-bold tabular-nums"
+              <span
+                className="font-bold"
+                style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, letterSpacing: "0.02em" }}
+              >
+                Kako radi Cjenko
+              </span>
+              <ChevronRight
+                size={14}
+                style={{
+                  color: "rgba(255,255,255,0.35)",
+                  transform: howOpen ? "rotate(-90deg)" : "rotate(90deg)",
+                  flexShrink: 0,
+                }}
+              />
+            </button>
+            {howOpen && (
+              <ol className="m-0 mt-1 p-0 list-none grid grid-cols-2 gap-1">
+                {HOW_IT_WORKS_STEPS.map(({ n, text }) => (
+                  <li
+                    key={n}
+                    className="flex items-start gap-1 min-w-0 rounded-lg px-2 py-1.5"
                     style={{
-                      color: "rgba(0,255,136,0.55)",
-                      fontSize: 10,
-                      lineHeight: 1.35,
-                      minWidth: 14,
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.06)",
                     }}
                   >
-                    {n}.
-                  </span>
-                  <span
-                    className="min-w-0 flex-1"
-                    style={{
-                      color: "rgba(255,255,255,0.32)",
-                      fontSize: 10,
-                      lineHeight: 1.35,
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {text}
-                  </span>
-                </li>
-              ))}
-            </ol>
+                    <span
+                      className="flex-shrink-0 font-bold tabular-nums"
+                      style={{
+                        color: "rgba(0,255,136,0.55)",
+                        fontSize: 10,
+                        lineHeight: 1.35,
+                        minWidth: 14,
+                      }}
+                    >
+                      {n}.
+                    </span>
+                    <span
+                      className="min-w-0 flex-1"
+                      style={{
+                        color: "rgba(255,255,255,0.32)",
+                        fontSize: 10,
+                        lineHeight: 1.35,
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {text}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
         )}
       </header>
