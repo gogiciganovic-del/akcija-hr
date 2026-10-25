@@ -1,7 +1,10 @@
 """
 Čista logika detekcije „novi letak” (bez I/O).
-Prag: novih >= max(MIN_NEW, ceil(PCT * today_n)); prev prozor WINDOW_DAYS;
-prev prazan → ne pali.
+Prag: novih >= max(MIN_NEW, ceil(PCT * today_n))
+  I  new/today > MIN_RATIO (50%);
+prev prozor WINDOW_DAYS; prev prazan → ne pali; week dedup.
+Faza 1 kandidati (pon): Eurospin, Kaufland, Plodine — filtriranje lanaca
+je u calleru, ne ovdje.
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ from datetime import date, datetime, timedelta, timezone
 # Tvrde konstante — test mutira očekivanje ako se promijene.
 MIN_NEW = 15
 PCT = 0.30
+MIN_RATIO = 0.50  # new/today mora biti strogo > 50%
 WINDOW_DAYS = 8
 
 
@@ -23,6 +27,12 @@ def threshold_for_today(today_n: int) -> int:
 
 def count_new(today_ids: set[str], prev_ids: set[str]) -> int:
     return sum(1 for pid in today_ids if pid not in prev_ids)
+
+
+def ratio_new(today_n: int, new_n: int) -> float:
+    if today_n <= 0:
+        return 0.0
+    return new_n / today_n
 
 
 def should_fire(
@@ -41,9 +51,18 @@ def should_fire(
     thr = threshold_for_today(today_n)
     if new_n < thr:
         return False, f"skip: below_threshold new={new_n} thr={thr}"
+    ratio = ratio_new(today_n, new_n)
+    if ratio <= MIN_RATIO:
+        return False, (
+            f"skip: below_ratio new={new_n} today={today_n} "
+            f"ratio={ratio:.3f} min={MIN_RATIO}"
+        )
     if week_already_fired:
         return False, "skip: week_dedup"
-    return True, f"ok: new={new_n} thr={thr} today={today_n} prev={prev_n}"
+    return True, (
+        f"ok: new={new_n} thr={thr} today={today_n} prev={prev_n} "
+        f"ratio={ratio:.3f}"
+    )
 
 
 def utc_day(dt: datetime | date | str) -> date:
