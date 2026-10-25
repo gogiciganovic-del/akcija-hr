@@ -22,7 +22,7 @@ plugins {
 
 def twaManifest = [
     applicationId: 'app.cjenko.akcije',
-    hostName: 'cjenko.app', // The domain being opened in the TWA.
+    hostName: 'www.cjenko.app', // The domain being opened in the TWA.
     launchUrl: '/', // The start path for the TWA. Must be relative to the domain.
     name: 'Cjenko', // The application name.
     launcherName: 'Cjenko', // The name shown on the Android Launcher.
@@ -63,8 +63,8 @@ android {
         applicationId "app.cjenko.akcije"
         minSdkVersion 21
         targetSdkVersion 36
-        versionCode 5
-        versionName "5"
+        versionCode 6
+        versionName "6"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -82,12 +82,12 @@ android {
             // The URL the Web Manifest for the Progressive Web App that the TWA points to. This
             // is used by Chrome OS and Meta Quest to open the Web version of the PWA instead of
             // the TWA, as it will probably give a better user experience for non-mobile devices.
-            resValue "string", "webManifestUrl", 'https://cjenko.app/manifest.json'
+            resValue "string", "webManifestUrl", 'https://www.cjenko.app/manifest.json'
         
 
         
             // This is used by Meta Quest.
-            resValue "string", "fullScopeUrl", 'https://cjenko.app/'
+            resValue "string", "fullScopeUrl", 'https://www.cjenko.app/'
         
 
         

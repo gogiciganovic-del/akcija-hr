@@ -1,6 +1,6 @@
 {
   "packageId": "app.cjenko.akcije",
-  "host": "cjenko.app",
+  "host": "www.cjenko.app",
   "name": "Cjenko",
   "launcherName": "Cjenko",
   "display": "standalone",
@@ -13,18 +13,18 @@
   "backgroundColor": "#EF9F27",
   "enableNotifications": true,
   "startUrl": "/",
-  "iconUrl": "https://cjenko.app/icon-512.png",
-  "maskableIconUrl": "https://cjenko.app/icon-512.png",
+  "iconUrl": "https://www.cjenko.app/icon-512.png",
+  "maskableIconUrl": "https://www.cjenko.app/icon-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "C:\\Users\\Korisnik\\Documents\\moja app\\android-twa\\android.keystore",
     "alias": "upload"
   },
-  "appVersionName": "5",
-  "appVersionCode": 5,
+  "appVersionName": "6",
+  "appVersionCode": 6,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "https://cjenko.app/manifest.json",
+  "webManifestUrl": "https://www.cjenko.app/manifest.json",
   "fallbackType": "customtabs",
   "features": {},
   "alphaDependencies": {
@@ -33,7 +33,7 @@
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "https://cjenko.app/",
+  "fullScopeUrl": "https://www.cjenko.app/",
   "minSdkVersion": 21,
   "orientation": "portrait",
   "fingerprints": [],
@@ -43,5 +43,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "5"
+  "appVersion": "6"
 }
