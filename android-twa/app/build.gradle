@@ -61,7 +61,7 @@ android {
     namespace "app.cjenko.akcije"
     defaultConfig {
         applicationId "app.cjenko.akcije"
-        minSdkVersion 21
+        minSdkVersion 24
         targetSdkVersion 36
         versionCode 6
         versionName "6"
