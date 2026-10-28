@@ -7,8 +7,11 @@ Pokreni: npm run test:flyer-push
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import io
+import json
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -32,6 +35,18 @@ from send_flyer_pushes import (  # noqa: E402
     process_jobs,
     resolve_dry_run,
 )
+from send_price_drop_pushes import supabase_key_role  # noqa: E402
+
+
+def fake_jwt(role: str | None) -> str:
+    header = base64.urlsafe_b64encode(b'{"alg":"none","typ":"JWT"}').rstrip(b"=").decode()
+    payload_obj = {"role": role} if role is not None else {"sub": "x"}
+    payload = (
+        base64.urlsafe_b64encode(json.dumps(payload_obj).encode("utf-8"))
+        .rstrip(b"=")
+        .decode()
+    )
+    return f"{header}.{payload}.fakesig"
 
 
 def assert_(cond: bool, msg: str) -> None:
@@ -77,6 +92,22 @@ ep = "https://fcm.googleapis.com/fcm/send/test-endpoint-abc"
 h = endpoint_hash_prefix(ep)
 assert_(len(h) == 12 and h.isalnum(), h)
 assert_("fcm" not in h and "endpoint" not in h, "hash must not leak endpoint")
+
+# --- supabase_key_role: sb_ + JWT + smeće ---
+assert_(
+    supabase_key_role("sb_secret_xxxxxxxxxxxxxxxx") == "service_role",
+    "sb_secret",
+)
+assert_(
+    supabase_key_role("sb_publishable_xxxxxxxxxxxxxxxx") == "anon",
+    "sb_publishable",
+)
+assert_(supabase_key_role(fake_jwt("service_role")) == "service_role", "jwt svc")
+assert_(supabase_key_role(fake_jwt("anon")) == "anon", "jwt anon")
+assert_(supabase_key_role("not-a-jwt") == "unknown", "garbage")
+assert_(supabase_key_role("sb_other_xxx") == "unknown", "sb other")
+assert_(supabase_key_role("") == "unknown", "empty")
+assert_(supabase_key_role(fake_jwt("authenticated")) == "unknown", "other jwt role")
 
 # --- CLI ---
 with contextlib.redirect_stderr(io.StringIO()):
@@ -289,11 +320,79 @@ assert_(
 kept, sk = filter_unsent_jobs(five, dry_keys)
 assert_(sk == 2 and len(kept) == 3, (sk, len(kept)))
 
-# --- main vraća 1 + ok:false kad evaluate_day baci; dry_run iz --send ---
-real_eval = sfp.evaluate_day
+# --- --send s anon ključem odbija; dry-run s anon prolazi uz WARN ---
+_env_save = {
+    k: os.environ.get(k)
+    for k in (
+        "SUPABASE_URL",
+        "VITE_SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_KEY",
+        "VITE_SUPABASE_ANON_KEY",
+    )
+}
+
+
+def _set_env_anon():
+    os.environ["SUPABASE_URL"] = "https://example.supabase.co"
+    os.environ.pop("VITE_SUPABASE_URL", None)
+    os.environ.pop("SUPABASE_SERVICE_ROLE_KEY", None)
+    os.environ.pop("VITE_SUPABASE_ANON_KEY", None)
+    os.environ["SUPABASE_KEY"] = fake_jwt("anon")
+
+
+def _restore_env():
+    for k, v in _env_save.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
+
+
+_set_env_anon()
+buf_send = io.StringIO()
+err_send = io.StringIO()
+try:
+    with contextlib.redirect_stdout(buf_send), contextlib.redirect_stderr(err_send):
+        code_send = sfp.main(["--limit", "1", "--send"])
+finally:
+    _restore_env()
+assert_(code_send == 1, code_send)
+out_send = buf_send.getvalue()
+assert_("key_not_service_role" in out_send, out_send)
+assert_('"ok":false' in out_send, out_send)
+assert_("supabase_key_role=anon" in out_send, out_send)
+
+_set_env_anon()
 real_client = sfp.supabase_client
 real_stores = sfp.fetch_stores
 real_sets = sfp.fetch_scrape_sets
+real_eval = sfp.evaluate_day
+sfp.supabase_client = lambda **kw: object()  # type: ignore[assignment]
+sfp.fetch_stores = lambda client: {}  # type: ignore[assignment]
+sfp.fetch_scrape_sets = lambda client, stores, batch: {}  # type: ignore[assignment]
+sfp.evaluate_day = lambda by_chain, as_of: []  # type: ignore[assignment]
+buf_dry = io.StringIO()
+err_dry = io.StringIO()
+try:
+    with contextlib.redirect_stdout(buf_dry), contextlib.redirect_stderr(err_dry):
+        code_dry = sfp.main(["--limit", "1"])
+finally:
+    sfp.supabase_client = real_client
+    sfp.fetch_stores = real_stores
+    sfp.fetch_scrape_sets = real_sets
+    sfp.evaluate_day = real_eval
+    _restore_env()
+assert_(code_dry == 0, code_dry)
+assert_("WARN: supabase_key_role=anon" in err_dry.getvalue(), err_dry.getvalue())
+assert_("supabase_key_role=anon" in buf_dry.getvalue(), buf_dry.getvalue())
+assert_('"ok":true' in buf_dry.getvalue(), buf_dry.getvalue())
+
+# --- main vraća 1 + ok:false kad evaluate_day baci; dry_run iz --send ---
+os.environ["SUPABASE_URL"] = "https://example.supabase.co"
+os.environ.pop("SUPABASE_SERVICE_ROLE_KEY", None)
+os.environ.pop("VITE_SUPABASE_ANON_KEY", None)
+os.environ["SUPABASE_KEY"] = fake_jwt("service_role")
 
 
 def boom_eval(*a, **k):
@@ -301,7 +400,7 @@ def boom_eval(*a, **k):
 
 
 sfp.evaluate_day = boom_eval  # type: ignore[assignment]
-sfp.supabase_client = lambda: object()  # type: ignore[assignment]
+sfp.supabase_client = lambda **kw: object()  # type: ignore[assignment]
 sfp.fetch_stores = lambda client: {}  # type: ignore[assignment]
 sfp.fetch_scrape_sets = lambda client, stores, batch: {}  # type: ignore[assignment]
 buf = io.StringIO()
@@ -313,6 +412,7 @@ finally:
     sfp.supabase_client = real_client
     sfp.fetch_stores = real_stores
     sfp.fetch_scrape_sets = real_sets
+    _restore_env()
 
 assert_(code == 1, code)
 main_out = buf.getvalue()
@@ -321,6 +421,7 @@ assert_('"ok":false' in main_out, main_out)
 assert_('"dry_run":false' in main_out, main_out)
 assert_("RuntimeError" in main_out, main_out)
 assert_("secret-db-url" not in main_out, main_out)
+assert_("service_role" in main_out, main_out)
 
 # --- mutacija: ukloni rezervaciju (try_reserve uvijek True) → dedup assert pada ---
 print("... mutacija: try_reserve uvijek True (bez stvarne rezervacije) ...")

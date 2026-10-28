@@ -12,6 +12,7 @@ Ne dira import_regular_prices.py — pokreće se kao zaseban korak nakon importa
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import sys
@@ -156,17 +157,60 @@ def resolve_since(args: argparse.Namespace) -> datetime:
     raise SystemExit("Obavezno: --since ILI --lookback-hours.")
 
 
-def supabase_client():
-    url = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL")
-    key = (
-        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        or os.getenv("SUPABASE_KEY")
-        or os.getenv("VITE_SUPABASE_ANON_KEY")
+def supabase_key_role(key: str) -> str:
+    """
+    Prepoznaj ulogu ključa bez logiranja tajne.
+    - sb_secret_… → service_role
+    - sb_publishable_… → anon
+    - inače JWT payload.role (bez potpisa) → service_role | anon
+    - sve ostalo → unknown
+    """
+    try:
+        raw_key = (key or "").strip().strip('"')
+        if raw_key.startswith("sb_secret_"):
+            return "service_role"
+        if raw_key.startswith("sb_publishable_"):
+            return "anon"
+        parts = raw_key.split(".")
+        if len(parts) < 2:
+            return "unknown"
+        payload_b64 = parts[1]
+        pad = "=" * (-len(payload_b64) % 4)
+        payload = base64.urlsafe_b64decode(payload_b64 + pad)
+        data = json.loads(payload.decode("utf-8"))
+        role = data.get("role")
+        if role == "service_role" or role == "anon":
+            return role
+        return "unknown"
+    except Exception:
+        return "unknown"
+
+
+def resolve_supabase_key(*, require_service_role: bool = False) -> tuple[str, str]:
+    """Vrati (url, key). S require_service_role ne koristi VITE_SUPABASE_ANON_KEY."""
+    url = (os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL") or "").strip().strip(
+        '"'
     )
+    if require_service_role:
+        key = (
+            os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY") or ""
+        ).strip().strip('"')
+    else:
+        key = (
+            os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+            or os.getenv("SUPABASE_KEY")
+            or os.getenv("VITE_SUPABASE_ANON_KEY")
+            or ""
+        ).strip().strip('"')
     if not url or not key:
         print("Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY", file=sys.stderr)
         raise SystemExit(1)
-    return create_client(url.strip().strip('"'), key.strip().strip('"'))
+    return url, key
+
+
+def supabase_client(*, require_service_role: bool = False):
+    url, key = resolve_supabase_key(require_service_role=require_service_role)
+    return create_client(url, key)
 
 
 def vapid_config() -> tuple[str, dict]:

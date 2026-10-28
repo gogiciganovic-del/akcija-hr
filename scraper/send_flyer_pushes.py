@@ -42,8 +42,10 @@ from send_price_drop_pushes import (  # noqa: E402
     configure_stdio,
     delete_subscription,
     is_gone_subscription,
+    resolve_supabase_key,
     send_one,
     supabase_client,
+    supabase_key_role,
     vapid_config,
 )
 
@@ -445,14 +447,42 @@ def _main_impl(
         as_of = datetime.now(timezone.utc).date()
 
     week = iso_week_key(as_of)
+    _url, key = resolve_supabase_key(require_service_role=True)
+    key_role = supabase_key_role(key)
+    progress["supabase_key_role"] = key_role
     print(
         f"send_flyer_pushes dry_run={dry_run} limit={args.limit} "
         f"as_of={as_of.isoformat()} week={week} "
         f"chains={','.join(ALLOWED_CHAINS)} "
-        f"only_hash={args.only_endpoint_hash or '-'}"
+        f"only_hash={args.only_endpoint_hash or '-'} "
+        f"supabase_key_role={key_role}"
     )
 
-    client = supabase_client()
+    if key_role != "service_role":
+        if not dry_run:
+            emit_flyer_push_stats(
+                {
+                    "ok": False,
+                    "error": "key_not_service_role",
+                    "supabase_key_role": key_role,
+                    "dry_run": dry_run,
+                    "limit": args.limit,
+                    "sent": 0,
+                    "gone": 0,
+                    "failed": 0,
+                    "skipped_dedup": 0,
+                    "candidates": 0,
+                    "fire_chains": [],
+                }
+            )
+            return 1
+        print(
+            f"WARN: supabase_key_role={key_role} (expected service_role); "
+            "dry-run nastavlja",
+            file=sys.stderr,
+        )
+
+    client = supabase_client(require_service_role=True)
     store_by_id = fetch_stores(client)
     by_chain = fetch_scrape_sets(client, store_by_id, batch_size)
     detection_rows = evaluate_day(by_chain, as_of)
@@ -480,6 +510,7 @@ def _main_impl(
                 "skipped_dedup": 0,
                 "candidates": 0,
                 "fire_chains": [],
+                "supabase_key_role": key_role,
             }
         )
         return 0
@@ -526,6 +557,7 @@ def _main_impl(
                 "skipped_dedup": skipped_pre,
                 "candidates": 0,
                 "fire_chains": fire_names,
+                "supabase_key_role": key_role,
             }
         )
         return 0
@@ -579,6 +611,7 @@ def _main_impl(
             "skipped_dedup": skipped_pre + stats["skipped_dedup"],
             "candidates": stats["candidates"],
             "fire_chains": fire_names,
+            "supabase_key_role": key_role,
         }
     )
     return 0
@@ -593,6 +626,7 @@ def main(argv: list[str] | None = None) -> int:
         "failed": 0,
         "skipped_dedup": 0,
         "candidates": 0,
+        "supabase_key_role": "unknown",
     }
     try:
         args = parse_args(argv)
@@ -609,6 +643,9 @@ def main(argv: list[str] | None = None) -> int:
                 "failed": int(progress.get("failed") or 0),
                 "skipped_dedup": int(progress.get("skipped_dedup") or 0),
                 "candidates": int(progress.get("candidates") or 0),
+                "supabase_key_role": str(
+                    progress.get("supabase_key_role") or "unknown"
+                ),
             }
         )
         return 1
