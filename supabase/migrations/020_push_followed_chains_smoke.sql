@@ -1,6 +1,11 @@
 -- SMOKE TEST za 020_push_followed_chains.sql (ručno u SQL Editoru).
--- NE pokretati u produkciji bez pregleda. Briše samo svoje test redove na kraju.
--- Pretpostavka: 020 je već primijenjena na ovoj bazi (lokalno / staging).
+-- Pokreni TEK NAKON što je 020_push_followed_chains.sql primijenjena
+-- (lokalno / staging). Cijeli test je u BEGIN … ROLLBACK — ništa ne ostaje
+-- u bazi, ni kad neki korak padne.
+--
+-- Napomena: u Supabase SQL Editoru pokreni cijeli fajl odjednom (jedna sesija).
+
+BEGIN;
 
 -- ---------------------------------------------------------------------------
 -- A) Priprema: test pretplata
@@ -164,4 +169,6 @@ END $$;
 -- SELECT * FROM push_flyer_notifications;  -- treba: permission denied / 0 polica
 -- RESET ROLE;
 
-SELECT '020 smoke: A–F passed' AS result;
+SELECT '020 smoke: A–F passed (will ROLLBACK)' AS result;
+
+ROLLBACK;

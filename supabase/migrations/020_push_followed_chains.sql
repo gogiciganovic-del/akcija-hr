@@ -113,3 +113,4 @@ ALTER TABLE push_flyer_notifications ENABLE ROW LEVEL SECURITY;
 -- Bez policy za anon/authenticated — pristup samo service_role (zaobilazi RLS).
 
 GRANT ALL ON push_flyer_notifications TO service_role;
+REVOKE ALL ON push_flyer_notifications FROM anon, authenticated;
