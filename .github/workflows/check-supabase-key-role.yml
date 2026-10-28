@@ -1,0 +1,69 @@
+# Ručna provjera secrets.SUPABASE_KEY (rola + vidi li push_subscriptions).
+# Samostalan: bez importa iz scraper/. Ne šalje push, ne piše u bazu.
+name: Check SUPABASE_KEY role
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-key-role:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r scraper/requirements.txt
+      - name: Print supabase version, key role, and row count (no secret logged)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          pip show supabase | grep Version
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          import sys
+
+          def supabase_key_role(key: str) -> str:
+              raw = (key or "").strip().strip('"')
+              if raw.startswith("sb_secret_"):
+                  return "service_role"
+              if raw.startswith("sb_publishable_"):
+                  return "anon"
+              try:
+                  parts = raw.split(".")
+                  if len(parts) < 2:
+                      return "unknown"
+                  payload_b64 = parts[1]
+                  pad = "=" * (-len(payload_b64) % 4)
+                  data = json.loads(base64.urlsafe_b64decode(payload_b64 + pad))
+                  role = data.get("role")
+                  if role in ("service_role", "anon"):
+                      return role
+                  return "unknown"
+              except Exception:
+                  return "unknown"
+
+          url = (os.environ.get("SUPABASE_URL") or "").strip().strip('"')
+          key = (os.environ.get("SUPABASE_KEY") or "").strip().strip('"')
+          if not url or not key:
+              print("Missing SUPABASE_URL or SUPABASE_KEY", file=sys.stderr)
+              sys.exit(1)
+
+          role = supabase_key_role(key)
+          print(f"supabase_key_role={role}")
+
+          from supabase import create_client
+
+          client = create_client(url, key)
+          resp = (
+              client.table("push_subscriptions")
+              .select("id", count="exact")
+              .limit(0)
+              .execute()
+          )
+          n = resp.count if resp.count is not None else len(resp.data or [])
+          print(f"push_subscriptions_count={n}")
+          PY
