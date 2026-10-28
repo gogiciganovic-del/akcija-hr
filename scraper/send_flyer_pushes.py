@@ -9,8 +9,8 @@ Dedup: push_flyer_notifications UNIQUE(subscription_id, chain, flyer_week).
 DEFAULT = dry-run (ništa se ne šalje ni ne upisuje). Stvarno slanje samo uz --send.
 Obavezan --limit. Ne logira endpoint / p256dh / auth (samo sha256 prefiks).
 
-Slanje: isti pywebpush + VAPID kao send_price_drop_pushes.send_one;
-404/410 → delete_subscription (isti mehanizam).
+Slanje: rezervacija reda PRIJE webpush; 404/410 → delete_subscription (CASCADE);
+privremena greška → obriši rezervaciju (retry).
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Callable
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -61,36 +62,99 @@ def build_flyer_payload(chain: str, flyer_week: str) -> dict:
     return {
         "title": "Izašao je novi letak",
         "body": f"{c}: pogledaj nove akcije",
-        "url": f"/?trgovina={c}",
+        "url": f"/?trgovina={quote(c, safe='')}",
         "tag": f"flyer-{c.lower()}-{week}",
     }
 
 
-def flyer_dedup_exists(
+def flyer_job_key(subscription_id: str, chain: str, flyer_week: str) -> tuple[str, str, str]:
+    return (str(subscription_id), str(chain), str(flyer_week))
+
+
+def try_reserve_flyer(
     client, subscription_id: str, chain: str, flyer_week: str
 ) -> bool:
+    """
+    Atomski INSERT (ignore duplicates). True ako je red STVARNO novoupisan.
+    """
     resp = (
         client.table("push_flyer_notifications")
-        .select("id")
-        .eq("subscription_id", subscription_id)
-        .eq("chain", chain)
-        .eq("flyer_week", flyer_week)
-        .limit(1)
+        .upsert(
+            {
+                "subscription_id": subscription_id,
+                "chain": chain,
+                "flyer_week": flyer_week,
+            },
+            on_conflict="subscription_id,chain,flyer_week",
+            ignore_duplicates=True,
+        )
         .execute()
     )
     return bool(resp.data)
 
 
-def record_flyer_sent(
+def release_flyer_reservation(
     client, subscription_id: str, chain: str, flyer_week: str
 ) -> None:
-    client.table("push_flyer_notifications").insert(
-        {
-            "subscription_id": subscription_id,
-            "chain": chain,
-            "flyer_week": flyer_week,
-        }
-    ).execute()
+    (
+        client.table("push_flyer_notifications")
+        .delete()
+        .eq("subscription_id", subscription_id)
+        .eq("chain", chain)
+        .eq("flyer_week", flyer_week)
+        .execute()
+    )
+
+
+def fetch_sent_keys_for_chain_weeks(
+    client,
+    chain_weeks: list[tuple[str, str]],
+    batch_size: int = FETCH_BATCH,
+) -> set[tuple[str, str, str]]:
+    """Svi (subscription_id, chain, flyer_week) već u logu za dane parove."""
+    out: set[tuple[str, str, str]] = set()
+    pairs = sorted({(str(c), str(w)) for c, w in chain_weeks if c and w})
+    for chain, week in pairs:
+        offset = 0
+        while True:
+            resp = (
+                client.table("push_flyer_notifications")
+                .select("subscription_id,chain,flyer_week")
+                .eq("chain", chain)
+                .eq("flyer_week", week)
+                .order("subscription_id")
+                .range(offset, offset + batch_size - 1)
+                .execute()
+            )
+            rows = resp.data or []
+            if not rows:
+                break
+            for row in rows:
+                sid = str(row.get("subscription_id") or "")
+                ch = str(row.get("chain") or "")
+                wk = str(row.get("flyer_week") or "")
+                if sid and ch and wk:
+                    out.add(flyer_job_key(sid, ch, wk))
+            if len(rows) < batch_size:
+                break
+            offset += batch_size
+    return out
+
+
+def filter_unsent_jobs(
+    jobs: list[dict], sent_keys: set[tuple[str, str, str]]
+) -> tuple[list[dict], int]:
+    """Izbaci jobove koji već imaju log red (prije --limit)."""
+    kept: list[dict] = []
+    skipped = 0
+    for job in jobs:
+        sid = str(job["subscription"].get("id") or "")
+        key = flyer_job_key(sid, job["chain"], job["flyer_week"])
+        if key in sent_keys:
+            skipped += 1
+            continue
+        kept.append(job)
+    return kept, skipped
 
 
 def fetch_subscriptions_for_chain(
@@ -189,15 +253,15 @@ def process_jobs(
     jobs: list[dict],
     *,
     dry_run: bool,
-    already_sent: Callable[[str, str, str], bool],
-    record_sent: Callable[[str, str, str], None],
+    try_reserve: Callable[[str, str, str], bool],
+    release_reserve: Callable[[str, str, str], None],
     send_fn: Callable[[dict, dict], None],
     delete_sub: Callable[[str], None],
     log: Callable[..., None] = print,
 ) -> dict:
     """
-    Obradi jobove. already_sent(sid, chain, week) → True ako je već u logu.
-    record_sent samo nakon USPJEŠNOG send_fn (ne u dry-run).
+    dry-run: samo log (bez rezervacije / slanja).
+    send: rezerviraj → pošalji; 404/410 briše pretplatu; inače pusti rezervaciju.
     """
     sent = 0
     failed = 0
@@ -218,20 +282,19 @@ def process_jobs(
             f"url={payload['url']!r} tag={payload['tag']!r}"
         )
 
-        if already_sent(sid, chain, week):
-            skipped_dedup += 1
-            prefix = "[dry-run] skip" if dry_run else "[skip]"
-            log(f"{prefix} (dedup): {line}")
-            continue
-
         if dry_run:
             log(f"[dry-run] would send: {line}")
             sent += 1
             continue
 
+        reserved = try_reserve(sid, chain, week)
+        if not reserved:
+            skipped_dedup += 1
+            log(f"[skip] (dedup/reserve): {line}")
+            continue
+
         try:
             send_fn(sub, payload)
-            record_sent(sid, chain, week)
             log(f"[sent] {line}")
             sent += 1
         except Exception as e:
@@ -245,10 +308,18 @@ def process_jobs(
                 try:
                     delete_sub(endpoint)
                 except Exception as del_e:
-                    log(f"WARN: delete failed: {del_e!r}", file=sys.stderr)
+                    log(f"WARN: delete failed: {type(del_e).__name__}", file=sys.stderr)
             else:
                 failed += 1
-                log(f"[fail] {line} err={e!r}", file=sys.stderr)
+                log(f"[fail] {line} err={type(e).__name__}", file=sys.stderr)
+                try:
+                    release_reserve(sid, chain, week)
+                except Exception as rel_e:
+                    log(
+                        f"WARN: release reservation failed "
+                        f"endpoint_hash={ehash} err={type(rel_e).__name__}",
+                        file=sys.stderr,
+                    )
 
     return {
         "sent": sent,
@@ -312,8 +383,20 @@ def resolve_dry_run(args: argparse.Namespace) -> bool:
     return True
 
 
-def main(argv: list[str] | None = None) -> int:
-    configure_stdio()
+def apply_limit_after_dedup(
+    jobs: list[dict],
+    sent_keys: set[tuple[str, str, str]],
+    limit: int,
+) -> tuple[list[dict], int, int]:
+    """
+    Vrati (limited_jobs, skipped_already, total_unsent).
+    Dedup prije limita.
+    """
+    unsent, skipped = filter_unsent_jobs(jobs, sent_keys)
+    return unsent[:limit], skipped, len(unsent)
+
+
+def _main_impl(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.limit < 0:
         raise SystemExit("--limit mora biti >= 0")
@@ -385,8 +468,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.only_endpoint_hash:
         print(f"after --only-endpoint-hash: {len(jobs)}")
 
-    jobs = jobs[: args.limit]
-    print(f"after --limit: {len(jobs)}")
+    chain_weeks = [
+        (str(r.get("chain") or ""), str(r.get("week") or "")) for r in fires
+    ]
+    sent_keys = fetch_sent_keys_for_chain_weeks(client, chain_weeks, batch_size)
+    jobs, skipped_pre, unsent_n = apply_limit_after_dedup(
+        jobs, sent_keys, args.limit
+    )
+    print(
+        f"after dedup-before-limit: skipped_already={skipped_pre} "
+        f"unsent={unsent_n} after_limit={len(jobs)}"
+    )
 
     if not jobs:
         print("Nothing to send after filters.")
@@ -398,7 +490,7 @@ def main(argv: list[str] | None = None) -> int:
                 "sent": 0,
                 "gone": 0,
                 "failed": 0,
-                "skipped_dedup": 0,
+                "skipped_dedup": skipped_pre,
                 "candidates": 0,
                 "fire_chains": fire_names,
             }
@@ -410,11 +502,11 @@ def main(argv: list[str] | None = None) -> int:
     if not dry_run:
         vapid_private, claims = vapid_config()
 
-    def already_sent(sid: str, chain: str, flyer_week: str) -> bool:
-        return flyer_dedup_exists(client, sid, chain, flyer_week)
+    def try_reserve(sid: str, chain: str, flyer_week: str) -> bool:
+        return try_reserve_flyer(client, sid, chain, flyer_week)
 
-    def record_sent(sid: str, chain: str, flyer_week: str) -> None:
-        record_flyer_sent(client, sid, chain, flyer_week)
+    def release_reserve(sid: str, chain: str, flyer_week: str) -> None:
+        release_flyer_reservation(client, sid, chain, flyer_week)
 
     def send_fn(sub: dict, payload: dict) -> None:
         send_one(sub, payload, vapid_private, claims)
@@ -425,15 +517,15 @@ def main(argv: list[str] | None = None) -> int:
     stats = process_jobs(
         jobs,
         dry_run=dry_run,
-        already_sent=already_sent,
-        record_sent=record_sent,
+        try_reserve=try_reserve,
+        release_reserve=release_reserve,
         send_fn=send_fn,
         delete_sub=delete_sub,
     )
     print(
         f"Done. sent_or_dry={stats['sent']} skipped_dedup={stats['skipped_dedup']} "
         f"failed={stats['failed']} gone_deleted={stats['gone']} "
-        f"(candidates_this_run={stats['candidates']})"
+        f"(candidates_this_run={stats['candidates']}, pre_limit_skipped={skipped_pre})"
     )
     emit_flyer_push_stats(
         {
@@ -443,12 +535,32 @@ def main(argv: list[str] | None = None) -> int:
             "sent": stats["sent"],
             "gone": stats["gone"],
             "failed": stats["failed"],
-            "skipped_dedup": stats["skipped_dedup"],
+            "skipped_dedup": skipped_pre + stats["skipped_dedup"],
             "candidates": stats["candidates"],
             "fire_chains": fire_names,
         }
     )
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    configure_stdio()
+    try:
+        return _main_impl(argv)
+    except Exception as e:
+        emit_flyer_push_stats(
+            {
+                "ok": False,
+                "error": type(e).__name__,
+                "dry_run": True,
+                "sent": 0,
+                "gone": 0,
+                "failed": 0,
+                "skipped_dedup": 0,
+                "candidates": 0,
+            }
+        )
+        return 1
 
 
 if __name__ == "__main__":
