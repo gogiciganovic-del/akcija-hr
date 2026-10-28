@@ -232,6 +232,29 @@ assert_(deleted == ["https://push.example/0"], deleted)
 assert_(("s0", "Eurospin", "2026-W44") in store.rows, "410 keeps row; CASCADE cleans")
 assert_(store.released == [], store.released)
 
+# --- try_reserve Exception → fail-reserve, petlja nastavlja ---
+jobs_two = make_jobs(2)
+
+
+def boom_then_ok(sid, chain, week):
+    if sid == "s0":
+        raise ConnectionError("db-down")
+    return True
+
+
+sent_after_reserve_fail: list[str] = []
+stats_rf = process_jobs(
+    jobs_two,
+    dry_run=False,
+    try_reserve=boom_then_ok,
+    release_reserve=lambda *a: None,
+    send_fn=lambda sub, payload: sent_after_reserve_fail.append(sub["id"]),
+    delete_sub=lambda ep: None,
+    log=lambda *a, **k: None,
+)
+assert_(stats_rf["failed"] == 1 and stats_rf["sent"] == 1, stats_rf)
+assert_(sent_after_reserve_fail == ["s1"], sent_after_reserve_fail)
+
 # --- dedup prije limita: run1 pošalje 2/5, run2 sljedeća 2 ---
 five = make_jobs(5)
 assert_(len(five) == 5, len(five))
@@ -266,7 +289,7 @@ assert_(
 kept, sk = filter_unsent_jobs(five, dry_keys)
 assert_(sk == 2 and len(kept) == 3, (sk, len(kept)))
 
-# --- main vraća 1 + ok:false kad evaluate_day baci ---
+# --- main vraća 1 + ok:false kad evaluate_day baci; dry_run iz --send ---
 real_eval = sfp.evaluate_day
 real_client = sfp.supabase_client
 real_stores = sfp.fetch_stores
@@ -284,7 +307,7 @@ sfp.fetch_scrape_sets = lambda client, stores, batch: {}  # type: ignore[assignm
 buf = io.StringIO()
 try:
     with contextlib.redirect_stdout(buf):
-        code = sfp.main(["--limit", "5"])
+        code = sfp.main(["--limit", "5", "--send"])
 finally:
     sfp.evaluate_day = real_eval
     sfp.supabase_client = real_client
@@ -294,7 +317,8 @@ finally:
 assert_(code == 1, code)
 main_out = buf.getvalue()
 assert_("FLYER_PUSH_STATS=" in main_out, main_out)
-assert_('"ok":false' in main_out or '"ok": false' in main_out, main_out)
+assert_('"ok":false' in main_out, main_out)
+assert_('"dry_run":false' in main_out, main_out)
 assert_("RuntimeError" in main_out, main_out)
 assert_("secret-db-url" not in main_out, main_out)
 

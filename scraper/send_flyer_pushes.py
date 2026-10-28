@@ -258,6 +258,7 @@ def process_jobs(
     send_fn: Callable[[dict, dict], None],
     delete_sub: Callable[[str], None],
     log: Callable[..., None] = print,
+    progress: dict | None = None,
 ) -> dict:
     """
     dry-run: samo log (bez rezervacije / slanja).
@@ -267,6 +268,16 @@ def process_jobs(
     failed = 0
     gone = 0
     skipped_dedup = 0
+    base_skipped = int((progress or {}).get("skipped_dedup") or 0)
+
+    def _sync_progress() -> None:
+        if progress is None:
+            return
+        progress["sent"] = sent
+        progress["failed"] = failed
+        progress["gone"] = gone
+        progress["skipped_dedup"] = base_skipped + skipped_dedup
+        progress["candidates"] = len(jobs)
 
     for job in jobs:
         sub = job["subscription"]
@@ -285,12 +296,24 @@ def process_jobs(
         if dry_run:
             log(f"[dry-run] would send: {line}")
             sent += 1
+            _sync_progress()
             continue
 
-        reserved = try_reserve(sid, chain, week)
+        try:
+            reserved = try_reserve(sid, chain, week)
+        except Exception as e:
+            failed += 1
+            log(
+                f"[fail-reserve] endpoint_hash={ehash} err={type(e).__name__}",
+                file=sys.stderr,
+            )
+            _sync_progress()
+            continue
+
         if not reserved:
             skipped_dedup += 1
             log(f"[skip] (dedup/reserve): {line}")
+            _sync_progress()
             continue
 
         try:
@@ -320,6 +343,7 @@ def process_jobs(
                         f"endpoint_hash={ehash} err={type(rel_e).__name__}",
                         file=sys.stderr,
                     )
+        _sync_progress()
 
     return {
         "sent": sent,
@@ -396,12 +420,21 @@ def apply_limit_after_dedup(
     return unsent[:limit], skipped, len(unsent)
 
 
-def _main_impl(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
+def _main_impl(
+    args: argparse.Namespace,
+    *,
+    progress: dict | None = None,
+) -> int:
     if args.limit < 0:
         raise SystemExit("--limit mora biti >= 0")
     dry_run = resolve_dry_run(args)
     batch_size = max(1, args.batch_size)
+    progress = progress if progress is not None else {}
+    progress.setdefault("sent", 0)
+    progress.setdefault("gone", 0)
+    progress.setdefault("failed", 0)
+    progress.setdefault("skipped_dedup", 0)
+    progress.setdefault("candidates", 0)
 
     if args.as_of:
         try:
@@ -514,6 +547,7 @@ def _main_impl(argv: list[str] | None = None) -> int:
     def delete_sub(endpoint: str) -> None:
         delete_subscription(client, endpoint)
 
+    progress["skipped_dedup"] = skipped_pre
     stats = process_jobs(
         jobs,
         dry_run=dry_run,
@@ -521,7 +555,14 @@ def _main_impl(argv: list[str] | None = None) -> int:
         release_reserve=release_reserve,
         send_fn=send_fn,
         delete_sub=delete_sub,
+        progress=progress,
     )
+    # process_jobs overwrites skipped_dedup; keep pre-limit skips in total
+    progress["skipped_dedup"] = skipped_pre + stats["skipped_dedup"]
+    progress["sent"] = stats["sent"]
+    progress["gone"] = stats["gone"]
+    progress["failed"] = stats["failed"]
+    progress["candidates"] = stats["candidates"]
     print(
         f"Done. sent_or_dry={stats['sent']} skipped_dedup={stats['skipped_dedup']} "
         f"failed={stats['failed']} gone_deleted={stats['gone']} "
@@ -545,19 +586,29 @@ def _main_impl(argv: list[str] | None = None) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     configure_stdio()
+    dry_run = True
+    progress: dict = {
+        "sent": 0,
+        "gone": 0,
+        "failed": 0,
+        "skipped_dedup": 0,
+        "candidates": 0,
+    }
     try:
-        return _main_impl(argv)
+        args = parse_args(argv)
+        dry_run = resolve_dry_run(args)
+        return _main_impl(args, progress=progress)
     except Exception as e:
         emit_flyer_push_stats(
             {
                 "ok": False,
                 "error": type(e).__name__,
-                "dry_run": True,
-                "sent": 0,
-                "gone": 0,
-                "failed": 0,
-                "skipped_dedup": 0,
-                "candidates": 0,
+                "dry_run": dry_run,
+                "sent": int(progress.get("sent") or 0),
+                "gone": int(progress.get("gone") or 0),
+                "failed": int(progress.get("failed") or 0),
+                "skipped_dedup": int(progress.get("skipped_dedup") or 0),
+                "candidates": int(progress.get("candidates") or 0),
             }
         )
         return 1
