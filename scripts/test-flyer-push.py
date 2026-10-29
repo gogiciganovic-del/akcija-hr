@@ -21,11 +21,14 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scraper"))
 
 import send_flyer_pushes as sfp  # noqa: E402
+from datetime import datetime, timezone  # noqa: E402
+
 from send_flyer_pushes import (  # noqa: E402
     ALLOWED_CHAINS,
     apply_limit_after_dedup,
     build_flyer_payload,
     build_jobs,
+    build_test_fire_jobs,
     endpoint_hash_prefix,
     filter_jobs_by_endpoint_hash,
     filter_unsent_jobs,
@@ -34,7 +37,10 @@ from send_flyer_pushes import (  # noqa: E402
     parse_args,
     process_jobs,
     resolve_dry_run,
+    test_flyer_week,
+    validate_test_fire_args,
 )
+from flyer_detect_lib import iso_week_key  # noqa: E402
 from send_price_drop_pushes import supabase_key_role  # noqa: E402
 
 
@@ -121,6 +127,82 @@ args = parse_args(["--limit", "3"])
 assert_(resolve_dry_run(args) is True, "default dry-run")
 args_send = parse_args(["--limit", "1", "--send"])
 assert_(resolve_dry_run(args_send) is False, "--send → not dry-run")
+
+# --- --test-fire: odbijanja + TEST week ne dira pravi tjedan ---
+fixed_now = datetime(2026, 10, 29, 14, 5, tzinfo=timezone.utc)
+tw = test_flyer_week(fixed_now)
+assert_(tw == "TEST-202610291405", tw)
+real_week = iso_week_key(fixed_now.date())
+assert_(tw != real_week, (tw, real_week))
+assert_(not tw.startswith(real_week[:4] + "-W"), "TEST week must not look like ISO week")
+
+# bez --send
+args_tf_nosend = parse_args(
+    ["--limit", "1", "--test-fire", "Kaufland", "--only-endpoint-hash", "abc"]
+)
+try:
+    validate_test_fire_args(args_tf_nosend)
+    raise AssertionError("test-fire without --send must fail")
+except SystemExit as e:
+    assert_("--send" in str(e), str(e))
+
+# bez --only-endpoint-hash
+args_tf_nohash = parse_args(["--limit", "1", "--send", "--test-fire", "Kaufland"])
+try:
+    validate_test_fire_args(args_tf_nohash)
+    raise AssertionError("test-fire without hash must fail")
+except SystemExit as e:
+    assert_("--only-endpoint-hash" in str(e), str(e))
+
+# nedopušten lanac
+args_tf_bad = parse_args(
+    [
+        "--limit",
+        "1",
+        "--send",
+        "--test-fire",
+        "Lidl",
+        "--only-endpoint-hash",
+        "deadbeefcafe",
+    ]
+)
+try:
+    validate_test_fire_args(args_tf_bad)
+    raise AssertionError("test-fire Lidl must fail")
+except SystemExit as e:
+    assert_("nedopušten" in str(e) and "Lidl" in str(e), str(e))
+
+# validan
+args_tf_ok = parse_args(
+    [
+        "--limit",
+        "1",
+        "--send",
+        "--test-fire",
+        "Eurospin",
+        "--only-endpoint-hash",
+        "aabbccddeeff",
+    ]
+)
+assert_(validate_test_fire_args(args_tf_ok) == "Eurospin", "ok chain")
+assert_(validate_test_fire_args(parse_args(["--limit", "1"])) is None, "no flag")
+
+# build_test_fire_jobs: jedan uređaj, TEST week u payload/tag; pravi tjedan nije u ključu
+sub_a = make_sub("s1", "https://push.example/a", ["Kaufland"])
+sub_b = make_sub("s2", "https://push.example/b", ["Kaufland"])
+want_h = endpoint_hash_prefix(sub_a["endpoint"])
+tf_jobs = build_test_fire_jobs(
+    "Kaufland", "TEST-202610291405", [sub_a, sub_b], want_h
+)
+assert_(len(tf_jobs) == 1, tf_jobs)
+assert_(tf_jobs[0]["subscription"]["id"] == "s1", tf_jobs[0])
+assert_(tf_jobs[0]["flyer_week"] == "TEST-202610291405", tf_jobs[0]["flyer_week"])
+assert_(
+    tf_jobs[0]["payload"]["tag"] == "flyer-kaufland-TEST-202610291405",
+    tf_jobs[0]["payload"]["tag"],
+)
+assert_(real_week not in tf_jobs[0]["flyer_week"], tf_jobs[0]["flyer_week"])
+assert_(real_week not in tf_jobs[0]["payload"]["tag"], tf_jobs[0]["payload"]["tag"])
 
 # --- firing_chains ---
 rows = [
@@ -210,6 +292,18 @@ def run_process(
     )
     return stats, store, deleted, sent_calls, log_buf.getvalue()
 
+
+# --- test-fire: rezervacija TEST tjedna ne dira pravi ISO tjedan ---
+store_tf = ReserveStore({("s1", "Kaufland", real_week)})
+stats_tf, store_tf, _, calls_tf, _ = run_process(
+    tf_jobs, dry_run=False, store=store_tf
+)
+assert_(stats_tf["sent"] == 1 and calls_tf == ["s1"], (stats_tf, calls_tf))
+assert_(("s1", "Kaufland", "TEST-202610291405") in store_tf.rows, store_tf.rows)
+assert_(
+    ("s1", "Kaufland", real_week) in store_tf.rows,
+    "real week row must stay untouched",
+)
 
 # --- dry-run: ništa ne rezervira / ne šalje ---
 stats, store, deleted, sent_calls, out = run_process(all_jobs[:2], dry_run=True)

@@ -398,6 +398,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=FETCH_BATCH,
         help=f"Stranica fetcha (default {FETCH_BATCH}).",
     )
+    p.add_argument(
+        "--test-fire",
+        metavar="CHAIN",
+        help=(
+            "Pošalji JEDAN test push (preskače detekciju; flyer_week=TEST-…). "
+            "Samo Eurospin/Kaufland/Plodine. Obavezno uz --send i --only-endpoint-hash."
+        ),
+    )
     return p.parse_args(argv)
 
 
@@ -407,6 +415,50 @@ def resolve_dry_run(args: argparse.Namespace) -> bool:
     if args.send:
         return False
     return True
+
+
+def test_flyer_week(now: datetime | None = None) -> str:
+    """
+    Umjetni flyer_week za --test-fire.
+    Ne poklapa se s pravim ISO tjednom (npr. 2026-W44) → ne troši dedup tjedna.
+    """
+    dt = now if now is not None else datetime.now(timezone.utc)
+    return f"TEST-{dt.strftime('%Y%m%d%H%M')}"
+
+
+def validate_test_fire_args(args: argparse.Namespace) -> str | None:
+    """
+    Ako --test-fire nije zadan → None.
+    Inače validira lanac + obavezne zastavice; vraća normalizirani lanac
+    ili diže SystemExit.
+    """
+    raw = getattr(args, "test_fire", None)
+    if raw is None or str(raw).strip() == "":
+        return None
+    chain = str(raw).strip()
+    if chain not in ALLOWED_CHAINS_SET:
+        raise SystemExit(
+            f"--test-fire: nedopušten lanac {chain!r}; "
+            f"dopušteni: {', '.join(ALLOWED_CHAINS)}"
+        )
+    if not args.send:
+        raise SystemExit("--test-fire radi ISKLJUČIVO uz --send")
+    if not str(getattr(args, "only_endpoint_hash", None) or "").strip():
+        raise SystemExit("--test-fire radi ISKLJUČIVO uz --only-endpoint-hash")
+    return chain
+
+
+def build_test_fire_jobs(
+    chain: str,
+    flyer_week: str,
+    subscriptions: list[dict],
+    only_endpoint_hash: str,
+) -> list[dict]:
+    """Jedan job za jedan uređaj (hash) s TEST- tjednom — bez detekcije."""
+    fire_rows = [{"chain": chain, "week": flyer_week, "would_fire": True}]
+    jobs = build_jobs(fire_rows, {chain: subscriptions})
+    jobs = filter_jobs_by_endpoint_hash(jobs, only_endpoint_hash)
+    return jobs[:1]
 
 
 def apply_limit_after_dedup(
@@ -422,6 +474,89 @@ def apply_limit_after_dedup(
     return unsent[:limit], skipped, len(unsent)
 
 
+def _run_send_pipeline(
+    *,
+    client,
+    jobs: list[dict],
+    dry_run: bool,
+    skipped_pre: int,
+    fire_names: list[str],
+    limit: int,
+    key_role: str,
+    progress: dict,
+) -> int:
+    if not jobs:
+        print("Nothing to send after filters.")
+        emit_flyer_push_stats(
+            {
+                "ok": True,
+                "dry_run": dry_run,
+                "limit": limit,
+                "sent": 0,
+                "gone": 0,
+                "failed": 0,
+                "skipped_dedup": skipped_pre,
+                "candidates": 0,
+                "fire_chains": fire_names,
+                "supabase_key_role": key_role,
+            }
+        )
+        return 0
+
+    vapid_private = ""
+    claims: dict = {}
+    if not dry_run:
+        vapid_private, claims = vapid_config()
+
+    def try_reserve(sid: str, chain: str, flyer_week: str) -> bool:
+        return try_reserve_flyer(client, sid, chain, flyer_week)
+
+    def release_reserve(sid: str, chain: str, flyer_week: str) -> None:
+        release_flyer_reservation(client, sid, chain, flyer_week)
+
+    def send_fn(sub: dict, payload: dict) -> None:
+        send_one(sub, payload, vapid_private, claims)
+
+    def delete_sub(endpoint: str) -> None:
+        delete_subscription(client, endpoint)
+
+    progress["skipped_dedup"] = skipped_pre
+    stats = process_jobs(
+        jobs,
+        dry_run=dry_run,
+        try_reserve=try_reserve,
+        release_reserve=release_reserve,
+        send_fn=send_fn,
+        delete_sub=delete_sub,
+        progress=progress,
+    )
+    progress["skipped_dedup"] = skipped_pre + stats["skipped_dedup"]
+    progress["sent"] = stats["sent"]
+    progress["gone"] = stats["gone"]
+    progress["failed"] = stats["failed"]
+    progress["candidates"] = stats["candidates"]
+    print(
+        f"Done. sent_or_dry={stats['sent']} skipped_dedup={stats['skipped_dedup']} "
+        f"failed={stats['failed']} gone_deleted={stats['gone']} "
+        f"(candidates_this_run={stats['candidates']}, pre_limit_skipped={skipped_pre})"
+    )
+    emit_flyer_push_stats(
+        {
+            "ok": True,
+            "dry_run": dry_run,
+            "limit": limit,
+            "sent": stats["sent"],
+            "gone": stats["gone"],
+            "failed": stats["failed"],
+            "skipped_dedup": skipped_pre + stats["skipped_dedup"],
+            "candidates": stats["candidates"],
+            "fire_chains": fire_names,
+            "supabase_key_role": key_role,
+        }
+    )
+    return 0
+
+
 def _main_impl(
     args: argparse.Namespace,
     *,
@@ -429,6 +564,7 @@ def _main_impl(
 ) -> int:
     if args.limit < 0:
         raise SystemExit("--limit mora biti >= 0")
+    test_chain = validate_test_fire_args(args)
     dry_run = resolve_dry_run(args)
     batch_size = max(1, args.batch_size)
     progress = progress if progress is not None else {}
@@ -455,6 +591,7 @@ def _main_impl(
         f"as_of={as_of.isoformat()} week={week} "
         f"chains={','.join(ALLOWED_CHAINS)} "
         f"only_hash={args.only_endpoint_hash or '-'} "
+        f"test_fire={test_chain or '-'} "
         f"supabase_key_role={key_role}"
     )
 
@@ -483,6 +620,63 @@ def _main_impl(
         )
 
     client = supabase_client(require_service_role=True)
+
+    # --test-fire: bez detekcije; flyer_week=TEST-… (pravi tjedan netaknut)
+    if test_chain:
+        test_week = test_flyer_week()
+        assert test_week.startswith("TEST-"), test_week
+        assert test_week != week, (test_week, week)
+        print(
+            f"TEST-FIRE chain={test_chain} flyer_week={test_week} "
+            f"(real_week={week} unused)"
+        )
+        subs = fetch_subscriptions_for_chain(client, test_chain, batch_size)
+        print(f"  followers {test_chain}: {len(subs)}")
+        jobs = build_test_fire_jobs(
+            test_chain, test_week, subs, str(args.only_endpoint_hash)
+        )
+        print(f"test-fire jobs after hash filter: {len(jobs)}")
+        if not jobs:
+            print("TEST-FIRE: nema pretplate za taj endpoint hash + lanac.")
+            emit_flyer_push_stats(
+                {
+                    "ok": True,
+                    "dry_run": dry_run,
+                    "limit": args.limit,
+                    "sent": 0,
+                    "gone": 0,
+                    "failed": 0,
+                    "skipped_dedup": 0,
+                    "candidates": 0,
+                    "fire_chains": [test_chain],
+                    "test_fire": True,
+                    "flyer_week": test_week,
+                    "supabase_key_role": key_role,
+                }
+            )
+            return 0
+        # Dedup samo za TEST- tjedan (ne dira pravi ISO tjedan)
+        sent_keys = fetch_sent_keys_for_chain_weeks(
+            client, [(test_chain, test_week)], batch_size
+        )
+        jobs, skipped_pre, unsent_n = apply_limit_after_dedup(
+            jobs, sent_keys, min(args.limit, 1)
+        )
+        print(
+            f"after dedup-before-limit (test): skipped_already={skipped_pre} "
+            f"unsent={unsent_n} after_limit={len(jobs)}"
+        )
+        return _run_send_pipeline(
+            client=client,
+            jobs=jobs,
+            dry_run=dry_run,
+            skipped_pre=skipped_pre,
+            fire_names=[test_chain],
+            limit=args.limit,
+            key_role=key_role,
+            progress=progress,
+        )
+
     store_by_id = fetch_stores(client)
     by_chain = fetch_scrape_sets(client, store_by_id, batch_size)
     detection_rows = evaluate_day(by_chain, as_of)
@@ -544,77 +738,16 @@ def _main_impl(
         f"unsent={unsent_n} after_limit={len(jobs)}"
     )
 
-    if not jobs:
-        print("Nothing to send after filters.")
-        emit_flyer_push_stats(
-            {
-                "ok": True,
-                "dry_run": dry_run,
-                "limit": args.limit,
-                "sent": 0,
-                "gone": 0,
-                "failed": 0,
-                "skipped_dedup": skipped_pre,
-                "candidates": 0,
-                "fire_chains": fire_names,
-                "supabase_key_role": key_role,
-            }
-        )
-        return 0
-
-    vapid_private = ""
-    claims: dict = {}
-    if not dry_run:
-        vapid_private, claims = vapid_config()
-
-    def try_reserve(sid: str, chain: str, flyer_week: str) -> bool:
-        return try_reserve_flyer(client, sid, chain, flyer_week)
-
-    def release_reserve(sid: str, chain: str, flyer_week: str) -> None:
-        release_flyer_reservation(client, sid, chain, flyer_week)
-
-    def send_fn(sub: dict, payload: dict) -> None:
-        send_one(sub, payload, vapid_private, claims)
-
-    def delete_sub(endpoint: str) -> None:
-        delete_subscription(client, endpoint)
-
-    progress["skipped_dedup"] = skipped_pre
-    stats = process_jobs(
-        jobs,
+    return _run_send_pipeline(
+        client=client,
+        jobs=jobs,
         dry_run=dry_run,
-        try_reserve=try_reserve,
-        release_reserve=release_reserve,
-        send_fn=send_fn,
-        delete_sub=delete_sub,
+        skipped_pre=skipped_pre,
+        fire_names=fire_names,
+        limit=args.limit,
+        key_role=key_role,
         progress=progress,
     )
-    # process_jobs overwrites skipped_dedup; keep pre-limit skips in total
-    progress["skipped_dedup"] = skipped_pre + stats["skipped_dedup"]
-    progress["sent"] = stats["sent"]
-    progress["gone"] = stats["gone"]
-    progress["failed"] = stats["failed"]
-    progress["candidates"] = stats["candidates"]
-    print(
-        f"Done. sent_or_dry={stats['sent']} skipped_dedup={stats['skipped_dedup']} "
-        f"failed={stats['failed']} gone_deleted={stats['gone']} "
-        f"(candidates_this_run={stats['candidates']}, pre_limit_skipped={skipped_pre})"
-    )
-    emit_flyer_push_stats(
-        {
-            "ok": True,
-            "dry_run": dry_run,
-            "limit": args.limit,
-            "sent": stats["sent"],
-            "gone": stats["gone"],
-            "failed": stats["failed"],
-            "skipped_dedup": skipped_pre + stats["skipped_dedup"],
-            "candidates": stats["candidates"],
-            "fire_chains": fire_names,
-            "supabase_key_role": key_role,
-        }
-    )
-    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
