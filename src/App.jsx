@@ -191,6 +191,7 @@ export default function App() {
         onToggleFav={toggle}
         homeResetSignal={homeResetSignal}
         favorites={favorites}
+        favoritesLoading={favoritesLoading}
       />
     ),
     search: (

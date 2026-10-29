@@ -32,6 +32,27 @@ export function barcodesFromFavorites(favorites) {
 }
 
 /**
+ * Upsert tracked_barcodes: prazan provided + neprazan lastSynced → zadrži lastSynced
+ * (ne briši server dok favoriti nisu pouzdani / još se učitavaju).
+ * @param {unknown} provided
+ * @param {unknown} lastSynced
+ * @returns {string[]}
+ */
+export function resolveTrackedBarcodesForUpsert(provided, lastSynced) {
+  const next = (Array.isArray(provided) ? provided : [])
+    .map((b) => String(b || "").trim())
+    .filter(isTrackableBarcode)
+    .slice(0, 500);
+  if (next.length > 0) return next;
+  const prev = (Array.isArray(lastSynced) ? lastSynced : [])
+    .map((b) => String(b || "").trim())
+    .filter(isTrackableBarcode)
+    .slice(0, 500);
+  if (prev.length > 0) return prev;
+  return [];
+}
+
+/**
  * Odluči što sync smije poslati na server.
  * Štiti od brisanja tracked_barcodes=[] na početnom loadu s praznim localStorage
  * (SW pretplata i dalje živa), a zadržava barkodove kad se doda favorit bez barkoda.

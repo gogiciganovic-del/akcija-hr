@@ -11,6 +11,7 @@ import {
   favoriteHasTrackableBarcode,
   isTrackableBarcode,
   planTrackedBarcodesUpdate,
+  resolveTrackedBarcodesForUpsert,
 } from "./pushTrackedBarcodes";
 
 export {
@@ -18,6 +19,7 @@ export {
   favoriteHasTrackableBarcode,
   isTrackableBarcode,
   planTrackedBarcodesUpdate,
+  resolveTrackedBarcodesForUpsert,
 };
 export {
   FLYER_FOLLOW_CHAINS,
@@ -150,7 +152,10 @@ async function upsertFromPushSubscription(sub, trackedBarcodes = []) {
   if (!endpoint || !p256dh || !auth) {
     throw new Error("Push pretplata nema potpune ključeve");
   }
-  const tracked = trackedBarcodes.slice(0, 500);
+  const tracked = resolveTrackedBarcodesForUpsert(
+    trackedBarcodes,
+    readLastSyncedBarcodes()
+  );
   await upsertPushSubscription({
     endpoint,
     p256dh,

@@ -15,6 +15,7 @@ import {
   planUnfollowChain,
   shouldShowFlyerFollowButton,
 } from "../src/lib/pushFlyerFollow.js";
+import { resolveTrackedBarcodesForUpsert } from "../src/lib/pushTrackedBarcodes.js";
 
 assert.deepEqual(FLYER_FOLLOW_CHAINS, ["Eurospin", "Kaufland", "Plodine"]);
 assert.equal(isFlyerFollowChain("Kaufland"), true);
@@ -114,6 +115,19 @@ assert.deepEqual(
   beforeDenied
 );
 
+// --- upsert: prazan popis + neprazan lastSynced → lastSynced ---
+const lastSynced = ["3850100000001", "3850100000002"];
+assert.deepEqual(resolveTrackedBarcodesForUpsert([], lastSynced), lastSynced);
+assert.deepEqual(resolveTrackedBarcodesForUpsert(null, lastSynced), lastSynced);
+// Normalan tok: neprazan provided ostaje (ne miješa s lastSynced)
+assert.deepEqual(
+  resolveTrackedBarcodesForUpsert(["3850199999999"], lastSynced),
+  ["3850199999999"]
+);
+// Oba prazna → []
+assert.deepEqual(resolveTrackedBarcodesForUpsert([], []), []);
+assert.deepEqual(resolveTrackedBarcodesForUpsert([], null), []);
+
 // Isključi: clearPushLocalState mora maknuti lokalno zrcalo followed_chains.
 // delete_push_subscription briše cijeli red → followed_chains nestaje u bazi.
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -141,8 +155,13 @@ assert.match(
 );
 assert.match(pushSrc, /notifyFollowedChainsChanged\(\)/);
 assert.match(pushSrc, /cjenko-followed-chains-changed/);
+// Zaštita: upsert ne šalje [] kad lastSynced nije prazan
+assert.match(
+  pushSrc,
+  /resolveTrackedBarcodesForUpsert\(\s*trackedBarcodes\s*,\s*readLastSyncedBarcodes\(\)\s*\)/
+);
 
-// HomePage: enable prema endpointu, barkodovi iz favorita
+// HomePage: enable prema endpointu, barkodovi iz favorita; loading → disabled
 const homeSrc = fs.readFileSync(
   path.join(root, "../src/pages/HomePage.jsx"),
   "utf8"
@@ -158,6 +177,17 @@ assert.doesNotMatch(
 assert.match(homeSrc, /getFollowedChainsChangedEvent\(\)/);
 assert.match(homeSrc, /shouldShowFlyerFollowButton\(/);
 assert.match(homeSrc, /isPushSupported\(\)/);
+assert.match(
+  homeSrc,
+  /followBlockedByFavoritesLoad = Boolean\(favoritesLoading\) && !following/
+);
+assert.match(homeSrc, /disabled=\{flyerDisabled\}/);
+assert.match(homeSrc, /if \(favoritesLoading && !following\) return;/);
+// Favoriti u učitavanju → nema puta koji zove upsert/enable s [] iz loada
+assert.match(homeSrc, /favoritesLoading=\{favoritesLoading\}/);
+
+const appSrc = fs.readFileSync(path.join(root, "../src/App.jsx"), "utf8");
+assert.match(appSrc, /favoritesLoading=\{favoritesLoading\}/);
 
 // SW: searchParams.set → &cjenko_from=push kad query već postoji
 const swSrc = fs.readFileSync(path.join(root, "../src/sw.js"), "utf8");

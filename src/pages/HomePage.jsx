@@ -88,7 +88,7 @@ function StoreFilterRow({ selectedStore, onSelect }) {
   );
 }
 
-function StoreInfoBar({ store, stats, loading, favorites }) {
+function StoreInfoBar({ store, stats, loading, favorites, favoritesLoading }) {
   const [following, setFollowing] = useState(() =>
     readFollowedChains().includes(store.id)
   );
@@ -99,6 +99,9 @@ function StoreInfoBar({ store, stats, loading, favorites }) {
     isSupported: isPushSupported(),
     permission,
   });
+  // Dok favoriti nisu učitani, ne upsertaj s [] — gumb "Obavijesti me" disabled.
+  const followBlockedByFavoritesLoad = Boolean(favoritesLoading) && !following;
+  const flyerDisabled = flyerBusy || followBlockedByFavoritesLoad;
 
   const refreshFollowing = useCallback(() => {
     setFollowing(readFollowedChains().includes(store.id));
@@ -125,6 +128,7 @@ function StoreInfoBar({ store, stats, loading, favorites }) {
 
   const handleFlyerFollowClick = useCallback(async () => {
     if (flyerBusy) return;
+    if (favoritesLoading && !following) return;
     setFlyerBusy(true);
     try {
       if (following) {
@@ -159,7 +163,7 @@ function StoreInfoBar({ store, stats, loading, favorites }) {
     } finally {
       setFlyerBusy(false);
     }
-  }, [following, flyerBusy, store.id, favorites]);
+  }, [following, flyerBusy, store.id, favorites, favoritesLoading]);
 
   const items = [
     {
@@ -241,7 +245,7 @@ function StoreInfoBar({ store, stats, loading, favorites }) {
         <button
           type="button"
           data-testid="flyer-follow-btn"
-          disabled={flyerBusy}
+          disabled={flyerDisabled}
           onClick={handleFlyerFollowClick}
           className="w-full mt-2.5 rounded-xl px-3 py-2 font-semibold transition-all duration-200"
           style={{
@@ -251,7 +255,7 @@ function StoreInfoBar({ store, stats, loading, favorites }) {
             border: following
               ? "1px solid #00ff88"
               : `1px solid ${store.color}66`,
-            opacity: flyerBusy ? 0.7 : 1,
+            opacity: flyerDisabled ? 0.7 : 1,
           }}
         >
           {following ? "Pratiš letak ✓" : "Obavijesti me kad izađe novi letak"}
@@ -296,6 +300,7 @@ export function HomePage({
   onToggleFav,
   homeResetSignal = 0,
   favorites = null,
+  favoritesLoading = false,
 }) {
   const scrollRef = useRef(null);
   const [activeCat, setActiveCat] = useState(null);
@@ -559,6 +564,7 @@ export function HomePage({
           stats={storeStats}
           loading={statsLoading}
           favorites={favorites}
+          favoritesLoading={favoritesLoading}
         />
       )}
 
