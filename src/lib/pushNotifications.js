@@ -1,6 +1,12 @@
 import { supabase } from "./supabase";
 import { disablePushSequence } from "./pushDisable";
 import {
+  isFlyerFollowChain,
+  normalizeFollowedChains,
+  planFollowChain,
+  planUnfollowChain,
+} from "./pushFlyerFollow";
+import {
   barcodesFromFavorites,
   favoriteHasTrackableBarcode,
   isTrackableBarcode,
@@ -13,10 +19,18 @@ export {
   isTrackableBarcode,
   planTrackedBarcodesUpdate,
 };
+export {
+  FLYER_FOLLOW_CHAINS,
+  isFlyerFollowChain,
+  normalizeFollowedChains,
+  planFollowChain,
+  planUnfollowChain,
+} from "./pushFlyerFollow";
 export { disablePushSequence } from "./pushDisable";
 
 const ENDPOINT_STORAGE_KEY = "cjenko_push_endpoint";
 const LAST_TRACKED_KEY = "cjenko_push_tracked_barcodes";
+const FOLLOWED_CHAINS_KEY = "cjenko_push_followed_chains";
 
 /**
  * @param {string} base64String
@@ -172,6 +186,104 @@ export async function enablePushNotifications(trackedBarcodes = []) {
   return sub;
 }
 
+export function readFollowedChains() {
+  try {
+    const raw = localStorage.getItem(FOLLOWED_CHAINS_KEY);
+    if (!raw) return [];
+    return normalizeFollowedChains(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+export function writeFollowedChains(chains) {
+  try {
+    localStorage.setItem(
+      FOLLOWED_CHAINS_KEY,
+      JSON.stringify(normalizeFollowedChains(chains))
+    );
+  } catch {
+    // ignore
+  }
+}
+
+function clearFollowedChainsLocal() {
+  try {
+    localStorage.removeItem(FOLLOWED_CHAINS_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Ažuriraj followed_chains za postojeći endpoint (RPC).
+ * @param {string} endpoint
+ * @param {string[]} chains
+ */
+export async function updateFollowedChains(endpoint, chains) {
+  if (!endpoint) return;
+  const { error } = await supabase.rpc("update_push_followed_chains", {
+    p_endpoint: endpoint,
+    p_chains: normalizeFollowedChains(chains),
+  });
+  if (error) throw error;
+}
+
+async function resolvePushEndpoint() {
+  if (isPushSupported()) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub?.endpoint) {
+        rememberEndpoint(sub.endpoint);
+        return sub.endpoint;
+      }
+    } catch {
+      // pad na zapamćeni
+    }
+  }
+  return getRememberedEndpoint();
+}
+
+/**
+ * Prati lanac za „novi letak”. Zahtijeva postojeću push pretplatu (endpoint).
+ * @param {string} chain
+ * @returns {Promise<{ ok: boolean, reason?: string, chains?: string[] }>}
+ */
+export async function followChain(chain) {
+  if (!isFlyerFollowChain(chain)) {
+    return { ok: false, reason: "not_allowed" };
+  }
+  const endpoint = await resolvePushEndpoint();
+  if (!endpoint) {
+    return { ok: false, reason: "no_subscription" };
+  }
+  const plan = planFollowChain(readFollowedChains(), chain);
+  if (!plan.ok) return plan;
+  await updateFollowedChains(endpoint, plan.chains);
+  writeFollowedChains(plan.chains);
+  return { ok: true, chains: plan.chains };
+}
+
+/**
+ * Prestani pratiti lanac.
+ * @param {string} chain
+ * @returns {Promise<{ ok: boolean, reason?: string, chains?: string[] }>}
+ */
+export async function unfollowChain(chain) {
+  const endpoint = await resolvePushEndpoint();
+  if (!endpoint) {
+    const local = planUnfollowChain(readFollowedChains(), chain);
+    writeFollowedChains(local.chains);
+    return { ok: true, chains: local.chains, reason: "local_only" };
+  }
+  const plan = planUnfollowChain(readFollowedChains(), chain);
+  if (!plan.ok) return plan;
+  await updateFollowedChains(endpoint, plan.chains);
+  writeFollowedChains(plan.chains);
+  return { ok: true, chains: plan.chains };
+}
+
 function clearPushLocalState() {
   rememberEndpoint("");
   try {
@@ -179,6 +291,7 @@ function clearPushLocalState() {
   } catch {
     // ignore
   }
+  clearFollowedChainsLocal();
 }
 
 /**

@@ -15,7 +15,8 @@
     "test:usage-cart-launch": "node scripts/test-usage-cart-launch.mjs",
     "test:how-it-works": "node scripts/test-how-it-works-pref.mjs",
     "test:flyer-detect": "py -3 scripts/test-flyer-detect.py",
-    "test:flyer-push": "py -3 scripts/test-flyer-push.py"
+    "test:flyer-push": "py -3 scripts/test-flyer-push.py",
+    "test:flyer-follow": "node scripts/test-flyer-follow.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",

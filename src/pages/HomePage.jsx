@@ -9,8 +9,16 @@ import { useStoreStats } from "../hooks/useStoreStats";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { CATEGORIES, STORES, STORES_ROW_1, STORES_ROW_2 } from "../lib/constants";
 import { isNewProduct, isExpiringTodayProduct } from "../lib/dealDates";
-import { trackSkenOtvoren } from "../lib/usageEvents";
+import { trackLetakPratim, trackLetakPrestani, trackSkenOtvoren } from "../lib/usageEvents";
 import { readHowItWorksOpen, writeHowItWorksOpen } from "../lib/howItWorksPref";
+import {
+  enablePushNotifications,
+  followChain,
+  getNotificationPermission,
+  isFlyerFollowChain,
+  readFollowedChains,
+  unfollowChain,
+} from "../lib/pushNotifications";
 
 function StoreGrid({ stores, selectedStore, onSelect }) {
   return (
@@ -76,6 +84,54 @@ function StoreFilterRow({ selectedStore, onSelect }) {
 }
 
 function StoreInfoBar({ store, stats, loading }) {
+  const [following, setFollowing] = useState(() =>
+    readFollowedChains().includes(store.id)
+  );
+  const [flyerBusy, setFlyerBusy] = useState(false);
+  const permission = getNotificationPermission();
+  const showFlyerFollow =
+    isFlyerFollowChain(store.id) && permission !== "denied" && permission !== "unsupported";
+
+  useEffect(() => {
+    setFollowing(readFollowedChains().includes(store.id));
+  }, [store.id]);
+
+  const handleFlyerFollowClick = useCallback(async () => {
+    if (flyerBusy) return;
+    setFlyerBusy(true);
+    try {
+      if (following) {
+        const res = await unfollowChain(store.id);
+        if (res.ok) {
+          setFollowing(false);
+          trackLetakPrestani();
+        }
+        return;
+      }
+
+      const perm = getNotificationPermission();
+      if (perm !== "granted") {
+        try {
+          await enablePushNotifications([]);
+        } catch (e) {
+          // Odbijena dozvola / dismiss — tiho, bez zastrašujuće poruke.
+          if (e?.code === "denied" || e?.code === "default") return;
+          return;
+        }
+      }
+
+      const res = await followChain(store.id);
+      if (res.ok) {
+        setFollowing(true);
+        trackLetakPratim();
+      }
+    } catch {
+      // tiho — ne plaši korisnika
+    } finally {
+      setFlyerBusy(false);
+    }
+  }, [following, flyerBusy, store.id]);
+
   const items = [
     {
       key: "akcije",
@@ -103,6 +159,7 @@ function StoreInfoBar({ store, stats, loading }) {
   return (
     <div
       className="mx-4 mb-4 rounded-2xl px-3 py-3"
+      data-testid="store-info-bar"
       style={{
         background: `linear-gradient(135deg, ${store.color}18, rgba(255,255,255,0.02))`,
         border: `1px solid ${store.color}44`,
@@ -151,6 +208,39 @@ function StoreInfoBar({ store, stats, loading }) {
       <p style={{ color: "rgba(0,255,136,0.55)", fontSize: 9, marginTop: 8, textAlign: "center" }}>
         Prikazane su samo akcije iz {store.label}
       </p>
+      {showFlyerFollow && (
+        <button
+          type="button"
+          data-testid="flyer-follow-btn"
+          disabled={flyerBusy}
+          onClick={handleFlyerFollowClick}
+          className="w-full mt-2.5 rounded-xl px-3 py-2 font-semibold transition-all duration-200"
+          style={{
+            fontSize: 11,
+            color: following ? "#020617" : "rgba(255,255,255,0.85)",
+            background: following ? "#00ff88" : "rgba(255,255,255,0.06)",
+            border: following
+              ? "1px solid #00ff88"
+              : `1px solid ${store.color}66`,
+            opacity: flyerBusy ? 0.7 : 1,
+          }}
+        >
+          {following ? "Pratiš letak ✓" : "Obavijesti me kad izađe novi letak"}
+        </button>
+      )}
+      {showFlyerFollow && (
+        <p
+          style={{
+            color: "rgba(255,255,255,0.32)",
+            fontSize: 8,
+            marginTop: 6,
+            textAlign: "center",
+            lineHeight: 1.35,
+          }}
+        >
+          Najviše jedna obavijest tjedno. Isključuješ na Favoritima.
+        </p>
+      )}
     </div>
   );
 }
@@ -198,6 +288,19 @@ export function HomePage({
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [homeResetSignal]);
+
+  // Jednom pri učitavanju: ?trgovina=<lanac> otvara postojeći odabir trgovine.
+  useEffect(() => {
+    try {
+      const raw = new URLSearchParams(window.location.search).get("trgovina");
+      if (!raw) return;
+      const chain = String(raw).trim();
+      if (!STORES.some((s) => s.id === chain)) return;
+      setSelectedStore(chain);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const storeMeta = STORES.find((s) => s.id === selectedStore);
   const { stats: storeStats, loading: statsLoading } = useStoreStats(selectedStore);

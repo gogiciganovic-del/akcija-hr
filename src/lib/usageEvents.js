@@ -4,7 +4,7 @@
  * Događaji: tab_home, tab_search, tab_cart, tab_fav, sken_otvoren, sken_uspjeh,
  * favorit_dodan, prati_cijenu, tap_redovna, kosarica_izracunaj, kosarica_dodan,
  * push_klik, push_ukljucen, push_odbijen, push_greska, push_otvoren, push_iskljucen,
- * otvoreno_iz_appa.
+ * letak_pratim, letak_prestani, otvoreno_iz_appa.
  */
 
 const TAB_EVENTS = {
@@ -178,6 +178,16 @@ export function trackPushOtvoren() {
 /** push_iskljucen — korisnik je isključio obavijesti (samo ime događaja). */
 export function trackPushIskljucen() {
   track("push_iskljucen");
+}
+
+/** letak_pratim — uključeno praćenje novog letka (samo ime događaja). */
+export function trackLetakPratim() {
+  track("letak_pratim");
+}
+
+/** letak_prestani — isključeno praćenje letka (samo ime događaja). */
+export function trackLetakPrestani() {
+  track("letak_prestani");
 }
 
 function stripPushOpenParam() {
