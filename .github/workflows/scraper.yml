@@ -33,3 +33,12 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      # Faza 1: flyer push dry-run (bez --send). continue-on-error: ne ruši scrape.
+      - name: Send flyer pushes (dry-run)
+        continue-on-error: true
+        run: python scraper/send_flyer_pushes.py --limit 500
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
