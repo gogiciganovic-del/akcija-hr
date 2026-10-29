@@ -129,8 +129,11 @@
       <li>
         <strong style="color:#fff">Obavijesti o padu cijene (opcionalno)</strong> — ako
         uključite push, na poslužitelj šaljemo endpoint pretplate i popis barkodova
-        favorita koje pratite. Uz pretplatu ne čuvamo ime, e-mail ni račun, pa je ne
-        možemo povezati s osobom. Zapis čuvamo dok je pretplata aktivna. Pretplatu s
+        favorita koje pratite. Uz push pretplatu pohranjujemo i popis lanaca
+        (Eurospin, Kaufland, Plodine) koje ste označili za obavijest o novom letku.
+        Taj popis briše se kad isključite obavijesti (gumb Isključi na Favoritima)
+        ili kad se red pretplate inače obriše. Uz pretplatu ne čuvamo ime, e-mail ni
+        račun, pa je ne možemo povezati s osobom. Zapis čuvamo dok je pretplata aktivna. Pretplatu s
         ovog uređaja brišete gumbom Isključi na Favoritima: odjava u pregledniku i
         brisanje retka na poslužitelju. Ako push servis pri slanju javi da pretplata
         više ne postoji (HTTP 404 ili 410), red automatski brišemo. Ako obavijesti
@@ -167,7 +170,8 @@
       <li>opcionalno prepoznavanje proizvoda barkodom,</li>
       <li>održavanje i sigurnost usluge,</li>
       <li>anonimno brojanje korištenja aplikacije (samo ime događaja),</li>
-      <li>opcionalno obavijest kad padne redovna cijena favorita.</li>
+      <li>opcionalno obavijest kad padne redovna cijena favorita,</li>
+      <li>opcionalno obavijest kad izađe novi letak (Eurospin, Kaufland, Plodine).</li>
     </ul>
 
     <h2>4. Pravna osnova i prava</h2>
