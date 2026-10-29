@@ -271,7 +271,9 @@ function StoreInfoBar({ store, stats, loading, favorites, favoritesLoading }) {
             lineHeight: 1.35,
           }}
         >
-          Najviše jedna obavijest tjedno. Isključuješ na Favoritima.
+          {following
+            ? "Dodirni za prekid praćenja. Sve obavijesti isključuješ na Favoritima."
+            : "Najviše jedna obavijest tjedno po trgovini. Isključuješ na Favoritima."}
         </p>
       )}
     </div>

@@ -55,6 +55,10 @@ const offText = (await btnOff.textContent()) || "";
 if (!offText.includes("Obavijesti me")) {
   throw new Error(`expected off CTA, got ${JSON.stringify(offText)}`);
 }
+const offCap = (await barOff.textContent()) || "";
+if (!offCap.includes("Najviše jedna obavijest tjedno po trgovini")) {
+  throw new Error(`expected off caption, got ${JSON.stringify(offCap)}`);
+}
 
 // Uključi lokalno zrcalo pa reload stanja gumba
 await page.evaluate(() => {
@@ -68,7 +72,12 @@ const onText = (await page.locator('[data-testid="flyer-follow-btn"]').textConte
 if (!onText.includes("Pratiš letak")) {
   throw new Error(`expected on CTA, got ${JSON.stringify(onText)}`);
 }
-await page.locator('[data-testid="store-info-bar"]').screenshot({
+const barOn = page.locator('[data-testid="store-info-bar"]');
+const onCap = (await barOn.textContent()) || "";
+if (!onCap.includes("Dodirni za prekid praćenja")) {
+  throw new Error(`expected on caption, got ${JSON.stringify(onCap)}`);
+}
+await barOn.screenshot({
   path: path.join(outDir, "flyer-follow-kaufland-on-360x740.png"),
 });
 

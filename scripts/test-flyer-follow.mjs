@@ -185,6 +185,14 @@ assert.match(homeSrc, /disabled=\{flyerDisabled\}/);
 assert.match(homeSrc, /if \(favoritesLoading && !following\) return;/);
 // Favoriti u učitavanju → nema puta koji zove upsert/enable s [] iz loada
 assert.match(homeSrc, /favoritesLoading=\{favoritesLoading\}/);
+assert.match(
+  homeSrc,
+  /Najviše jedna obavijest tjedno po trgovini\. Isključuješ na Favoritima\./
+);
+assert.match(
+  homeSrc,
+  /Dodirni za prekid praćenja\. Sve obavijesti isključuješ na Favoritima\./
+);
 
 const appSrc = fs.readFileSync(path.join(root, "../src/App.jsx"), "utf8");
 assert.match(appSrc, /favoritesLoading=\{favoritesLoading\}/);
