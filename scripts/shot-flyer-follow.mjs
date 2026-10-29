@@ -90,4 +90,63 @@ await page.locator('[data-testid="store-info-bar"]').screenshot({
 });
 
 await browser.close();
+
+// --- Greška (nije odbijena dozvola): lažni endpoint → follow RPC padne → mirna poruka ---
+const browserErr = await chromium.launch({ headless: true, channel: "chrome" });
+const pageErr = await browserErr.newPage({
+  viewport: { width: 360, height: 740 },
+  deviceScaleFactor: 2,
+});
+await pageErr.addInitScript(() => {
+  try {
+    Object.defineProperty(Notification, "permission", {
+      configurable: true,
+      get: () => "granted",
+    });
+  } catch {
+    // ignore
+  }
+});
+await pageErr.goto("http://127.0.0.1:5173/", {
+  waitUntil: "domcontentloaded",
+  timeout: 30000,
+});
+await pageErr.evaluate(() => {
+  localStorage.clear();
+  // Postoji "pretplata" → skip enable; RPC će pasti zbog route.abort ispod.
+  localStorage.setItem(
+    "cjenko_push_endpoint",
+    "https://example.invalid/push/fake-endpoint-for-shot"
+  );
+});
+// Blokiraj Supabase RPC/REST → followChain baca → mirna poruka (nije denied).
+await pageErr.route("**/*supabase.co/**", (route) => route.abort());
+await pageErr.route("**/rest/v1/**", (route) => route.abort());
+await pageErr.goto("http://127.0.0.1:5173/?trgovina=Kaufland", {
+  waitUntil: "networkidle",
+  timeout: 30000,
+});
+await pageErr.waitForSelector('[data-testid="flyer-follow-btn"]', {
+  timeout: 15000,
+});
+await pageErr.waitForFunction(() => {
+  const b = document.querySelector('[data-testid="flyer-follow-btn"]');
+  return b && !b.disabled;
+}, null, { timeout: 15000 });
+await pageErr.locator('[data-testid="flyer-follow-btn"]').click();
+await pageErr.waitForSelector('[data-testid="flyer-follow-enable-error"]', {
+  state: "visible",
+  timeout: 15000,
+});
+const errText =
+  (await pageErr.locator('[data-testid="flyer-follow-enable-error"]').textContent()) ||
+  "";
+if (!errText.includes("Ne mogu uključiti obavijesti")) {
+  throw new Error(`expected enable fail msg, got ${JSON.stringify(errText)}`);
+}
+await pageErr.locator('[data-testid="store-info-bar"]').screenshot({
+  path: path.join(outDir, "flyer-follow-enable-error-360x740.png"),
+});
+await browserErr.close();
+
 console.log("OK shot-flyer-follow → _tmp_search_shots/flyer-follow-*-360x740.png");

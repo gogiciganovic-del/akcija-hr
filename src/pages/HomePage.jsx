@@ -14,6 +14,7 @@ import { readHowItWorksOpen, writeHowItWorksOpen } from "../lib/howItWorksPref";
 import {
   barcodesFromFavorites,
   enablePushNotifications,
+  FLYER_ENABLE_FAIL_MSG,
   followChain,
   getFollowedChainsChangedEvent,
   getNotificationPermission,
@@ -21,6 +22,7 @@ import {
   needsEnableBeforeFollow,
   readFollowedChains,
   resolvePushEndpoint,
+  shouldShowFlyerEnableFailMessage,
   shouldShowFlyerFollowButton,
   unfollowChain,
 } from "../lib/pushNotifications";
@@ -93,6 +95,7 @@ function StoreInfoBar({ store, stats, loading, favorites, favoritesLoading }) {
     readFollowedChains().includes(store.id)
   );
   const [flyerBusy, setFlyerBusy] = useState(false);
+  const [flyerEnableError, setFlyerEnableError] = useState(null);
   const permission = getNotificationPermission();
   const showFlyerFollow = shouldShowFlyerFollowButton({
     chain: store.id,
@@ -109,6 +112,7 @@ function StoreInfoBar({ store, stats, loading, favorites, favoritesLoading }) {
 
   useEffect(() => {
     refreshFollowing();
+    setFlyerEnableError(null);
   }, [refreshFollowing]);
 
   // Nakon "Isključi" na Favoritima: lokalno zrcalo se briše → osvježi gumb.
@@ -130,6 +134,7 @@ function StoreInfoBar({ store, stats, loading, favorites, favoritesLoading }) {
     if (flyerBusy) return;
     if (favoritesLoading && !following) return;
     setFlyerBusy(true);
+    setFlyerEnableError(null);
     try {
       if (following) {
         const res = await unfollowChain(store.id);
@@ -147,8 +152,9 @@ function StoreInfoBar({ store, stats, loading, favorites, favoritesLoading }) {
         try {
           await enablePushNotifications(barcodes);
         } catch (e) {
-          // Odbijena dozvola / dismiss — tiho, bez greške; gumb ostaje isključeno.
-          if (e?.code === "denied" || e?.code === "default") return;
+          // Odbijena dozvola / dismiss — tiho; ostale greške → mirna poruka.
+          if (!shouldShowFlyerEnableFailMessage(e?.code)) return;
+          setFlyerEnableError(FLYER_ENABLE_FAIL_MSG);
           return;
         }
       }
@@ -156,10 +162,13 @@ function StoreInfoBar({ store, stats, loading, favorites, favoritesLoading }) {
       const res = await followChain(store.id, { trackedBarcodes: barcodes });
       if (res.ok) {
         setFollowing(true);
+        setFlyerEnableError(null);
         trackLetakPratim();
+      } else {
+        setFlyerEnableError(FLYER_ENABLE_FAIL_MSG);
       }
     } catch {
-      // tiho — ne plaši korisnika
+      setFlyerEnableError(FLYER_ENABLE_FAIL_MSG);
     } finally {
       setFlyerBusy(false);
     }
@@ -274,6 +283,20 @@ function StoreInfoBar({ store, stats, loading, favorites, favoritesLoading }) {
           {following
             ? "Dodirni za prekid praćenja. Sve obavijesti isključuješ na Favoritima."
             : "Najviše jedna obavijest tjedno po trgovini. Isključuješ na Favoritima."}
+        </p>
+      )}
+      {showFlyerFollow && flyerEnableError && (
+        <p
+          data-testid="flyer-follow-enable-error"
+          style={{
+            color: "rgba(255,255,255,0.32)",
+            fontSize: 8,
+            marginTop: 6,
+            textAlign: "center",
+            lineHeight: 1.35,
+          }}
+        >
+          {flyerEnableError}
         </p>
       )}
     </div>

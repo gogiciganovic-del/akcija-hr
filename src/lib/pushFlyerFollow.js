@@ -81,3 +81,17 @@ export function shouldShowFlyerFollowButton({ chain, isSupported, permission }) 
 export function needsEnableBeforeFollow(endpoint) {
   return !endpoint;
 }
+
+/** Mirna poruka ispod gumba kad enable/follow padne (ne zbog odbijene dozvole). */
+export const FLYER_ENABLE_FAIL_MSG =
+  "Ne mogu uključiti obavijesti na ovom uređaju. Pokušaj ponovo kasnije.";
+
+/**
+ * Odbijena / dismiss dozvola → tiho; sve ostalo → pokaži FLYER_ENABLE_FAIL_MSG.
+ * @param {string|undefined|null} errorCode  npr. err.code iz enablePushNotifications
+ */
+export function shouldShowFlyerEnableFailMessage(errorCode) {
+  const c = String(errorCode || "");
+  if (c === "denied" || c === "default") return false;
+  return true;
+}

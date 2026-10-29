@@ -25,9 +25,11 @@ export {
   FLYER_FOLLOW_CHAINS,
   isFlyerFollowChain,
   normalizeFollowedChains,
+  FLYER_ENABLE_FAIL_MSG,
   needsEnableBeforeFollow,
   planFollowChain,
   planUnfollowChain,
+  shouldShowFlyerEnableFailMessage,
   shouldShowFlyerFollowButton,
 } from "./pushFlyerFollow";
 export { disablePushSequence } from "./pushDisable";

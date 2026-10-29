@@ -7,12 +7,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  FLYER_ENABLE_FAIL_MSG,
   FLYER_FOLLOW_CHAINS,
   isFlyerFollowChain,
   needsEnableBeforeFollow,
   normalizeFollowedChains,
   planFollowChain,
   planUnfollowChain,
+  shouldShowFlyerEnableFailMessage,
   shouldShowFlyerFollowButton,
 } from "../src/lib/pushFlyerFollow.js";
 import { resolveTrackedBarcodesForUpsert } from "../src/lib/pushTrackedBarcodes.js";
@@ -115,6 +117,17 @@ assert.deepEqual(
   beforeDenied
 );
 
+// --- enable fail poruka: denied/default tiho; ostalo pokaži ---
+assert.equal(shouldShowFlyerEnableFailMessage("denied"), false);
+assert.equal(shouldShowFlyerEnableFailMessage("default"), false);
+assert.equal(shouldShowFlyerEnableFailMessage(undefined), true);
+assert.equal(shouldShowFlyerEnableFailMessage("abort"), true);
+assert.equal(shouldShowFlyerEnableFailMessage(""), true);
+assert.match(
+  FLYER_ENABLE_FAIL_MSG,
+  /Ne mogu uključiti obavijesti na ovom uređaju/
+);
+
 // --- upsert: prazan popis + neprazan lastSynced → lastSynced ---
 const lastSynced = ["3850100000001", "3850100000002"];
 assert.deepEqual(resolveTrackedBarcodesForUpsert([], lastSynced), lastSynced);
@@ -193,6 +206,12 @@ assert.match(
   homeSrc,
   /Dodirni za prekid praćenja\. Sve obavijesti isključuješ na Favoritima\./
 );
+assert.match(homeSrc, /flyerEnableError/);
+assert.match(homeSrc, /shouldShowFlyerEnableFailMessage\(e\?\.code\)/);
+assert.match(homeSrc, /setFlyerEnableError\(FLYER_ENABLE_FAIL_MSG\)/);
+assert.match(homeSrc, /setFlyerEnableError\(null\)/);
+assert.match(homeSrc, /data-testid="flyer-follow-enable-error"/);
+assert.match(homeSrc, /FLYER_ENABLE_FAIL_MSG/);
 
 const appSrc = fs.readFileSync(path.join(root, "../src/App.jsx"), "utf8");
 assert.match(appSrc, /favoritesLoading=\{favoritesLoading\}/);
