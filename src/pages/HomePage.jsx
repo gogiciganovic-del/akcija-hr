@@ -12,11 +12,16 @@ import { isNewProduct, isExpiringTodayProduct } from "../lib/dealDates";
 import { trackLetakPratim, trackLetakPrestani, trackSkenOtvoren } from "../lib/usageEvents";
 import { readHowItWorksOpen, writeHowItWorksOpen } from "../lib/howItWorksPref";
 import {
+  barcodesFromFavorites,
   enablePushNotifications,
   followChain,
+  getFollowedChainsChangedEvent,
   getNotificationPermission,
-  isFlyerFollowChain,
+  isPushSupported,
+  needsEnableBeforeFollow,
   readFollowedChains,
+  resolvePushEndpoint,
+  shouldShowFlyerFollowButton,
   unfollowChain,
 } from "../lib/pushNotifications";
 
@@ -83,18 +88,40 @@ function StoreFilterRow({ selectedStore, onSelect }) {
   );
 }
 
-function StoreInfoBar({ store, stats, loading }) {
+function StoreInfoBar({ store, stats, loading, favorites }) {
   const [following, setFollowing] = useState(() =>
     readFollowedChains().includes(store.id)
   );
   const [flyerBusy, setFlyerBusy] = useState(false);
   const permission = getNotificationPermission();
-  const showFlyerFollow =
-    isFlyerFollowChain(store.id) && permission !== "denied" && permission !== "unsupported";
+  const showFlyerFollow = shouldShowFlyerFollowButton({
+    chain: store.id,
+    isSupported: isPushSupported(),
+    permission,
+  });
 
-  useEffect(() => {
+  const refreshFollowing = useCallback(() => {
     setFollowing(readFollowedChains().includes(store.id));
   }, [store.id]);
+
+  useEffect(() => {
+    refreshFollowing();
+  }, [refreshFollowing]);
+
+  // Nakon "Isključi" na Favoritima: lokalno zrcalo se briše → osvježi gumb.
+  useEffect(() => {
+    const ev = getFollowedChainsChangedEvent();
+    const onChanged = () => refreshFollowing();
+    const onFocus = () => refreshFollowing();
+    window.addEventListener(ev, onChanged);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener(ev, onChanged);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [refreshFollowing]);
 
   const handleFlyerFollowClick = useCallback(async () => {
     if (flyerBusy) return;
@@ -109,18 +136,20 @@ function StoreInfoBar({ store, stats, loading }) {
         return;
       }
 
-      const perm = getNotificationPermission();
-      if (perm !== "granted") {
+      const barcodes = barcodesFromFavorites(favorites);
+      // Stvarna pretplata, ne Notification.permission (granted + nema sub → enable).
+      const endpoint = await resolvePushEndpoint();
+      if (needsEnableBeforeFollow(endpoint)) {
         try {
-          await enablePushNotifications([]);
+          await enablePushNotifications(barcodes);
         } catch (e) {
-          // Odbijena dozvola / dismiss — tiho, bez zastrašujuće poruke.
+          // Odbijena dozvola / dismiss — tiho, bez greške; gumb ostaje isključeno.
           if (e?.code === "denied" || e?.code === "default") return;
           return;
         }
       }
 
-      const res = await followChain(store.id);
+      const res = await followChain(store.id, { trackedBarcodes: barcodes });
       if (res.ok) {
         setFollowing(true);
         trackLetakPratim();
@@ -130,7 +159,7 @@ function StoreInfoBar({ store, stats, loading }) {
     } finally {
       setFlyerBusy(false);
     }
-  }, [following, flyerBusy, store.id]);
+  }, [following, flyerBusy, store.id, favorites]);
 
   const items = [
     {
@@ -266,6 +295,7 @@ export function HomePage({
   isFav,
   onToggleFav,
   homeResetSignal = 0,
+  favorites = null,
 }) {
   const scrollRef = useRef(null);
   const [activeCat, setActiveCat] = useState(null);
@@ -528,6 +558,7 @@ export function HomePage({
           store={storeMeta}
           stats={storeStats}
           loading={statsLoading}
+          favorites={favorites}
         />
       )}
 

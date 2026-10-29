@@ -23,8 +23,10 @@ export {
   FLYER_FOLLOW_CHAINS,
   isFlyerFollowChain,
   normalizeFollowedChains,
+  needsEnableBeforeFollow,
   planFollowChain,
   planUnfollowChain,
+  shouldShowFlyerFollowButton,
 } from "./pushFlyerFollow";
 export { disablePushSequence } from "./pushDisable";
 
@@ -133,6 +135,52 @@ export async function updateTrackedBarcodes(endpoint, barcodes) {
 }
 
 /**
+ * Upsert retka pretplate iz postojeće browser PushSubscription
+ * (isti RPC kao Favoriti / enablePushNotifications).
+ * upsert_push_subscription NE briše followed_chains (smoke E).
+ * @param {PushSubscription} sub
+ * @param {string[]} trackedBarcodes
+ * @returns {Promise<string>} endpoint
+ */
+async function upsertFromPushSubscription(sub, trackedBarcodes = []) {
+  const json = sub.toJSON();
+  const endpoint = json.endpoint;
+  const p256dh = json.keys?.p256dh;
+  const auth = json.keys?.auth;
+  if (!endpoint || !p256dh || !auth) {
+    throw new Error("Push pretplata nema potpune ključeve");
+  }
+  const tracked = trackedBarcodes.slice(0, 500);
+  await upsertPushSubscription({
+    endpoint,
+    p256dh,
+    auth,
+    tracked_barcodes: tracked,
+  });
+  rememberEndpoint(endpoint);
+  writeLastSyncedBarcodes(tracked);
+  return endpoint;
+}
+
+/**
+ * Ako browser već ima pretplatu — upsert retka u bazi (bez requestPermission).
+ * @param {string[]} trackedBarcodes
+ * @returns {Promise<string|null>} endpoint ili null ako nema sub
+ */
+export async function ensurePushSubscriptionUpserted(trackedBarcodes = []) {
+  if (!isPushSupported()) return null;
+  if (Notification.permission !== "granted") return null;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return null;
+    return await upsertFromPushSubscription(sub, trackedBarcodes);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @param {string[]} trackedBarcodes
  * @returns {Promise<PushSubscription>}
  */
@@ -166,24 +214,20 @@ export async function enablePushNotifications(trackedBarcodes = []) {
     });
   }
 
-  const json = sub.toJSON();
-  const endpoint = json.endpoint;
-  const p256dh = json.keys?.p256dh;
-  const auth = json.keys?.auth;
-  if (!endpoint || !p256dh || !auth) {
-    throw new Error("Push pretplata nema potpune ključeve");
-  }
-
-  const tracked = trackedBarcodes.slice(0, 500);
-  await upsertPushSubscription({
-    endpoint,
-    p256dh,
-    auth,
-    tracked_barcodes: tracked,
-  });
-  rememberEndpoint(endpoint);
-  writeLastSyncedBarcodes(tracked);
+  await upsertFromPushSubscription(sub, trackedBarcodes);
   return sub;
+}
+
+const FOLLOWED_CHAINS_CHANGED = "cjenko-followed-chains-changed";
+
+function notifyFollowedChainsChanged() {
+  try {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(FOLLOWED_CHAINS_CHANGED));
+    }
+  } catch {
+    // ignore
+  }
 }
 
 export function readFollowedChains() {
@@ -205,6 +249,7 @@ export function writeFollowedChains(chains) {
   } catch {
     // ignore
   }
+  notifyFollowedChainsChanged();
 }
 
 function clearFollowedChainsLocal() {
@@ -213,6 +258,12 @@ function clearFollowedChainsLocal() {
   } catch {
     // ignore
   }
+  notifyFollowedChainsChanged();
+}
+
+/** Event name — StoreInfoBar sluša da osvježi following nakon Isključi. */
+export function getFollowedChainsChangedEvent() {
+  return FOLLOWED_CHAINS_CHANGED;
 }
 
 /**
@@ -229,7 +280,7 @@ export async function updateFollowedChains(endpoint, chains) {
   if (error) throw error;
 }
 
-async function resolvePushEndpoint() {
+export async function resolvePushEndpoint() {
   if (isPushSupported()) {
     try {
       const reg = await navigator.serviceWorker.ready;
@@ -247,14 +298,22 @@ async function resolvePushEndpoint() {
 
 /**
  * Prati lanac za „novi letak”. Zahtijeva postojeću push pretplatu (endpoint).
+ * Prije update_push_followed_chains upserta red (isti RPC kao Favoriti) —
+ * upsert ne briše followed_chains (smoke E).
  * @param {string} chain
+ * @param {{ trackedBarcodes?: string[] }} [opts]
  * @returns {Promise<{ ok: boolean, reason?: string, chains?: string[] }>}
  */
-export async function followChain(chain) {
+export async function followChain(chain, opts = {}) {
   if (!isFlyerFollowChain(chain)) {
     return { ok: false, reason: "not_allowed" };
   }
-  const endpoint = await resolvePushEndpoint();
+  const tracked = Array.isArray(opts.trackedBarcodes) ? opts.trackedBarcodes : [];
+  // Osiguraj red u bazi (browser sub → upsert_push_subscription).
+  let endpoint = await ensurePushSubscriptionUpserted(tracked);
+  if (!endpoint) {
+    endpoint = await resolvePushEndpoint();
+  }
   if (!endpoint) {
     return { ok: false, reason: "no_subscription" };
   }

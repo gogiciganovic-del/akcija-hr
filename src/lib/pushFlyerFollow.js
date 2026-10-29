@@ -62,3 +62,22 @@ export function normalizeFollowedChains(raw) {
   }
   return out;
 }
+
+/**
+ * Prikaz gumba: samo dopušteni lanac + podržan push + dozvola nije denied.
+ * @param {{ chain: string, isSupported: boolean, permission: string }} opts
+ */
+export function shouldShowFlyerFollowButton({ chain, isSupported, permission }) {
+  if (!isFlyerFollowChain(chain)) return false;
+  if (!isSupported) return false;
+  if (permission === "denied" || permission === "unsupported") return false;
+  return true;
+}
+
+/**
+ * Uključi push (enable) ako nema stvarne pretplate — ne gledaj samo Notification.permission.
+ * @param {string|null|undefined} endpoint
+ */
+export function needsEnableBeforeFollow(endpoint) {
+  return !endpoint;
+}

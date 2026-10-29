@@ -70,15 +70,13 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   const rawUrl = event.notification?.data?.url || DEFAULT_URL;
-  let targetUrl = rawUrl;
   let openUrl = rawUrl;
   try {
-    targetUrl = new URL(rawUrl, self.location.origin).href;
-    const withFlag = new URL(targetUrl);
+    // searchParams.set → ?cjenko_from=push ili &cjenko_from=push ako query već postoji
+    const withFlag = new URL(rawUrl, self.location.origin);
     withFlag.searchParams.set("cjenko_from", "push");
     openUrl = withFlag.href;
   } catch {
-    targetUrl = new URL(DEFAULT_URL, self.location.origin).href;
     openUrl = new URL(`${DEFAULT_URL}?cjenko_from=push`, self.location.origin).href;
   }
 
@@ -97,9 +95,10 @@ self.addEventListener("notificationclick", (event) => {
             // ignore
           }
           await client.focus();
-          if ("navigate" in client && client.url !== targetUrl) {
+          if ("navigate" in client && client.url !== openUrl) {
             try {
-              await client.navigate(targetUrl);
+              // openUrl već ima cjenko_from=push (searchParams.set → & ako query postoji)
+              await client.navigate(openUrl);
             } catch {
               // navigate nije uvijek dostupan — focus je dovoljan
             }

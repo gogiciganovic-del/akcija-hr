@@ -1,5 +1,5 @@
 /**
- * Logika praćenja letka + dokaz da Isključi čisti lokalno zrcalo.
+ * Logika praćenja letka + UI odluke + dokaz da Isključi čisti lokalno zrcalo.
  * Pokreni: npm run test:flyer-follow
  */
 import assert from "node:assert/strict";
@@ -9,9 +9,11 @@ import { fileURLToPath } from "node:url";
 import {
   FLYER_FOLLOW_CHAINS,
   isFlyerFollowChain,
+  needsEnableBeforeFollow,
   normalizeFollowedChains,
   planFollowChain,
   planUnfollowChain,
+  shouldShowFlyerFollowButton,
 } from "../src/lib/pushFlyerFollow.js";
 
 assert.deepEqual(FLYER_FOLLOW_CHAINS, ["Eurospin", "Kaufland", "Plodine"]);
@@ -61,9 +63,56 @@ assert.deepEqual(
   ["Eurospin", "Plodine", "Kaufland"]
 );
 
-// Odbijena dozvola: UI ne zove follow → plan/stanje se ne mijenja
+// --- granted bez pretplate → mora enable (ne gledaj samo permission) ---
+assert.equal(needsEnableBeforeFollow(null), true);
+assert.equal(needsEnableBeforeFollow(undefined), true);
+assert.equal(needsEnableBeforeFollow(""), true);
+assert.equal(
+  needsEnableBeforeFollow("https://fcm.googleapis.com/fcm/send/abc"),
+  false
+);
+
+// --- nepodržan push → gumb se ne prikazuje ---
+assert.equal(
+  shouldShowFlyerFollowButton({
+    chain: "Kaufland",
+    isSupported: false,
+    permission: "granted",
+  }),
+  false
+);
+assert.equal(
+  shouldShowFlyerFollowButton({
+    chain: "Kaufland",
+    isSupported: true,
+    permission: "default",
+  }),
+  true
+);
+assert.equal(
+  shouldShowFlyerFollowButton({
+    chain: "Lidl",
+    isSupported: true,
+    permission: "default",
+  }),
+  false
+);
+
+// --- odbijena dozvola: gumb sakriven; plan/stanje se ne mijenja ---
+assert.equal(
+  shouldShowFlyerFollowButton({
+    chain: "Kaufland",
+    isSupported: true,
+    permission: "denied",
+  }),
+  false
+);
 const beforeDenied = ["Eurospin"];
 assert.deepEqual(planFollowChain(beforeDenied, "Eurospin").chains, beforeDenied);
+assert.deepEqual(
+  planUnfollowChain(beforeDenied, "Kaufland").chains,
+  beforeDenied
+);
 
 // Isključi: clearPushLocalState mora maknuti lokalno zrcalo followed_chains.
 // delete_push_subscription briše cijeli red → followed_chains nestaje u bazi.
@@ -79,6 +128,49 @@ assert.match(
 assert.match(pushSrc, /function clearFollowedChainsLocal\(\)/);
 assert.match(pushSrc, /localStorage\.removeItem\(FOLLOWED_CHAINS_KEY\)/);
 assert.match(pushSrc, /clearFollowedChainsLocal\(\)/);
-assert.match(pushSrc, /function clearPushLocalState\(\)[\s\S]*clearFollowedChainsLocal\(\)/);
+assert.match(
+  pushSrc,
+  /function clearPushLocalState\(\)[\s\S]*clearFollowedChainsLocal\(\)/
+);
+// Upsert prije update_followed (isti RPC kao Favoriti)
+assert.match(pushSrc, /async function upsertFromPushSubscription\(/);
+assert.match(pushSrc, /export async function ensurePushSubscriptionUpserted\(/);
+assert.match(
+  pushSrc,
+  /export async function followChain\([\s\S]*ensurePushSubscriptionUpserted\(/
+);
+assert.match(pushSrc, /notifyFollowedChainsChanged\(\)/);
+assert.match(pushSrc, /cjenko-followed-chains-changed/);
+
+// HomePage: enable prema endpointu, barkodovi iz favorita
+const homeSrc = fs.readFileSync(
+  path.join(root, "../src/pages/HomePage.jsx"),
+  "utf8"
+);
+assert.match(homeSrc, /resolvePushEndpoint\(\)/);
+assert.match(homeSrc, /needsEnableBeforeFollow\(endpoint\)/);
+assert.match(homeSrc, /barcodesFromFavorites\(favorites\)/);
+assert.match(homeSrc, /enablePushNotifications\(barcodes\)/);
+assert.doesNotMatch(
+  homeSrc,
+  /enablePushNotifications\(\[\]\)/
+);
+assert.match(homeSrc, /getFollowedChainsChangedEvent\(\)/);
+assert.match(homeSrc, /shouldShowFlyerFollowButton\(/);
+assert.match(homeSrc, /isPushSupported\(\)/);
+
+// SW: searchParams.set → &cjenko_from=push kad query već postoji
+const swSrc = fs.readFileSync(path.join(root, "../src/sw.js"), "utf8");
+assert.match(swSrc, /searchParams\.set\(\s*["']cjenko_from["']\s*,\s*["']push["']\s*\)/);
+
+const withQuery = new URL("https://cjenko.app/?trgovina=Kaufland");
+withQuery.searchParams.set("cjenko_from", "push");
+assert.equal(
+  withQuery.href,
+  "https://cjenko.app/?trgovina=Kaufland&cjenko_from=push"
+);
+const bare = new URL("https://cjenko.app/");
+bare.searchParams.set("cjenko_from", "push");
+assert.equal(bare.href, "https://cjenko.app/?cjenko_from=push");
 
 console.log("OK test-flyer-follow");
