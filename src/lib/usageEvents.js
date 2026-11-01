@@ -225,11 +225,27 @@ function onSwMessage(event) {
 }
 
 /**
+ * ?notrack=1 → localStorage umami.disabled=1 (Umami poštuje);
+ * ?notrack=0 → ukloni. Ostale vrijednosti ne diraju.
+ */
+export function applyUmamiNotrackFromUrl() {
+  if (typeof window === "undefined") return;
+  try {
+    const v = new URLSearchParams(window.location.search).get("notrack");
+    if (v === "1") localStorage.setItem("umami.disabled", "1");
+    else if (v === "0") localStorage.removeItem("umami.disabled");
+  } catch {
+    // private mode / blocked storage
+  }
+}
+
+/**
  * Učitaj Umami samo kad je eksplicitno uključeno.
  * data-auto-pageview=false — tabovi idu kao custom events, ne kao pageview.
  */
 export function initUsageTracking() {
   if (typeof window === "undefined") return;
+  applyUmamiNotrackFromUrl();
   consumePushOpenFromUrl();
   if (consumeOtvorenoIzAppa(document.referrer)) {
     trackOtvorenoIzAppa();
