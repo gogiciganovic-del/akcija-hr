@@ -3,6 +3,8 @@
  * Pokreni: npm run test:daily-picks
  */
 import {
+  DAILY_FRESH_FALLBACK_MIN,
+  DAILY_FRESHNESS_MS,
   DAILY_MIN_DISCOUNT,
   DAILY_PICKS_MIN_VISIBLE,
   DAILY_POOL_SIZE,
@@ -15,6 +17,7 @@ import {
   hasRealPhoto,
   hashString,
   isEverydayItem,
+  maxScrapedAtByStore,
   nameKey,
   rankHotDeals,
   selectDailyPicks,
@@ -373,6 +376,126 @@ assert(DAILY_PICKS_MIN_VISIBLE === 3, "min visible 3");
   const first12 = ranked.slice(0, 12);
   const mlijeko = first12.filter((p) => nameKey(p.name) === "mlijeko").length;
   assert(mlijeko <= 3, `max 3 mlijeko in first 12 got ${mlijeko}`);
+}
+
+// --- svježina: stari red NE smije ući kad lanac ima MAX scraped_at ---
+{
+  const maxIso = "2026-10-31T12:00:00.000Z";
+  const freshIso = "2026-10-31T10:00:00.000Z"; // unutar 24h
+  const staleIso = "2026-10-29T12:00:00.000Z"; // >24h od MAX
+  const products = [
+    makeP({
+      id: "fresh1",
+      product_id: "fresh1",
+      name: "Mlijeko svjeze 1L",
+      chain: "Lidl",
+      discount: 30,
+      scrapedAt: freshIso,
+    }),
+    makeP({
+      id: "fresh2",
+      product_id: "fresh2",
+      name: "Jogurt svjezi 180g",
+      chain: "Lidl",
+      discount: 28,
+      scrapedAt: maxIso,
+    }),
+    makeP({
+      id: "stale1",
+      product_id: "stale1",
+      name: "Kruh stari 500g",
+      chain: "Lidl",
+      discount: 45, // viši popust — bez filtera bi bio prvi
+      scrapedAt: staleIso,
+    }),
+    makeP({
+      id: "k1",
+      product_id: "k1",
+      name: "Sir drugi lanac",
+      chain: "Konzum",
+      discount: 32,
+      scrapedAt: maxIso,
+    }),
+  ];
+  const maxMap = maxScrapedAtByStore(products);
+  assert(maxMap.get("lidl") === new Date(maxIso).getTime(), "Lidl MAX from data");
+  assert(DAILY_FRESHNESS_MS === 24 * 60 * 60 * 1000, "24h window");
+
+  const meta = {};
+  const pool = buildDailyCandidatePool(products, { freshnessMeta: meta });
+  assert(!pool.some((p) => p.id === "stale1"), "stale excluded from pool");
+  assert(pool.some((p) => p.id === "fresh1"), "fresh in pool");
+  assert(pool.some((p) => p.id === "fresh2"), "max-row in pool");
+  assert(!meta.usedFallback, "no store-filter fallback here");
+
+  const picks = selectDailyPicks(products, {
+    now: new Date("2026-11-01T12:00:00+01:00"),
+  });
+  assert(!picks.some((p) => p.id === "stale1"), "stale excluded from picks");
+}
+
+// --- FALLBACK: odabrana trgovina, svježi pool < 10 → popusti pravilo ---
+{
+  const maxIso = "2026-10-31T12:00:00.000Z";
+  const freshIso = "2026-10-31T11:00:00.000Z";
+  const staleIso = "2026-10-20T12:00:00.000Z";
+  const products = [];
+  const freshWords = ["mlijeko", "jogurt", "kruh"];
+  const staleWords =
+    "sir maslac jaja tjestenina riza brasno secer kava caj sok pivo".split(" ");
+  // samo 3 svježa + 12 starih u istom lancu → bez fallbacka < 10
+  for (let i = 0; i < 3; i++) {
+    products.push(
+      makeP({
+        id: `ff${i}`,
+        product_id: `ff${i}`,
+        name: `${freshWords[i]} svjez ekstra`,
+        chain: "Lidl",
+        discount: 30 + i,
+        scrapedAt: i === 0 ? maxIso : freshIso,
+      })
+    );
+  }
+  for (let i = 0; i < 12; i++) {
+    products.push(
+      makeP({
+        id: `fs${i}`,
+        product_id: `fs${i}`,
+        name: `${staleWords[i]} star ekstra`,
+        chain: "Lidl",
+        discount: 25,
+        scrapedAt: staleIso,
+      })
+    );
+  }
+  assert(DAILY_FRESH_FALLBACK_MIN === 10, "fallback min 10");
+
+  const metaStrict = {};
+  const poolStrict = buildDailyCandidatePool(products, {
+    storeFilterActive: false,
+    freshnessMeta: metaStrict,
+  });
+  assert(poolStrict.length === 3, `no-filter keeps only fresh got ${poolStrict.length}`);
+  assert(!poolStrict.some((p) => String(p.id).startsWith("fs")), "stale out without fallback");
+
+  const metaFb = {};
+  const poolFb = buildDailyCandidatePool(products, {
+    storeFilterActive: true,
+    freshnessMeta: metaFb,
+  });
+  assert(metaFb.usedFallback === true, "FALLBACK marked usedFallback");
+  assert(
+    metaFb.relaxedStores.includes("lidl"),
+    `FALLBACK relaxed lidl got ${JSON.stringify(metaFb.relaxedStores)}`
+  );
+  assert(poolFb.length >= DAILY_FRESH_FALLBACK_MIN, "fallback pool >= 10");
+  assert(poolFb.some((p) => String(p.id).startsWith("fs")), "FALLBACK includes stale rows");
+
+  const picksFb = selectDailyPicks(products, {
+    now: new Date("2026-11-01T12:00:00+01:00"),
+    storeFilterActive: true,
+  });
+  assert(picksFb.length >= 3, "fallback can still pick");
 }
 
 console.log("OK daily-picks");

@@ -14,6 +14,10 @@ export const DAILY_MAX_PER_STORE = 2;
 export const DAILY_MIN_FOOD = 5;
 export const DAILY_MAX_HYGIENE = 3;
 export const DAILY_MAX_OTHER = 2;
+/** Svježina za pool: scraped_at unutar ovog prozora od MAX(scraped_at) lanca. */
+export const DAILY_FRESHNESS_MS = 24 * 60 * 60 * 1000;
+/** Ako je pool odabrane trgovine manji, popusti svježinu samo za tu trgovinu. */
+export const DAILY_FRESH_FALLBACK_MIN = 10;
 /** @deprecated koristi DAILY_MIN_FOOD; zadržano za kompatibilnost. */
 export const DAILY_MIN_EVERYDAY = 7;
 export const HOT_MAX_DISCOUNT = 70;
@@ -1152,20 +1156,107 @@ function discountOf(product) {
   return Number.isFinite(d) ? d : 0;
 }
 
+/** scrapedAt / scraped_at → ms, ili null. */
+export function scrapedAtTime(product) {
+  const raw = product?.scrapedAt ?? product?.scraped_at;
+  if (raw == null || raw === "") return null;
+  const t = new Date(raw).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
 /**
- * Skup: 15–50% + foto, sort po popustu desc, prvih 600.
+ * MAX(scraped_at) po storeKey iz učitanih podataka.
  * @param {Array<object>} products
- * @param {{ poolSize?: number, minDiscount?: number, maxDiscount?: number }} [opts]
+ * @returns {Map<string, number>}
+ */
+export function maxScrapedAtByStore(products) {
+  const map = new Map();
+  const list = Array.isArray(products) ? products : [];
+  for (const p of list) {
+    const t = scrapedAtTime(p);
+    if (t == null) continue;
+    const sk = storeKey(p);
+    const prev = map.get(sk);
+    if (prev == null || t > prev) map.set(sk, t);
+  }
+  return map;
+}
+
+/**
+ * Je li red svjež relativno na MAX lanca (ili true ako lanac nema scraped_at).
+ * @param {object} product
+ * @param {Map<string, number>} maxByStore
+ * @param {number} [windowMs]
+ */
+export function isFreshForStore(product, maxByStore, windowMs = DAILY_FRESHNESS_MS) {
+  const sk = storeKey(product);
+  const maxT = maxByStore?.get(sk);
+  if (maxT == null) return true;
+  const t = scrapedAtTime(product);
+  if (t == null) return false;
+  return t >= maxT - windowMs;
+}
+
+/**
+ * Skup: 15–50% + foto + svježi (scraped_at ≥ MAX lanca − 24h), sort po popustu desc, prvih 600.
+ * Lanac bez scraped_at: pravilo se popušta za taj lanac.
+ * Odabrana trgovina s poolom &lt; DAILY_FRESH_FALLBACK_MIN: popusti samo za tu trgovinu.
+ * @param {Array<object>} products
+ * @param {{
+ *   poolSize?: number,
+ *   minDiscount?: number,
+ *   maxDiscount?: number,
+ *   storeFilterActive?: boolean,
+ *   freshnessWindowMs?: number,
+ *   freshFallbackMin?: number,
+ *   freshnessMeta?: { relaxedStores?: string[], usedFallback?: boolean },
+ * }} [opts]
  */
 export function buildDailyCandidatePool(products, opts = {}) {
   const poolSize = opts.poolSize ?? DAILY_POOL_SIZE;
   const minD = opts.minDiscount ?? DAILY_MIN_DISCOUNT;
   const maxD = opts.maxDiscount ?? DAILY_MAX_DISCOUNT;
+  const storeFilterActive = Boolean(opts.storeFilterActive);
+  const windowMs = opts.freshnessWindowMs ?? DAILY_FRESHNESS_MS;
+  const fallbackMin = opts.freshFallbackMin ?? DAILY_FRESH_FALLBACK_MIN;
   const list = Array.isArray(products) ? products : [];
-  const filtered = list.filter((p) => {
+
+  const band = list.filter((p) => {
     const d = discountOf(p);
     return d >= minD && d <= maxD && hasRealPhoto(p);
   });
+
+  // MAX iz svih učitanih podataka (ne samo band)
+  const maxByStore = maxScrapedAtByStore(list);
+  const relaxedStores = new Set();
+  for (const p of band) {
+    const sk = storeKey(p);
+    if (!maxByStore.has(sk)) relaxedStores.add(sk);
+  }
+
+  function applyFreshness(items) {
+    return items.filter((p) => {
+      const sk = storeKey(p);
+      if (relaxedStores.has(sk)) return true;
+      return isFreshForStore(p, maxByStore, windowMs);
+    });
+  }
+
+  let filtered = applyFreshness(band);
+  let usedFallback = false;
+
+  // Odabrana trgovina: ako je svježi pool premali, popusti pravilo samo za nju
+  if (storeFilterActive && filtered.length < fallbackMin) {
+    usedFallback = true;
+    for (const p of band) relaxedStores.add(storeKey(p));
+    filtered = band.slice();
+  }
+
+  if (opts.freshnessMeta && typeof opts.freshnessMeta === "object") {
+    opts.freshnessMeta.relaxedStores = [...relaxedStores];
+    opts.freshnessMeta.usedFallback = usedFallback;
+  }
+
   filtered.sort((a, b) => {
     const dd = discountOf(b) - discountOf(a);
     if (dd !== 0) return dd;
