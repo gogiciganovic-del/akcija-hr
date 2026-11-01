@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { X, Heart, ListPlus, Check } from "lucide-react";
 import { usePriceHistory } from "../hooks/usePriceHistory";
 import { PRICE_DISCLAIMER, productDateLabel } from "../lib/priceTrust";
+import { productDisplayName } from "../lib/productDisplayName";
 import { enqueueCartAdd } from "../lib/cartDraft";
 import { chainFromStoreName } from "../lib/constants";
 import { fetchCheaperAlternatives } from "../lib/cheaperAlternatives";
@@ -159,6 +160,9 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
 
   const addedOk = listFeedback === "ok";
   const errorMsg = listFeedback && listFeedback !== "ok" ? listFeedback : null;
+  const title = productDisplayName(product.name);
+  const categoryRaw = String(product.category || "").trim();
+  const showCategory = categoryRaw && categoryRaw.toLowerCase() !== "dom";
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
@@ -192,21 +196,29 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
         <div className="overflow-y-auto px-4 pb-8" style={{ scrollbarWidth: "none" }}>
           <img
             src={product.image}
-            alt={product.name}
+            alt={title}
             className="w-full rounded-2xl object-cover mb-4"
             style={{ height: 200, background: product.imageBg }}
             onError={(e) => { e.target.style.display = "none"; }}
           />
 
           <h2 className="font-black text-white mb-1" style={{ fontSize: 20, letterSpacing: "-0.03em" }}>
-            {product.name}
+            {title}
           </h2>
-          <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, marginBottom: 4 }}>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.55)",
+              fontSize: 12,
+              marginBottom: showCategory ? 4 : 16,
+            }}
+          >
             {product.chain || product.store || "Trgovina"}
           </p>
-          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginBottom: 16 }}>
-            {product.category}
-          </p>
+          {showCategory && (
+            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginBottom: 16 }}>
+              {categoryRaw}
+            </p>
+          )}
 
           <div className="flex items-center gap-3 mb-5">
             <div>
@@ -296,12 +308,6 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
             {PRICE_DISCLAIMER}
           </p>
 
-          {product.description && (
-            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 13, lineHeight: 1.6, marginBottom: 20 }}>
-              {product.description}
-            </p>
-          )}
-
           {!cheaperLoading && cheaper.length > 0 && (
             <div className="mb-5">
               <p
@@ -344,9 +350,9 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
                         <p
                           className="truncate font-semibold text-white"
                           style={{ fontSize: 12 }}
-                          title={alt.name}
+                          title={productDisplayName(alt.name)}
                         >
-                          {alt.name}
+                          {productDisplayName(alt.name)}
                         </p>
                         <p className="tabular-nums" style={{ fontSize: 11, color: "rgba(0,255,136,0.85)" }}>
                           {alt.perUnitLabel}
@@ -363,7 +369,7 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
                           color: "#00ff88",
                           fontSize: 11,
                         }}
-                        aria-label={`Dodaj ${alt.name} na popis`}
+                        aria-label={`Dodaj ${productDisplayName(alt.name)} na popis`}
                       >
                         {done ? <Check size={13} /> : <ListPlus size={13} />}
                         {done ? "OK" : "Dodaj"}

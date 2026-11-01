@@ -11,6 +11,7 @@ import { loadScanHistory, pushScanHistory, clearScanHistory } from "../lib/scanH
 import { chainFromStoreName } from "../lib/constants";
 import { productPlaceholderDataUri } from "../lib/productImage";
 import { PRICE_DISCLAIMER, productDateLabel } from "../lib/priceTrust";
+import { productDisplayName } from "../lib/productDisplayName";
 import {
   parseQuantityFromName,
   pricePerBaseUnit,
@@ -252,6 +253,7 @@ function TrackPriceButton({ tracking, onClick }) {
 function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta, isCheapest }) {
   const isRegular = p.priceSource === "regular";
   const storeLabel = p.chain ?? chainFromStoreName(p.store);
+  const displayName = productDisplayName(p.name);
   const imgSrc = isRegular
     ? productPlaceholderDataUri(p.name, 80)
     : p.image || productPlaceholderDataUri(p.name, 80);
@@ -276,7 +278,7 @@ function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta,
     >
       <img
         src={imgSrc}
-        alt={p.name}
+        alt={displayName}
         className="flex-shrink-0 object-cover"
         style={{ width: 80, height: 80, background: p.imageBg || "#0d1f3a", opacity: 0.85 }}
         onError={(e) => {
@@ -290,7 +292,7 @@ function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta,
       <div className="flex-1 px-3 py-2.5 min-w-0">
         <div className="flex items-start gap-2 mb-1">
           <p className="font-bold text-white text-[12.5px] leading-tight truncate flex-1 min-w-0">
-            {highlightQuery ? highlight(p.name, highlightQuery) : p.name}
+            {highlightQuery ? highlight(displayName, highlightQuery) : displayName}
           </p>
           {isCheapest && (
             <span

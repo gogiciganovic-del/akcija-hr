@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { Navigation } from "lucide-react";
 import { useProximity } from "../hooks/useProximity";
+import { productDisplayName } from "../lib/productDisplayName";
 
 const fmt = (v) => v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
 const DIST_OPTIONS = [500, 1000, 2000, 5000];
@@ -101,11 +102,11 @@ export function ProximityPage({ onProductSelect }) {
                     className="flex items-center rounded-[14px] overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                     style={{ background:"rgba(255,255,255,0.03)",
                       border: p.isGlitch?"1px solid rgba(0,255,136,0.14)":"1px solid rgba(255,255,255,0.06)" }}>
-                    <img src={p.image} alt={p.name} className="flex-shrink-0 object-cover"
+                    <img src={p.image} alt={productDisplayName(p.name)} className="flex-shrink-0 object-cover"
                       style={{ width:70,height:70,background:p.imageBg,opacity:0.85 }}
                       onError={(e)=>e.target.style.display="none"} />
                     <div className="flex-1 px-3 py-2.5 min-w-0">
-                      <p className="font-bold text-white text-[12px] leading-tight mb-1 truncate">{p.name}</p>
+                      <p className="font-bold text-white text-[12px] leading-tight mb-1 truncate">{productDisplayName(p.name)}</p>
                       <p style={{ color:"rgba(255,255,255,0.3)",fontSize:10,marginBottom:6 }}>{p.category}{p.isHot?" · 🔥":""}</p>
                       <div className="flex items-center gap-2">
                         <div>
