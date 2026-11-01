@@ -19,7 +19,8 @@
     "test:flyer-follow": "node scripts/test-flyer-follow.mjs",
     "test:deal-dates-novo": "node scripts/test-deal-dates-novo.mjs",
     "test:daily-picks": "node scripts/test-daily-picks.mjs",
-    "test:store-display-label": "node scripts/test-store-display-label.mjs"
+    "test:store-display-label": "node scripts/test-store-display-label.mjs",
+    "test:product-display-name": "node scripts/test-product-display-name.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",

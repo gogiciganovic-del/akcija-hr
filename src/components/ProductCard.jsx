@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
 import { storeDisplayLabel } from "../lib/constants";
+import { productDisplayName } from "../lib/productDisplayName";
 import { productPlaceholderDataUri } from "../lib/productImage";
 
 const fmt = (v) => v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -12,6 +13,7 @@ function isRemoteSrc(src) {
 export function ProductCard({ product, size = "normal", isFavorite, onToggleFavorite, onClick }) {
   const large = size === "large";
   const imageHeight = large ? 140 : 100;
+  const title = productDisplayName(product.name);
   const fallbackSrc = productPlaceholderDataUri(product.name, imageHeight);
   const storeLabel = storeDisplayLabel(product);
   const metaLine = storeLabel
@@ -70,7 +72,7 @@ export function ProductCard({ product, size = "normal", isFavorite, onToggleFavo
         )}
         <img
           src={displaySrc}
-          alt={product.name}
+          alt={title}
           className="relative w-full h-full object-contain"
           style={{ opacity: imageLoading ? 0 : 0.9 }}
           loading="lazy"
@@ -89,7 +91,7 @@ export function ProductCard({ product, size = "normal", isFavorite, onToggleFavo
           className="font-bold text-white leading-tight mb-1 truncate"
           style={{ fontSize: large ? 13 : 11.5 }}
         >
-          {product.name}
+          {title}
         </p>
         {metaLine && (
           <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, marginBottom: 6 }}>
