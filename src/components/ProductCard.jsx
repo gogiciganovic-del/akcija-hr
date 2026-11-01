@@ -3,6 +3,7 @@ import { Heart } from "lucide-react";
 import { storeDisplayLabel } from "../lib/constants";
 import { productDisplayName } from "../lib/productDisplayName";
 import { productPlaceholderDataUri } from "../lib/productImage";
+import { SHOW_EXPIRES_IN } from "../lib/priceTrust";
 
 const fmt = (v) => v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
 
@@ -120,7 +121,7 @@ export function ProductCard({ product, size = "normal", isFavorite, onToggleFavo
             -{product.discount}%
           </div>
         </div>
-        {product.expiresIn && (
+        {SHOW_EXPIRES_IN && product.expiresIn && (
           <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 9, marginTop: 4 }}>
             Ističe za {product.expiresIn}
           </p>

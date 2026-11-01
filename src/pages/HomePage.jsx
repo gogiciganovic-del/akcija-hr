@@ -22,6 +22,7 @@ import {
   trackSkenOtvoren,
 } from "../lib/usageEvents";
 import { readHowItWorksOpen, writeHowItWorksOpen } from "../lib/howItWorksPref";
+import { SHOW_EXPIRING_CHIP } from "../lib/priceTrust";
 import {
   barcodesFromFavorites,
   enablePushNotifications,
@@ -314,7 +315,6 @@ function StoreInfoBar({ store, stats, loading, favorites, favoritesLoading }) {
   );
 }
 
-const SHOW_EXPIRING_CHIP = false;
 const SPECIAL_FILTERS_ALL = [
   { id: "novo", label: "Novo", emoji: "✨" },
   { id: "expiring", label: "Danas ističe", emoji: "⏰" },
