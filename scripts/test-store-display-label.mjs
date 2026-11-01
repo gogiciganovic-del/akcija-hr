@@ -14,6 +14,9 @@ assert(storeDisplayLabel({ chain: "Konzum", store: "Konzum Ilica" }) === "Konzum
 assert(storeDisplayLabel({ chain: "Lidl" }) === "Lidl", "label Lidl");
 assert(storeDisplayLabel({ store: "Nepoznata trgovina XYZ" }) === null, "unknown null");
 assert(storeDisplayLabel({}) === null, "empty null");
+assert(storeDisplayLabel({ store: null }) === null, "store null");
+assert(storeDisplayLabel({ store: "" }) === null, "store empty string");
+assert(storeDisplayLabel({ chain: null, store: null }) === null, "chain+store null");
 assert(storeDisplayLabel({ chain: "Dm" }) === "Dm", "Dm label");
 
 console.log("OK store-display-label");

@@ -210,6 +210,8 @@ export function normalizeEverydayName(name) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    // đ/Đ ne rastavljaju NFD-om — mapiraj prije [^a-z]
+    .replace(/đ/g, "d")
     .replace(/[''`]/g, "")
     // makni suffix scrapera da marke/trgovine na kraju ne utječu
     .replace(/\s+akcija\s+u\s+trgovini\s+.+$/i, "")
@@ -236,6 +238,7 @@ const EXCLUDE_KEYWORDS = [
   "za macke",
   "poslastice za pse",
   "pijesak za macke",
+  "cat snack",
   "pedigree",
   "whiskas",
   "friskies",
@@ -243,11 +246,18 @@ const EXCLUDE_KEYWORDS = [
   "cesar",
   "migliorcane",
   "dein bestes",
+  "miamor",
+  "vitakraft",
+  "encian",
   "pribor za",
   "set pribora",
   "kuhalo",
   "boca za",
   "staklena boca",
+  "kutija za",
+  "zdjela za",
+  "smoothie maker",
+  "presa za",
   "dekoracija",
   "dekorativ",
   "ukras",
@@ -259,9 +269,10 @@ const EXCLUDE_KEYWORDS = [
   "bozic",
   "novogodis",
   "uskrs",
-  "halloween",
+  "zemlja za",
   "kuglica",
-  "kuglice",
+  "bozicne kuglice",
+  "staklene kuglice",
   "svijece",
   "svijeca",
   "svjetiljk",
@@ -312,9 +323,12 @@ const EXCLUDE_KEYWORDS = [
   "pegela",
   "usisivac",
   "friteza",
-  "pecnic",
+  "mikrovalna pecnica",
+  "mikrovlna pecnica",
   "tiganj",
   "tave",
+  "tava za",
+  "posipac",
   "tanjur",
   "tanjiri",
   "salice",
@@ -343,7 +357,11 @@ const EXCLUDE_KEYWORDS = [
   "tefal",
   "silvercrest",
   "philips",
-  "rostilj",
+  "elektricni rostilj",
+  "preklopni rostilj",
+  "tava za rostilj",
+  "ploca za rostilj",
+  "rostiljanje",
   "alat",
   "cekic",
   "odvijac",
@@ -359,7 +377,8 @@ const EXCLUDE_KEYWORDS = [
   "tipkovnic",
   "stolac",
   "stolovi",
-  "polica",
+  "zidna polica",
+  "police za",
   "ormaric",
   "tepih",
   "prostirka",
@@ -425,21 +444,33 @@ const FOOD_KEYWORDS = [
   "majoneza",
   "pesto",
   "umak",
+  "umaci",
   "preljev",
   "ajvar",
   "namaz",
   "hummus",
+  "humus",
   "dzem",
   "kompot",
   "puding",
   "cokolada",
   "praline",
   "keks",
+  "keksi",
+  "piskot",
+  "piskote",
+  "mascarpone",
+  "rafiol",
+  "grisin",
+  "pletenic",
+  "speculoos",
+  "speculaas",
   "kreker",
   "vafel",
   "vafl",
   "biskvit",
   "napolitanke",
+  "napolitank",
   "bombon",
   "lizalica",
   "cips",
@@ -461,7 +492,9 @@ const FOOD_KEYWORDS = [
   "zobena",
   "protein",
   "kava",
+  "kave",
   "cappuccino",
+  "cheesecake",
   "nektar",
   "smoothie",
   "napitak",
@@ -509,10 +542,78 @@ const FOOD_KEYWORDS = [
   "wafer",
   "biscotti",
   "digestive",
+  "spaghetti",
+  "strukli",
+  "strukl",
+  "slabin",
+  "cheddar",
+  "incun",
+  "vongole",
+  "bougatsa",
+  "krupica",
+  "gris",
+  "cokolad",
+  "gyoza",
+  "lizika",
+  "voce",
+  "puder za pecenje",
+  "purec",
+  "pilec",
+  "peciv",
+  "pogaca",
+  "zemlja",
+  "pistaci",
+  "jagoda",
+  "pizzi",
+  "tikva",
+  "krvavic",
+  "mango",
+  "grozd",
+  "bundeva",
+  "grickalic",
+  "junec",
+  "ciabatta",
+  "cevap",
+  "kelj",
+  "svinjska mast",
+  "fusilli",
+  "sirev",
+  "telec",
+  "kracic",
+  "pagar",
+  "sipak",
+  "alkoholna pica",
+  "orasast",
+  "riblj",
+  "poriluk",
+  "kajzeric",
+  "odojak",
+  "plavac",
+  "izotonic",
+  "isotonic",
+  "pomfit",
+  "sljiva",
+  "povrce",
+  "kesten",
+  "biscuit",
+  "stangic",
+  "svinjska leda",
+  "mantije",
+  "mantija",
+  "spinat",
+  "kozic",
+  "laks",
+  "pasata",
+  "kapsule za kavu",
+  "martini",
+  "golice",
+  "cimet",
+  "zvjezdic",
+  "crisp rolls",
   "sunka",
   "prsut",
   "panceta",
-  "slanina",
+  "slanin",
   "budola",
   "kobasica",
   "kulen",
@@ -538,8 +639,14 @@ const FOOD_KEYWORDS = [
   "pizza",
   "sendvic",
   "hamburger",
+  "burger",
+  "sarma",
+  "mortadell",
+  "spekulatius",
+  "vafli",
   "tortilla",
   "tortilja",
+  "tortilj",
   "grissini",
   "lisnato",
   "kakao",
@@ -681,6 +788,18 @@ const FOOD_BRANDS = new Set([
   "bellarom",
   "lay",
   "lays",
+  "bobis",
+  "solevita",
+  "danone",
+  "actimel",
+  "raffaello",
+  "rauch",
+  "knoppers",
+  "meinl",
+  "aptamil",
+  "lino",
+  "bobi",
+  "powerade",
 ]);
 
 /** Višerječne marke hrane. */
@@ -689,8 +808,31 @@ const FOOD_MULTI = ["rio mare", "ritter sport", "dr oetker", "coca cola", "red b
 /** Higijena / kozmetika / deterdženti / čišćenje. */
 const HYGIENE_KEYWORDS = [
   "sampon",
+  "regenerator",
   "sapun",
   "losion",
+  "brijac",
+  "cetka za kosu",
+  "sjajilo",
+  "pomadica",
+  "pomad",
+  "blazinic",
+  "umivanje",
+  "boja za kosu",
+  "sprej za kosu",
+  "eye pad",
+  "stapici za usi",
+  "vateni stapici",
+  "relief cream",
+  "kontaktne lece",
+  "kombi losung",
+  "olovka za usne",
+  "britvic",
+  "eksfolirajuci",
+  "serum",
+  "cushion",
+  "izbjeljivanje zubi",
+  "folije za nokte",
   "pasta za zube",
   "zubna pasta",
   "zubna",
@@ -756,10 +898,13 @@ const HYGIENE_KEYWORDS = [
   "odmascivac",
   "sredstvo za ciscenje",
   "kreme",
+  // puder = šminka; „puder za pečenje” je hrana (FOOD_KEYWORDS, prije higijene)
+  "puder",
+  "spuzvica za sminku",
 ];
 
 /** Higijena — oprezne riječi. */
-const HYGIENE_CAREFUL = ["papir", "cistac", "ruz"];
+const HYGIENE_CAREFUL = ["cistac", "ruz"];
 
 /** Marke higijene. */
 const HYGIENE_BRANDS = new Set([
@@ -795,6 +940,7 @@ const HYGIENE_BRANDS = new Set([
   "calgon",
   "herbal",
   "essences",
+  "essence",
   "head",
   "shoulders",
   "oral",
@@ -824,6 +970,17 @@ const HYGIENE_BRANDS = new Set([
   "malizia",
   "lactovit",
   "taft",
+  "elseve",
+  "haettric",
+  "hattric",
+  "alverde",
+  "bulldog",
+  "vaseline",
+  "vazelin",
+  "visiomax",
+  "biorepair",
+  "blanx",
+  "tirtir",
 ]);
 
 const HYGIENE_MULTI = [
@@ -836,6 +993,8 @@ const HYGIENE_MULTI = [
   "air wick",
   "herbal essences",
   "l oreal",
+  "max factor",
+  "real techniques",
 ];
 
 function haystackHasKeyword(hay, keyword) {
@@ -875,7 +1034,7 @@ function hasMulti(hay, list) {
 
 /**
  * Klasa proizvoda po nazivu: hrana | higijena | ostalo.
- * Prioritet: isključenja → hrana → higijena → ostalo.
+ * Prioritet: isključenja → marke higijene → hrana → higijena riječi → ostalo.
  * @param {string} name
  * @returns {"hrana"|"higijena"|"ostalo"}
  */
@@ -884,33 +1043,57 @@ export function classifyItem(name) {
   if (norm.length < 2) return ITEM_CLASS_OTHER;
   const hay = ` ${norm} `;
 
+  // Sukobi korijena prije isključenja
+  if (/\bpapirnat\w* rucni/.test(hay)) return ITEM_CLASS_HYGIENE;
+  // kuhinjski ručnik na roli / troslojni = papirnati, ne tekstil
+  if (/\bkuhinjski rucni/.test(hay) && /\b(rola|role|troslojn|listic)/.test(hay)) {
+    return ITEM_CLASS_HYGIENE;
+  }
+  // olovka za usne ≠ olovka (pribor)
+  if (hay.includes(" olovka za usne ")) return ITEM_CLASS_HYGIENE;
+  if (/\bpunjen\w* vjesalic/.test(hay)) return ITEM_CLASS_FOOD;
+  // Kinder Božićnjak (čokolada) ≠ figurica Djeda Božićnjaka
+  if (/\bkinder\b/.test(hay) && /\b\d+\s*g\b/.test(hay)) return ITEM_CLASS_FOOD;
+  // kruh iz kalupa ≠ silikonski kalup
+  if (/\bkruh\b/.test(hay) && /\bkalup/.test(hay)) return ITEM_CLASS_FOOD;
+  // „Casa, Coop” sredstvo / deterdžent s ocat/limun ≠ hrana
+  if (
+    /sredstvo za ciscenje|sredstvo za odstranjivanje|wc skoljk|\bdeterdzent\b/.test(
+      hay
+    )
+  ) {
+    return ITEM_CLASS_HYGIENE;
+  }
+
   for (const kw of EXCLUDE_KEYWORDS) {
     if (haystackHasKeyword(hay, kw)) return ITEM_CLASS_OTHER;
   }
 
-  // Kozmetičko „mlijeko/voda” — ne hrana
+  // Kozmetičko „mlijeko/voda/ulje” — ne hrana
   const cosmeticFluid =
-    /micelarna|za ciscenje|skidanje sminke|ciscenje lica|mlijeko za lice/.test(hay);
+    /micelarna|za ciscenje|skidanje sminke|ciscenje lica|mlijeko za lice|maslac za tijelo|krema za ruke|sampon|ulje za pranje|ulje za tijelo|ulje za kosu|ulje za lice|ulje za kozu|atopicn/.test(
+      hay
+    );
 
-  if (!cosmeticFluid) {
-    if (hasMulti(hay, FOOD_MULTI) || hasBrandToken(norm, FOOD_BRANDS)) {
-      return ITEM_CLASS_FOOD;
-    }
-    for (const kw of FOOD_KEYWORDS) {
-      if (haystackHasKeyword(hay, kw)) return ITEM_CLASS_FOOD;
-    }
-    for (const kw of FOOD_CAREFUL) {
-      if (hasCarefulWord(hay, kw)) return ITEM_CLASS_FOOD;
-    }
-    if (hasCarefulWord(hay, "voda") && WATER_CONTEXT.some((w) => hay.includes(w))) {
-      return ITEM_CLASS_FOOD;
-    }
-  }
-
+  // Marke higijene prije hrane (Balea/Nivea/Dexal + limun/mlijeko/maslac u nazivu)
   if (hasMulti(hay, HYGIENE_MULTI) || hasBrandToken(norm, HYGIENE_BRANDS)) {
     return ITEM_CLASS_HYGIENE;
   }
   if (cosmeticFluid) return ITEM_CLASS_HYGIENE;
+
+  if (hasMulti(hay, FOOD_MULTI) || hasBrandToken(norm, FOOD_BRANDS)) {
+    return ITEM_CLASS_FOOD;
+  }
+  for (const kw of FOOD_KEYWORDS) {
+    if (haystackHasKeyword(hay, kw)) return ITEM_CLASS_FOOD;
+  }
+  for (const kw of FOOD_CAREFUL) {
+    if (hasCarefulWord(hay, kw)) return ITEM_CLASS_FOOD;
+  }
+  if (hasCarefulWord(hay, "voda") && WATER_CONTEXT.some((w) => hay.includes(w))) {
+    return ITEM_CLASS_FOOD;
+  }
+
   for (const kw of HYGIENE_KEYWORDS) {
     if (haystackHasKeyword(hay, kw)) return ITEM_CLASS_HYGIENE;
   }
