@@ -190,6 +190,11 @@ export function trackLetakPrestani() {
   track("letak_prestani");
 }
 
+/** ponuda_dana_tap — dodir kartice u bloku Ponuda dana (samo ime događaja). */
+export function trackPonudaDanaTap() {
+  track("ponuda_dana_tap");
+}
+
 function stripPushOpenParam() {
   try {
     const url = new URL(window.location.href);

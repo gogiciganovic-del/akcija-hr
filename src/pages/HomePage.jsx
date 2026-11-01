@@ -9,7 +9,18 @@ import { useStoreStats } from "../hooks/useStoreStats";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { CATEGORIES, STORES, STORES_ROW_1, STORES_ROW_2 } from "../lib/constants";
 import { isNewProduct, isExpiringTodayProduct } from "../lib/dealDates";
-import { trackLetakPratim, trackLetakPrestani, trackSkenOtvoren } from "../lib/usageEvents";
+import {
+  formatZagrebShortDate,
+  rankHotDeals,
+  selectDailyPicks,
+  shouldShowDailyPicks,
+} from "../lib/dailyPicks";
+import {
+  trackLetakPratim,
+  trackLetakPrestani,
+  trackPonudaDanaTap,
+  trackSkenOtvoren,
+} from "../lib/usageEvents";
 import { readHowItWorksOpen, writeHowItWorksOpen } from "../lib/howItWorksPref";
 import {
   barcodesFromFavorites,
@@ -303,10 +314,14 @@ function StoreInfoBar({ store, stats, loading, favorites, favoritesLoading }) {
   );
 }
 
-const SPECIAL_FILTERS = [
+const SHOW_EXPIRING_CHIP = false;
+const SPECIAL_FILTERS_ALL = [
   { id: "novo", label: "Novo", emoji: "✨" },
   { id: "expiring", label: "Danas ističe", emoji: "⏰" },
 ];
+const SPECIAL_FILTERS = SHOW_EXPIRING_CHIP
+  ? SPECIAL_FILTERS_ALL
+  : SPECIAL_FILTERS_ALL.filter((f) => f.id !== "expiring");
 const EXPIRING_PREVIEW = 4;
 const NOVO_PREVIEW = 4;
 
@@ -446,16 +461,25 @@ export function HomePage({
   const hasMoreNovo = newProducts.length > NOVO_PREVIEW;
   const novoVisible = novoExpanded ? newProducts : newProducts.slice(0, NOVO_PREVIEW);
 
-  const hotProducts = products.filter((p) => p.isGlitch);
+  const dailyPicks = selectDailyPicks(products, {
+    storeFilterActive: Boolean(selectedStore),
+  });
+  const showDailyPicks =
+    !isNovoMode && !isExpiringMode && shouldShowDailyPicks(dailyPicks);
+  const dailyPicksDateLabel = formatZagrebShortDate();
+  const hotProducts = rankHotDeals(products);
   const expiringTodayProducts = products.filter((p) => isExpiringTodayProduct(p));
   const expiringTodayIds = new Set(expiringTodayProducts.map((p) => p.id));
   const hasMoreExpiring = expiringTodayProducts.length > EXPIRING_PREVIEW;
   const expiringVisible = expiringExpanded
     ? expiringTodayProducts
     : expiringTodayProducts.slice(0, EXPIRING_PREVIEW);
-  const regularProducts = products.filter((p) => !p.isGlitch && !expiringTodayIds.has(p.id));
+  const dailyPickIds = new Set(dailyPicks.map((p) => p.id));
+  const regularProducts = products.filter(
+    (p) => !p.isGlitch && !expiringTodayIds.has(p.id) && !dailyPickIds.has(p.id)
+  );
   const filterLabel = selectedStore ? storeMeta?.label : null;
-  const specialFilterMeta = SPECIAL_FILTERS.find((f) => f.id === specialFilter);
+  const specialFilterMeta = SPECIAL_FILTERS_ALL.find((f) => f.id === specialFilter);
   const headerFilterParts = [
     filterLabel,
     specialFilterMeta?.label,
@@ -736,6 +760,37 @@ export function HomePage({
         </section>
       ) : (
         <>
+          {showDailyPicks && (
+            <section className="mb-5">
+              <div className="flex items-center justify-between px-4 mb-3">
+                <div>
+                  <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>
+                    Ponuda dana
+                  </h2>
+                  <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+                    {dailyPicksDateLabel}
+                    {filterLabel ? ` · ${filterLabel}` : ""}
+                    {` · ${dailyPicks.length} ponuda`}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 px-4">
+                {dailyPicks.map((p) => (
+                  <ProductCard
+                    key={p.id}
+                    product={p}
+                    isFavorite={isFav(p.id)}
+                    onToggleFavorite={onToggleFav}
+                    onClick={() => {
+                      trackPonudaDanaTap();
+                      onProductSelect(p);
+                    }}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="mb-5">
             <div className="flex items-center justify-between px-4 mb-3">
               <div>
