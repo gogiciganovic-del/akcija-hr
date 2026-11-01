@@ -18,7 +18,8 @@
     "test:flyer-push": "py -3 scripts/test-flyer-push.py",
     "test:flyer-follow": "node scripts/test-flyer-follow.mjs",
     "test:deal-dates-novo": "node scripts/test-deal-dates-novo.mjs",
-    "test:daily-picks": "node scripts/test-daily-picks.mjs"
+    "test:daily-picks": "node scripts/test-daily-picks.mjs",
+    "test:store-display-label": "node scripts/test-store-display-label.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",

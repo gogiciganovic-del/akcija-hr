@@ -11,11 +11,18 @@ export const DAILY_POOL_SIZE = 600;
 export const DAILY_MIN_DISCOUNT = 15;
 export const DAILY_MAX_DISCOUNT = 50;
 export const DAILY_MAX_PER_STORE = 2;
+export const DAILY_MIN_FOOD = 5;
+export const DAILY_MAX_HYGIENE = 3;
+export const DAILY_MAX_OTHER = 2;
+/** @deprecated koristi DAILY_MIN_FOOD; zadržano za kompatibilnost. */
 export const DAILY_MIN_EVERYDAY = 7;
-export const DAILY_MAX_OTHER = 3;
 export const HOT_MAX_DISCOUNT = 70;
 export const HOT_WINDOW = 12;
 export const HOT_MAX_PER_NAME_KEY = 3;
+
+export const ITEM_CLASS_FOOD = "hrana";
+export const ITEM_CLASS_HYGIENE = "higijena";
+export const ITEM_CLASS_OTHER = "ostalo";
 
 /** Poznate višerječne marke (nakon normalizacije, bez dijakritike). */
 const MULTI_WORD_BRANDS = new Set([
@@ -73,6 +80,7 @@ const MULTI_WORD_BRANDS = new Set([
   "sidolin crystal",
   "frosch citrus",
   "froggy frog",
+  "ritter sport",
 ]);
 
 /** Mjerne / pakiranje riječi koje se odbacuju iz ključa. */
@@ -203,16 +211,43 @@ export function normalizeEverydayName(name) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[''`]/g, "")
+    // makni suffix scrapera da marke/trgovine na kraju ne utječu
+    .replace(/\s+akcija\s+u\s+trgovini\s+.+$/i, "")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 /**
- * „Ostalo”: dekoracija, tekstil/posteljina, aparati/posuđe, alati, odjeća, igračke, sezonski ukrasi.
- * Provjerava se PRIJE everyday — eksplicitni reject.
+ * ISKLJUČIVANJA — kuhinjski pribor/aparati/posuđe/alati/odjeća/igračke/ukrasi/parfemi.
+ * Pobjeđuju pogodak na hrani/higijeni.
  */
-const OTHER_KEYWORDS = [
+const EXCLUDE_KEYWORDS = [
+  "toaletna voda",
+  "parfem",
+  "parfema",
+  "parfemska",
+  "eau de",
+  "edt",
+  "edp",
+  "hrana za pse",
+  "hrana za macke",
+  "za pse",
+  "za macke",
+  "poslastice za pse",
+  "pijesak za macke",
+  "pedigree",
+  "whiskas",
+  "friskies",
+  "felix",
+  "cesar",
+  "migliorcane",
+  "dein bestes",
+  "pribor za",
+  "set pribora",
+  "kuhalo",
+  "boca za",
+  "staklena boca",
   "dekoracija",
   "dekorativ",
   "ukras",
@@ -225,21 +260,23 @@ const OTHER_KEYWORDS = [
   "novogodis",
   "uskrs",
   "halloween",
+  "kuglica",
+  "kuglice",
   "svijece",
   "svijeca",
   "svjetiljk",
   "lampion",
+  "difuzor",
   "posteljin",
   "jastucnic",
   "jastuk",
   "pokriva",
   "prekrivac",
+  "nadmadrac",
   "deka",
-  "ćebe",
   "cebe",
   "rucnik",
   "peskir",
-  "kupaliski",
   "navlaka",
   "navlake",
   "vjesalic",
@@ -264,32 +301,49 @@ const OTHER_KEYWORDS = [
   "igrack",
   "slagalic",
   "lego",
+  "puzzle",
   "sjeckalic",
+  "sjeckalica",
+  "chop chop",
+  "delimano",
   "mikser",
   "blender",
   "toster",
   "pegela",
   "usisivac",
-  "fen ",
-  " fen",
-  "kuhinjski aparat",
   "friteza",
   "pecnic",
   "tiganj",
   "tave",
   "tanjur",
   "tanjiri",
+  "salice",
+  "salica",
+  "casa",
+  "case",
+  "tognana",
   "pribor za jelo",
   "vilica",
   "noz za",
   "lonac",
   "lonci",
+  "posuda za",
   "set posuda",
-  "set za fondue",
+  "posude za",
+  "valjak",
+  "kalup",
   "fondue",
-  "chop chop",
-  "sjeckalica",
-  "delimano",
+  "aparat",
+  "aparati",
+  "set za",
+  "ultrazvucni",
+  "parni cistac",
+  "parna postaja",
+  "cistac mrlja",
+  "tefal",
+  "silvercrest",
+  "philips",
+  "rostilj",
   "alat",
   "cekic",
   "odvijac",
@@ -301,13 +355,10 @@ const OTHER_KEYWORDS = [
   "baterij",
   "powerbank",
   "usb",
-  "tv ",
   "monitor",
   "tipkovnic",
-  "mis ",
   "stolac",
   "stolovi",
-  "stol ",
   "polica",
   "ormaric",
   "tepih",
@@ -322,26 +373,26 @@ const OTHER_KEYWORDS = [
   "bojice",
   "flomaster",
   "knjiga",
-  "slagalica",
-  "puzzle",
   "bicikl",
   "romobil",
   "kaciga",
+  "etažer",
+  "etazer",
+  "kutije za odlaganje",
+  "aranžiranje",
+  "aranziranje",
+  "trenirka",
+  "ipl ",
+  "lumea",
 ];
 
-/**
- * Svakodnevno: hrana, piće, higijena/kozmetika, deterdženti i čišćenje.
- * Uključuje tokene iz productTypes + dodatne robne marke / higijena.
- */
-const EVERYDAY_KEYWORDS = [
-  // hrana / piće (iz productTypes + uobičajeno)
+/** Hrana i piće — vrste. */
+const FOOD_KEYWORDS = [
   "mlijeko",
   "jogurt",
   "kefir",
   "vrhnje",
   "slag",
-  "sir ",
-  " sir",
   "mozzarella",
   "maslac",
   "margarin",
@@ -354,7 +405,6 @@ const EVERYDAY_KEYWORDS = [
   "kroasan",
   "krafna",
   "burek",
-  "pita ",
   "donut",
   "muffin",
   "dvopek",
@@ -365,8 +415,6 @@ const EVERYDAY_KEYWORDS = [
   "riza",
   "brasno",
   "secer",
-  "sol ",
-  " sol",
   "papar",
   "zacin",
   "ulje",
@@ -383,8 +431,6 @@ const EVERYDAY_KEYWORDS = [
   "hummus",
   "dzem",
   "kompot",
-  "med ",
-  " med",
   "puding",
   "cokolada",
   "praline",
@@ -406,23 +452,19 @@ const EVERYDAY_KEYWORDS = [
   "strudla",
   "desert",
   "kasica",
-  "kasa ",
   "muesli",
   "musli",
   "pahuljice",
+  "loptice",
+  "zitne",
+  "zitarice",
   "zobena",
   "protein",
   "kava",
   "cappuccino",
-  "caj ",
-  " caj",
-  "sok ",
-  " sok",
   "nektar",
   "smoothie",
   "napitak",
-  "pice",
-  "voda",
   "mineralna",
   "pivo",
   "cider",
@@ -432,12 +474,10 @@ const EVERYDAY_KEYWORDS = [
   "rakija",
   "pelinkovac",
   "liker",
-  "gin ",
   "vodka",
   "whiskey",
   "whisky",
   "viski",
-  "rum ",
   "tequila",
   "cocktail",
   "sirup",
@@ -450,9 +490,25 @@ const EVERYDAY_KEYWORDS = [
   "junetina",
   "govedina",
   "puretina",
+  "pureca",
+  "pureci",
   "teletina",
   "janjetina",
   "mljeveno",
+  "pecenica",
+  "avokado",
+  "sirutka",
+  "cola",
+  "klementina",
+  "mandarina",
+  "naranca",
+  "rizoto",
+  "puretin",
+  "klipic",
+  "kolutici",
+  "wafer",
+  "biscotti",
+  "digestive",
   "sunka",
   "prsut",
   "panceta",
@@ -478,7 +534,6 @@ const EVERYDAY_KEYWORDS = [
   "oslic",
   "skusa",
   "filet",
-  "file ",
   "juha",
   "pizza",
   "sendvic",
@@ -486,9 +541,14 @@ const EVERYDAY_KEYWORDS = [
   "tortilla",
   "tortilja",
   "grissini",
-  "stapici",
-  "tijesto",
   "lisnato",
+  "kakao",
+  "dessert",
+  "cordon",
+  "nugget",
+  "nuggets",
+  "medaljon",
+  "medaljoni",
   "rajcica",
   "paprika",
   "krumpir",
@@ -496,8 +556,6 @@ const EVERYDAY_KEYWORDS = [
   "pire",
   "kupus",
   "mrkva",
-  "luk ",
-  " luk",
   "krastavac",
   "cikla",
   "sampinjoni",
@@ -521,7 +579,115 @@ const EVERYDAY_KEYWORDS = [
   "orah",
   "kikiriki",
   "kvasac",
-  // higijena / kozmetika
+  "cvarci",
+  "pekmez",
+  "rezanci",
+  "gljive",
+  "pistacio",
+  "slatkis",
+  "slatkisi",
+  "tingul",
+  "rasjek",
+  "medenjaci",
+  "medenjak",
+  "sushi",
+  "sauvignon",
+  "muskat",
+  "grasevina",
+  "chardonnay",
+  "merlot",
+  "cabernet",
+  "pite",
+  "savijace",
+];
+
+/** Hrana — riječi s oprezom (kratke / česte). */
+const FOOD_CAREFUL = [
+  "sir",
+  "sol",
+  "med",
+  "caj",
+  "sok",
+  "pice",
+  "rum",
+  "gin",
+  "file",
+  "pita",
+  "kasa",
+  "luk",
+  "tijesto",
+];
+
+/** Piće „voda” samo s kontekstom (ne micelarna / kuhalo). */
+const WATER_CONTEXT = ["mineralna", "gazirana", "negazirana", "negaz", "izvorska", "stolisna"];
+
+/** Marke hrane (cijela riječ). */
+const FOOD_BRANDS = new Set([
+  "nesquik",
+  "nestle",
+  "nestlé",
+  "podravka",
+  "vindija",
+  "dukat",
+  "zvijezda",
+  "barilla",
+  "milka",
+  "lindt",
+  "pivac",
+  "gavrilovic",
+  "president",
+  "alpro",
+  "dolcela",
+  "marodi",
+  "cedevita",
+  "jamnica",
+  "cockta",
+  "karlovačko",
+  "karlovacko",
+  "ozujsko",
+  "pan",
+  "vegeta",
+  "eva",
+  "toblerone",
+  "kandit",
+  "kraś",
+  "kras",
+  "financ",
+  "zdenka",
+  "sirela",
+  "dukat",
+  "meggle",
+  "actuamel",
+  "activia",
+  "oho",
+  "kikkoman",
+  "goldfish",
+  "storck",
+  "toffifee",
+  "merci",
+  "bottega",
+  "deluxe",
+  "golden",
+  "land",
+  "argeta",
+  "gavrilović",
+  "haribo",
+  "cockta",
+  "lavazza",
+  "barcaffe",
+  "chio",
+  "ledo",
+  "ehrmann",
+  "bellarom",
+  "lay",
+  "lays",
+]);
+
+/** Višerječne marke hrane. */
+const FOOD_MULTI = ["rio mare", "ritter sport", "dr oetker", "coca cola", "red bull"];
+
+/** Higijena / kozmetika / deterdženti / čišćenje. */
+const HYGIENE_KEYWORDS = [
   "sampon",
   "sapun",
   "losion",
@@ -531,40 +697,34 @@ const EVERYDAY_KEYWORDS = [
   "cetkica",
   "konac za zube",
   "deodorant",
+  "dezodorans",
   "antiperspirant",
   "pjena za brijanje",
   "gel za tusiranje",
   "tusiranje",
   "kupka",
-  "krema",
+  "krema za",
+  "dnevna krema",
+  "nocna krema",
   "maskara",
-  "ruž",
-  "ruz ",
   "lak za nokte",
+  "lak za kosu",
+  "pjena za kosu",
+  "nadlak",
+  "uv gel",
   "vata",
+  "mirisni stapici",
+  "osvjezivac prostora",
+  "maska za kosu",
   "ulosci",
   "tampone",
   "pelene",
   "maramice",
   "salvete",
-  "papir",
   "ubrusi",
   "ubrus",
   "toaletni",
   "wc papir",
-  "parodontax",
-  "colgate",
-  "oral b",
-  "dontodent",
-  "nivea",
-  "balea",
-  "garnier",
-  "loreal",
-  "gillette",
-  "head shoulders",
-  "palmolive",
-  "neutrogena",
-  // deterdženti / čišćenje
   "deterdzent",
   "omeksivac",
   "tablete za pranje",
@@ -575,7 +735,6 @@ const EVERYDAY_KEYWORDS = [
   "za posuda",
   "sudoper",
   "sredstvo za",
-  "cistac",
   "ciscenje",
   "ociscivac",
   "dezinfekcij",
@@ -583,6 +742,41 @@ const EVERYDAY_KEYWORDS = [
   "varikina",
   "wc gel",
   "osvjezivac",
+  "spuzva",
+  "spuzve",
+  "krpa",
+  "krpe",
+  "rukavice za",
+  "smece",
+  "vrece za smece",
+  "kese za smece",
+  "sanitar",
+  "balzam",
+  "miris za perilicu",
+  "odmascivac",
+  "sredstvo za ciscenje",
+  "kreme",
+];
+
+/** Higijena — oprezne riječi. */
+const HYGIENE_CAREFUL = ["papir", "cistac", "ruz"];
+
+/** Marke higijene. */
+const HYGIENE_BRANDS = new Set([
+  "fa",
+  "rimmel",
+  "nivea",
+  "dove",
+  "colgate",
+  "schauma",
+  "gillette",
+  "loreal",
+  "garnier",
+  "balea",
+  "dontodent",
+  "parodontax",
+  "palmolive",
+  "neutrogena",
   "ariel",
   "persil",
   "lenor",
@@ -594,55 +788,143 @@ const EVERYDAY_KEYWORDS = [
   "frosch",
   "denkmit",
   "sidolin",
+  "jar",
+  "cif",
+  "ajax",
+  "vanish",
+  "calgon",
+  "herbal",
+  "essences",
+  "head",
+  "shoulders",
+  "oral",
+  "ambi",
+  "glade",
+  "dexal",
+  "nila",
+  "vesh",
+  "weisser",
+  "riese",
+  "blista",
+  "perfex",
+  "afrodita",
+  "w5",
+  "meri",
+  "merino",
+  "olival",
+  "dove",
+  "silan",
+  "perwoll",
+  "rexona",
+  "batiste",
+  "ornel",
+  "libresse",
+  "eveline",
+  "ziaja",
+  "malizia",
+  "lactovit",
+  "taft",
+]);
+
+const HYGIENE_MULTI = [
+  "head shoulders",
+  "oral b",
   "mr proper",
   "mr muscle",
   "wc ente",
   "wc net",
   "air wick",
-  "glade",
-  "spuzva",
-  "spuzve",
-  "krpa",
-  "krpe",
-  "rukavice za",
-  "smece",
-  "vrece za smece",
-  "kese za smece",
+  "herbal essences",
+  "l oreal",
 ];
-
-/** Robne marke deterdženta / higijene — match kao cijela riječ. */
-const EVERYDAY_BRAND_WORDS = new Set(["jar", "cif", "ajax", "vanish", "calgon"]);
 
 function haystackHasKeyword(hay, keyword) {
   const k = String(keyword || "").trim();
   if (!k) return false;
-  if (k.includes(" ")) return hay.includes(k);
-  // riječ ili prefiks (bozicn → bozicni)
-  const re = new RegExp(`(?:^|\\s)${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+  if (k.includes(" ")) {
+    return hay.includes(` ${k} `) || hay.includes(` ${k}`) || hay.includes(`${k} `);
+  }
+  const esc = k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // točna riječ ili kratki nastavak (puretina → puretinom), min. korijen 5 znakova
+  const re =
+    k.length >= 5
+      ? new RegExp(`(?:^|\\s)${esc}[a-z]{0,4}(?:\\s|$)`)
+      : new RegExp(`(?:^|\\s)${esc}(?:\\s|$)`);
   return re.test(hay);
 }
 
-/**
- * Je li naziv „svakodnevna” roba (hrana/piće/higijena/čišćenje)?
- * Ostalo (dekoracija, tekstil, aparati…) → false. Nepoznato → false.
- * @param {string} name
- * @returns {boolean}
- */
-export function isEverydayItem(name) {
-  const norm = normalizeEverydayName(name);
-  if (norm.length < 2) return false;
-  const hay = ` ${norm} `;
-  for (const kw of OTHER_KEYWORDS) {
-    if (haystackHasKeyword(hay, kw)) return false;
-  }
-  for (const kw of EVERYDAY_KEYWORDS) {
-    if (haystackHasKeyword(hay, kw)) return true;
-  }
+function hasCarefulWord(hay, word) {
+  const re = new RegExp(`(?:^|\\s)${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s|$)`);
+  return re.test(hay.trim());
+}
+
+function hasBrandToken(norm, brands) {
   const tokens = norm.split(" ").filter(Boolean);
   for (const t of tokens) {
-    if (EVERYDAY_BRAND_WORDS.has(t)) return true;
+    if (brands.has(t)) return true;
   }
   return false;
+}
+
+function hasMulti(hay, list) {
+  for (const m of list) {
+    if (hay.includes(` ${m} `) || hay.includes(` ${m}`) || hay.startsWith(`${m} `)) return true;
+  }
+  return false;
+}
+
+/**
+ * Klasa proizvoda po nazivu: hrana | higijena | ostalo.
+ * Prioritet: isključenja → hrana → higijena → ostalo.
+ * @param {string} name
+ * @returns {"hrana"|"higijena"|"ostalo"}
+ */
+export function classifyItem(name) {
+  const norm = normalizeEverydayName(name);
+  if (norm.length < 2) return ITEM_CLASS_OTHER;
+  const hay = ` ${norm} `;
+
+  for (const kw of EXCLUDE_KEYWORDS) {
+    if (haystackHasKeyword(hay, kw)) return ITEM_CLASS_OTHER;
+  }
+
+  // Kozmetičko „mlijeko/voda” — ne hrana
+  const cosmeticFluid =
+    /micelarna|za ciscenje|skidanje sminke|ciscenje lica|mlijeko za lice/.test(hay);
+
+  if (!cosmeticFluid) {
+    if (hasMulti(hay, FOOD_MULTI) || hasBrandToken(norm, FOOD_BRANDS)) {
+      return ITEM_CLASS_FOOD;
+    }
+    for (const kw of FOOD_KEYWORDS) {
+      if (haystackHasKeyword(hay, kw)) return ITEM_CLASS_FOOD;
+    }
+    for (const kw of FOOD_CAREFUL) {
+      if (hasCarefulWord(hay, kw)) return ITEM_CLASS_FOOD;
+    }
+    if (hasCarefulWord(hay, "voda") && WATER_CONTEXT.some((w) => hay.includes(w))) {
+      return ITEM_CLASS_FOOD;
+    }
+  }
+
+  if (hasMulti(hay, HYGIENE_MULTI) || hasBrandToken(norm, HYGIENE_BRANDS)) {
+    return ITEM_CLASS_HYGIENE;
+  }
+  if (cosmeticFluid) return ITEM_CLASS_HYGIENE;
+  for (const kw of HYGIENE_KEYWORDS) {
+    if (haystackHasKeyword(hay, kw)) return ITEM_CLASS_HYGIENE;
+  }
+  for (const kw of HYGIENE_CAREFUL) {
+    if (hasCarefulWord(hay, kw)) return ITEM_CLASS_HYGIENE;
+  }
+
+  return ITEM_CLASS_OTHER;
+}
+
+/** hrana || higijena */
+export function isEverydayItem(name) {
+  const c = classifyItem(name);
+  return c === ITEM_CLASS_FOOD || c === ITEM_CLASS_HYGIENE;
 }
 
 /**
@@ -710,15 +992,15 @@ export function buildDailyCandidatePool(products, opts = {}) {
 }
 
 /**
- * Dnevni izbor (deterministički).
- * Prvo svakodnevno; u 10 pickova ≥7 everyday i ≤3 ostalo (ako everyday nedostaje, dopuni iz ostalog).
+ * Dnevni izbor: ≥5 hrana, ≤3 higijena, ≤2 ostalo; inače dopuna redom hrana→higijena→ostalo.
  * @param {Array<object>} products
  * @param {{
  *   now?: Date,
  *   limit?: number,
  *   storeFilterActive?: boolean,
  *   maxPerStore?: number,
- *   minEveryday?: number,
+ *   minFood?: number,
+ *   maxHygiene?: number,
  *   maxOther?: number,
  * }} [opts]
  * @returns {object[]}
@@ -728,7 +1010,8 @@ export function selectDailyPicks(products, opts = {}) {
   const limit = opts.limit ?? DAILY_PICKS_LIMIT;
   const storeFilterActive = Boolean(opts.storeFilterActive);
   const maxPerStore = opts.maxPerStore ?? DAILY_MAX_PER_STORE;
-  const minEveryday = opts.minEveryday ?? DAILY_MIN_EVERYDAY;
+  const minFood = opts.minFood ?? DAILY_MIN_FOOD;
+  const maxHygiene = opts.maxHygiene ?? DAILY_MAX_HYGIENE;
   const maxOther = opts.maxOther ?? DAILY_MAX_OTHER;
   const dayKey = calendarDayKey(now);
   if (!dayKey) return [];
@@ -739,13 +1022,14 @@ export function selectDailyPicks(products, opts = {}) {
   const scored = pool.map((p) => {
     const pid = productIdentity(p);
     const score = hashString(`${dayKey}:${pid}`);
+    const cls = classifyItem(p.name);
     return {
       p,
       pid,
       score,
       nk: nameKey(p.name),
       sk: storeKey(p),
-      everyday: isEverydayItem(p.name),
+      cls,
     };
   });
   scored.sort((a, b) => {
@@ -757,8 +1041,11 @@ export function selectDailyPicks(products, opts = {}) {
   const seenProduct = new Set();
   const seenNameKey = new Set();
   const storeCounts = new Map();
-  let everydayCount = 0;
-  let otherCount = 0;
+  const counts = {
+    [ITEM_CLASS_FOOD]: 0,
+    [ITEM_CLASS_HYGIENE]: 0,
+    [ITEM_CLASS_OTHER]: 0,
+  };
 
   function canTake(row) {
     if (!row.pid || seenProduct.has(row.pid)) return false;
@@ -777,43 +1064,52 @@ export function selectDailyPicks(products, opts = {}) {
     if (!storeFilterActive) {
       storeCounts.set(row.sk, (storeCounts.get(row.sk) || 0) + 1);
     }
-    if (row.everyday) everydayCount += 1;
-    else otherCount += 1;
+    counts[row.cls] = (counts[row.cls] || 0) + 1;
   }
 
-  const everydayRows = scored.filter((r) => r.everyday);
-  const otherRows = scored.filter((r) => !r.everyday);
-
-  for (const row of everydayRows) {
-    if (picked.length >= limit) break;
-    if (!canTake(row)) continue;
-    take(row);
-  }
-
-  const otherCap =
-    everydayCount >= minEveryday
-      ? Math.min(maxOther, limit - picked.length)
-      : limit - picked.length;
-
-  let addedOther = 0;
-  for (const row of otherRows) {
-    if (picked.length >= limit) break;
-    if (addedOther >= otherCap) break;
-    if (!canTake(row)) continue;
-    take(row);
-    addedOther += 1;
-  }
-
-  // Ako još ima mjesta i everyday je ostao (preskočen zbog capa), pokušaj opet
-  if (picked.length < limit) {
-    for (const row of everydayRows) {
+  function takeFrom(rows, maxAdd) {
+    let added = 0;
+    for (const row of rows) {
       if (picked.length >= limit) break;
+      if (added >= maxAdd) break;
       if (!canTake(row)) continue;
       take(row);
+      added += 1;
     }
   }
 
-  void otherCount;
+  const foodRows = scored.filter((r) => r.cls === ITEM_CLASS_FOOD);
+  const hygieneRows = scored.filter((r) => r.cls === ITEM_CLASS_HYGIENE);
+  const otherRows = scored.filter((r) => r.cls === ITEM_CLASS_OTHER);
+
+  // 1) hrana — cilj barem minFood, smije ići do limita
+  takeFrom(foodRows, limit);
+
+  // 2) higijena — soft cap ako ima dovoljno hrane
+  {
+    const remaining = limit - picked.length;
+    const soft =
+      counts[ITEM_CLASS_FOOD] >= minFood
+        ? Math.min(maxHygiene, remaining)
+        : remaining;
+    takeFrom(hygieneRows, soft);
+  }
+
+  // 3) ostalo — soft cap ako ima dovoljno hrane
+  {
+    const remaining = limit - picked.length;
+    const soft =
+      counts[ITEM_CLASS_FOOD] >= minFood
+        ? Math.min(maxOther, remaining)
+        : remaining;
+    takeFrom(otherRows, soft);
+  }
+
+  // 4) dopuna redom hrana → higijena → ostalo
+  if (picked.length < limit) takeFrom(foodRows, limit - picked.length);
+  if (picked.length < limit) takeFrom(hygieneRows, limit - picked.length);
+  if (picked.length < limit) takeFrom(otherRows, limit - picked.length);
+
   return picked;
 }
 
@@ -853,6 +1149,5 @@ export function rankHotDeals(products, opts = {}) {
     keyCounts.set(nk, c + 1);
   }
 
-  // Nakon prozora: dodaj odgođene pa ostatak (bez oštre ograde)
   return window.concat(deferred);
 }

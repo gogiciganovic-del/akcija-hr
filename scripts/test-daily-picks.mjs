@@ -6,7 +6,11 @@ import {
   DAILY_MIN_DISCOUNT,
   DAILY_PICKS_MIN_VISIBLE,
   DAILY_POOL_SIZE,
+  ITEM_CLASS_FOOD,
+  ITEM_CLASS_HYGIENE,
+  ITEM_CLASS_OTHER,
   buildDailyCandidatePool,
+  classifyItem,
   formatZagrebShortDate,
   hasRealPhoto,
   hashString,
@@ -60,15 +64,22 @@ assert(tokenizeProductName("Sok 1,5L").includes("l") === false, "measure dropped
 assert(nameKey("Dr. Oetker puding") === "dr oetker", "dr oetker multi");
 assert(nameKey("") === "", "empty name key");
 
-// --- isEverydayItem ---
-assert(isEverydayItem("Mlijeko 2,8% 1 L") === true, "mlijeko everyday");
-assert(isEverydayItem("Persil deterdžent 5 L") === true, "deterdzent everyday");
-assert(isEverydayItem("Nivea krema za ruke") === true, "kozmetika everyday");
-assert(isEverydayItem("Božićni vijenac 24 cm") === false, "vijenac other");
-assert(isEverydayItem("Navlake za stolice pak 6/1") === false, "navlake other");
-assert(isEverydayItem("Delimano Chop Chop") === false, "chop chop other");
-assert(isEverydayItem("Wellneo posteljina 140x200") === false, "posteljina other");
-assert(isEverydayItem("LEGO set 42676") === false, "lego other");
+// --- classifyItem / isEverydayItem ---
+assert(classifyItem("Mlijeko 2,8% 1 L") === ITEM_CLASS_FOOD, "mlijeko hrana");
+assert(classifyItem("Pivac Dimljena pečenica 100 g") === ITEM_CLASS_FOOD, "pecenica hrana");
+assert(classifyItem("Nestle Nesquik žitne loptice 450 g") === ITEM_CLASS_FOOD, "nesquik hrana");
+assert(classifyItem("Persil deterdžent 5 L") === ITEM_CLASS_HYGIENE, "persil higijena");
+assert(classifyItem("Fa Men set gel") === ITEM_CLASS_HYGIENE, "fa higijena");
+assert(classifyItem("Rimmel London sprej") === ITEM_CLASS_HYGIENE, "rimmel higijena");
+assert(classifyItem("Emporio Armani toaletna voda 50 ml") === ITEM_CLASS_OTHER, "parfem ostalo");
+assert(classifyItem("Božićni vijenac 24 cm") === ITEM_CLASS_OTHER, "vijenac ostalo");
+assert(classifyItem("Posuda za maslac Spar") === ITEM_CLASS_OTHER, "posuda za ostalo");
+assert(classifyItem("Kela valjak za tijesto") === ITEM_CLASS_OTHER, "valjak ostalo");
+assert(classifyItem("Silvercrest Ultrazvučni čistač") === ITEM_CLASS_OTHER, "ultrazvucni ostalo");
+assert(classifyItem("Delimano Chop Chop") === ITEM_CLASS_OTHER, "chop ostalo");
+assert(isEverydayItem("Mlijeko") === true, "everyday food");
+assert(isEverydayItem("Persil") === true, "everyday hygiene");
+assert(isEverydayItem("LEGO set") === false, "not everyday lego");
 
 assert(DAILY_MIN_DISCOUNT === 15, "min discount 15");
 assert(DAILY_POOL_SIZE === 600, "pool size 600");
@@ -96,13 +107,14 @@ assert(DAILY_POOL_SIZE === 600, "pool size 600");
   assert(pool[0].discount >= pool[pool.length - 1].discount, "pool sorted desc");
 }
 
-// --- prefer everyday (≥7 when available) ---
+// --- prefer hrana (≥5), ≤3 higijena, ≤2 ostalo ---
 {
   const products = [];
   const food =
     "mlijeko jogurt kruh sir maslac jaja tjestenina riza brasno secer kava caj sok pivo cokolada keks tuna sunka".split(
       " "
     );
+  const hygiene = "persil ariel nivea colgate bref jar".split(" ");
   const other =
     "vijenac posteljina navlaka vjesalice igracka tipkovnica slusalice romobil".split(" ");
   const chains = ["Lidl", "Konzum", "Spar", "Plodine", "Tommy", "Kaufland", "Eurospin", "Dm"];
@@ -114,6 +126,17 @@ assert(DAILY_POOL_SIZE === 600, "pool size 600");
         name: `${w} ekstra`,
         chain: chains[i % chains.length],
         discount: 30,
+      })
+    );
+  });
+  hygiene.forEach((w, i) => {
+    products.push(
+      makeP({
+        id: `h${i}`,
+        product_id: `h${i}`,
+        name: `${w} ekstra`,
+        chain: chains[i % chains.length],
+        discount: 40,
       })
     );
   });
@@ -131,10 +154,12 @@ assert(DAILY_POOL_SIZE === 600, "pool size 600");
   const picks = selectDailyPicks(products, {
     now: new Date("2026-11-01T12:00:00+01:00"),
   });
-  const everydayN = picks.filter((p) => isEverydayItem(p.name)).length;
-  const otherN = picks.length - everydayN;
-  assert(everydayN >= 7, `everyday >=7 got ${everydayN}`);
-  assert(otherN <= 3, `other <=3 got ${otherN}`);
+  const nFood = picks.filter((p) => classifyItem(p.name) === ITEM_CLASS_FOOD).length;
+  const nHyg = picks.filter((p) => classifyItem(p.name) === ITEM_CLASS_HYGIENE).length;
+  const nOth = picks.filter((p) => classifyItem(p.name) === ITEM_CLASS_OTHER).length;
+  assert(nFood >= 5, `food >=5 got ${nFood}`);
+  assert(nHyg <= 3, `hyg <=3 got ${nHyg}`);
+  assert(nOth <= 2, `other <=2 got ${nOth}`);
 }
 
 // --- empty safe ---
