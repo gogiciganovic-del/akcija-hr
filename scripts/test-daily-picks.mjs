@@ -3,11 +3,14 @@
  * Pokreni: npm run test:daily-picks
  */
 import {
+  DAILY_MIN_DISCOUNT,
   DAILY_PICKS_MIN_VISIBLE,
+  DAILY_POOL_SIZE,
   buildDailyCandidatePool,
   formatZagrebShortDate,
   hasRealPhoto,
   hashString,
+  isEverydayItem,
   nameKey,
   rankHotDeals,
   selectDailyPicks,
@@ -57,7 +60,20 @@ assert(tokenizeProductName("Sok 1,5L").includes("l") === false, "measure dropped
 assert(nameKey("Dr. Oetker puding") === "dr oetker", "dr oetker multi");
 assert(nameKey("") === "", "empty name key");
 
-// --- pool: 20–50, foto, top 300 by discount ---
+// --- isEverydayItem ---
+assert(isEverydayItem("Mlijeko 2,8% 1 L") === true, "mlijeko everyday");
+assert(isEverydayItem("Persil deterdžent 5 L") === true, "deterdzent everyday");
+assert(isEverydayItem("Nivea krema za ruke") === true, "kozmetika everyday");
+assert(isEverydayItem("Božićni vijenac 24 cm") === false, "vijenac other");
+assert(isEverydayItem("Navlake za stolice pak 6/1") === false, "navlake other");
+assert(isEverydayItem("Delimano Chop Chop") === false, "chop chop other");
+assert(isEverydayItem("Wellneo posteljina 140x200") === false, "posteljina other");
+assert(isEverydayItem("LEGO set 42676") === false, "lego other");
+
+assert(DAILY_MIN_DISCOUNT === 15, "min discount 15");
+assert(DAILY_POOL_SIZE === 600, "pool size 600");
+
+// --- pool: 15–50, foto, top 600 by discount ---
 {
   const many = [];
   for (let i = 0; i < 50; i++) {
@@ -74,10 +90,51 @@ assert(nameKey("") === "", "empty name key");
   many.push(makeP({ id: "noimg", discount: 40, image: "data:image/svg+xml,x" }));
   many.push(makeP({ id: "hi", discount: 55, name: "Too high" }));
   const pool = buildDailyCandidatePool(many);
-  assert(pool.every((p) => p.discount >= 20 && p.discount <= 50), "pool discount band");
+  assert(pool.every((p) => p.discount >= 15 && p.discount <= 50), "pool discount band");
   assert(pool.every((p) => hasRealPhoto(p)), "pool all photos");
   assert(!pool.some((p) => p.id === "noimg" || p.id === "hi"), "excluded bad");
   assert(pool[0].discount >= pool[pool.length - 1].discount, "pool sorted desc");
+}
+
+// --- prefer everyday (≥7 when available) ---
+{
+  const products = [];
+  const food =
+    "mlijeko jogurt kruh sir maslac jaja tjestenina riza brasno secer kava caj sok pivo cokolada keks tuna sunka".split(
+      " "
+    );
+  const other =
+    "vijenac posteljina navlaka vjesalice igracka tipkovnica slusalice romobil".split(" ");
+  const chains = ["Lidl", "Konzum", "Spar", "Plodine", "Tommy", "Kaufland", "Eurospin", "Dm"];
+  food.forEach((w, i) => {
+    products.push(
+      makeP({
+        id: `f${i}`,
+        product_id: `f${i}`,
+        name: `${w} ekstra`,
+        chain: chains[i % chains.length],
+        discount: 30,
+      })
+    );
+  });
+  other.forEach((w, i) => {
+    products.push(
+      makeP({
+        id: `o${i}`,
+        product_id: `o${i}`,
+        name: `${w} ekstra`,
+        chain: chains[i % chains.length],
+        discount: 45,
+      })
+    );
+  });
+  const picks = selectDailyPicks(products, {
+    now: new Date("2026-11-01T12:00:00+01:00"),
+  });
+  const everydayN = picks.filter((p) => isEverydayItem(p.name)).length;
+  const otherN = picks.length - everydayN;
+  assert(everydayN >= 7, `everyday >=7 got ${everydayN}`);
+  assert(otherN <= 3, `other <=3 got ${otherN}`);
 }
 
 // --- empty safe ---
