@@ -54,4 +54,19 @@ export function chainFromStoreName(storeName) {
   return null
 }
 
+/**
+ * Prikazni naziv lanca za ProductCard (npr. "Eurospin Dubrava" → "Eurospin").
+ * @param {{ chain?: string|null, store?: string|null }} product
+ * @returns {string|null}
+ */
+export function storeDisplayLabel(product) {
+  const chainId =
+    product?.chain ||
+    chainFromStoreName(product?.store) ||
+    null
+  if (!chainId) return null
+  const meta = STORES.find((s) => s.id === chainId)
+  return meta?.label || chainId
+}
+
 export const RADIUS_OPTIONS = [1, 2, 5, 10, 20]

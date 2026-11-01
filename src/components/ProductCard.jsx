@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
+import { storeDisplayLabel } from "../lib/constants";
 import { productPlaceholderDataUri } from "../lib/productImage";
 
 const fmt = (v) => v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -12,6 +13,12 @@ export function ProductCard({ product, size = "normal", isFavorite, onToggleFavo
   const large = size === "large";
   const imageHeight = large ? 140 : 100;
   const fallbackSrc = productPlaceholderDataUri(product.name, imageHeight);
+  const storeLabel = storeDisplayLabel(product);
+  const metaLine = storeLabel
+    ? `${storeLabel}${product.isHot ? " · 🔥" : ""}`
+    : product.isHot
+      ? "🔥"
+      : null;
 
   const [displaySrc, setDisplaySrc] = useState(product.image || fallbackSrc);
   const [imageLoading, setImageLoading] = useState(() => isRemoteSrc(product.image));
@@ -84,9 +91,11 @@ export function ProductCard({ product, size = "normal", isFavorite, onToggleFavo
         >
           {product.name}
         </p>
-        <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, marginBottom: 6 }}>
-          Hrvatska{product.isHot ? " · 🔥" : ""}
-        </p>
+        {metaLine && (
+          <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, marginBottom: 6 }}>
+            {metaLine}
+          </p>
+        )}
         <div className="flex items-end justify-between">
           <div>
             <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 9, textDecoration: "line-through" }}>
