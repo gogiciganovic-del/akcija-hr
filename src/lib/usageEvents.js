@@ -4,7 +4,8 @@
  * Događaji: tab_home, tab_search, tab_cart, tab_fav, sken_otvoren, sken_uspjeh,
  * favorit_dodan, prati_cijenu, tap_redovna, kosarica_izracunaj, kosarica_dodan,
  * push_klik, push_ukljucen, push_odbijen, push_greska, push_otvoren, push_iskljucen,
- * letak_pratim, letak_prestani, otvoreno_iz_appa.
+ * letak_pratim, letak_prestani, otvoreno_iz_appa,
+ * onboarding_prikazan, onboarding_korak_1..3, onboarding_zavrsen, onboarding_preskocen.
  */
 
 const TAB_EVENTS = {
@@ -193,6 +194,25 @@ export function trackLetakPrestani() {
 /** ponuda_dana_tap — dodir kartice u bloku Ponuda dana (samo ime događaja). */
 export function trackPonudaDanaTap() {
   track("ponuda_dana_tap");
+}
+
+export function trackOnboardingPrikazan() {
+  track("onboarding_prikazan");
+}
+
+/** Korak 1–3 → onboarding_korak_1 … (broj u imenu; Umami bez svojstava). */
+export function trackOnboardingKorak(step) {
+  const n = Number(step);
+  if (!Number.isInteger(n) || n < 1 || n > 3) return;
+  track(`onboarding_korak_${n}`);
+}
+
+export function trackOnboardingZavrsen() {
+  track("onboarding_zavrsen");
+}
+
+export function trackOnboardingPreskocen() {
+  track("onboarding_preskocen");
 }
 
 function stripPushOpenParam() {

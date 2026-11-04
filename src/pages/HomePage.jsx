@@ -7,7 +7,11 @@ import { BarcodeScannerModal, ScanBarcodeButton } from "../components/BarcodeSca
 import { useProducts } from "../hooks/useProducts";
 import { useStoreStats } from "../hooks/useStoreStats";
 import { useUserLocation } from "../hooks/useUserLocation";
-import { CATEGORIES, STORES, STORES_ROW_1, STORES_ROW_2 } from "../lib/constants";
+import { CATEGORIES, STORES } from "../lib/constants";
+import {
+  orderStoresPreferredFirst,
+  readPreferredStores,
+} from "../lib/onboardingGate";
 import { isNewProduct, isExpiringTodayProduct } from "../lib/dealDates";
 import {
   formatZagrebShortDate,
@@ -87,16 +91,19 @@ function StoreGrid({ stores, selectedStore, onSelect }) {
   );
 }
 
-function StoreFilterRow({ selectedStore, onSelect }) {
+function StoreFilterRow({ selectedStore, onSelect, preferredStores = [] }) {
+  const ordered = orderStoresPreferredFirst(STORES, preferredStores);
+  const row1 = ordered.slice(0, 6);
+  const row2 = ordered.slice(6, 12);
   return (
     <div className="mx-4 mb-3 rounded-2xl px-2.5 py-2.5"
       style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
       <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 8, fontWeight: 700, letterSpacing: "0.16em", marginBottom: 8, paddingLeft: 2 }}>
         TRGOVINE
       </p>
-      <StoreGrid stores={STORES_ROW_1} selectedStore={selectedStore} onSelect={onSelect} />
+      <StoreGrid stores={row1} selectedStore={selectedStore} onSelect={onSelect} />
       <div className="mt-1.5">
-        <StoreGrid stores={STORES_ROW_2} selectedStore={selectedStore} onSelect={onSelect} />
+        <StoreGrid stores={row2} selectedStore={selectedStore} onSelect={onSelect} />
       </div>
     </div>
   );
@@ -341,11 +348,16 @@ export function HomePage({
   homeResetSignal = 0,
   favorites = null,
   favoritesLoading = false,
+  preferredStoresTick = 0,
+  onEarlyEngage = null,
 }) {
   const scrollRef = useRef(null);
   const [activeCat, setActiveCat] = useState(null);
   const [specialFilter, setSpecialFilter] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
+  const [preferredStores, setPreferredStores] = useState(() =>
+    readPreferredStores()
+  );
   const [hotExpanded, setHotExpanded] = useState(false);
   const [expiringExpanded, setExpiringExpanded] = useState(false);
   const [novoExpanded, setNovoExpanded] = useState(false);
@@ -363,6 +375,10 @@ export function HomePage({
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [homeResetSignal]);
+
+  useEffect(() => {
+    setPreferredStores(readPreferredStores());
+  }, [preferredStoresTick]);
 
   // Jednom pri učitavanju: ?trgovina=<lanac> otvara postojeći odabir trgovine.
   useEffect(() => {
@@ -513,7 +529,10 @@ export function HomePage({
 
         <div className="mx-4 mb-1 flex items-center gap-2">
           <div
-            onClick={onSearchFocus}
+            onClick={() => {
+              onEarlyEngage?.();
+              onSearchFocus?.();
+            }}
             className="flex-1 min-w-0 flex items-center gap-3 rounded-2xl px-4 py-3 cursor-pointer"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
           >
@@ -524,6 +543,7 @@ export function HomePage({
           </div>
           <ScanBarcodeButton
             onClick={() => {
+              onEarlyEngage?.();
               trackSkenOtvoren();
               setScannerOpen(true);
             }}
@@ -605,7 +625,11 @@ export function HomePage({
       />
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0" style={{ scrollbarWidth: "none" }}>
-      <StoreFilterRow selectedStore={selectedStore} onSelect={handleStoreSelect} />
+      <StoreFilterRow
+        selectedStore={selectedStore}
+        onSelect={handleStoreSelect}
+        preferredStores={preferredStores}
+      />
 
       {storeMeta && (
         <StoreInfoBar

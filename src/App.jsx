@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { BottomNav }     from "./components/BottomNav";
 import { ProductSheet }  from "./components/ProductSheet";
+import { OnboardingSheet } from "./components/OnboardingSheet";
 import { HomePage }      from "./pages/HomePage";
 import { SearchPage }    from "./pages/SearchPage";
 import { FavoritesPage } from "./pages/FavoritesPage";
@@ -11,6 +12,10 @@ import { usePushNotifications } from "./hooks/usePushNotifications";
 import { CjenkoPeek }    from "./components/CjenkoPeek";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { trackTabOnce } from "./lib/usageEvents";
+import {
+  ONBOARDING_DELAY_MS,
+  shouldShowOnboarding,
+} from "./lib/onboardingGate";
 
 const VALID_TABS = new Set(["home", "search", "cart", "fav"]);
 
@@ -51,14 +56,56 @@ export default function App() {
   const [pendingBarcode, setPendingBarcode] = useState(null);
   const [pendingOpenScanner, setPendingOpenScanner] = useState(false);
   const [scanToast, setScanToast] = useState(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [preferredStoresTick, setPreferredStoresTick] = useState(0);
 
   const activeTabRef = useRef(activeTab);
   activeTabRef.current = activeTab;
   const sheetOpenRef = useRef(false);
+  const mainRef = useRef(null);
+  const onboardingTimerRef = useRef(null);
+  const sessionSkipOnboardingRef = useRef(false);
+
+  const cancelOnboardingForSession = useCallback(() => {
+    if (onboardingTimerRef.current) {
+      window.clearTimeout(onboardingTimerRef.current);
+      onboardingTimerRef.current = null;
+    }
+    sessionSkipOnboardingRef.current = true;
+  }, []);
 
   useEffect(() => {
     trackTabOnce(activeTab);
   }, [activeTab]);
+
+  // Onboarding: ~3s na Homeu; engažman prije toga → samo ova sesija.
+  // Timer se ne resetira na svaki re-render (cleanup ne briše timeout).
+  useEffect(() => {
+    if (sessionSkipOnboardingRef.current || onboardingOpen) return;
+    if (activeTab !== "home" || selectedProduct) {
+      if (onboardingTimerRef.current) cancelOnboardingForSession();
+      return;
+    }
+    if (!shouldShowOnboarding()) return;
+    if (onboardingTimerRef.current) return;
+    onboardingTimerRef.current = window.setTimeout(() => {
+      onboardingTimerRef.current = null;
+      if (sessionSkipOnboardingRef.current) return;
+      if (activeTabRef.current !== "home") return;
+      if (sheetOpenRef.current) return;
+      if (!shouldShowOnboarding()) return;
+      setOnboardingOpen(true);
+    }, ONBOARDING_DELAY_MS);
+  }, [activeTab, selectedProduct, onboardingOpen, cancelOnboardingForSession]);
+
+  useEffect(() => {
+    return () => {
+      if (onboardingTimerRef.current) {
+        window.clearTimeout(onboardingTimerRef.current);
+        onboardingTimerRef.current = null;
+      }
+    };
+  }, []);
 
   /** Promjena taba s history entryjem (korak-po-korak back). */
   const goTab = useCallback((tab) => {
@@ -110,6 +157,7 @@ export default function App() {
   }, []);
 
   const handleProductSelect = useCallback((product) => {
+    if (!onboardingOpen) cancelOnboardingForSession();
     setSelectedProduct(product);
     if (!sheetOpenRef.current) {
       sheetOpenRef.current = true;
@@ -119,7 +167,7 @@ export default function App() {
         window.location.href
       );
     }
-  }, []);
+  }, [onboardingOpen, cancelOnboardingForSession]);
 
   const handleCloseSheet = useCallback(() => {
     if (sheetOpenRef.current && window.history.state?.sheet) {
@@ -137,9 +185,10 @@ export default function App() {
 
   const handleTabChange = useCallback(
     (tab) => {
+      if (tab !== "home") cancelOnboardingForSession();
       goTab(tab);
     },
-    [goTab]
+    [goTab, cancelOnboardingForSession]
   );
 
   const handleBarcodeScanned = useCallback(
@@ -185,13 +234,18 @@ export default function App() {
     home: (
       <HomePage
         onProductSelect={handleProductSelect}
-        onSearchFocus={() => goTab("search")}
+        onSearchFocus={() => {
+          cancelOnboardingForSession();
+          goTab("search");
+        }}
         onBarcodeScanned={handleBarcodeScanned}
         isFav={isFav}
         onToggleFav={toggle}
         homeResetSignal={homeResetSignal}
         favorites={favorites}
         favoritesLoading={favoritesLoading}
+        preferredStoresTick={preferredStoresTick}
+        onEarlyEngage={cancelOnboardingForSession}
       />
     ),
     search: (
@@ -240,7 +294,12 @@ export default function App() {
       style={{ background: "#020617", fontFamily: "'DM Sans','Inter',sans-serif" }}
     >
       <CjenkoPeek />
-      <main className="flex-1 min-h-0 overflow-hidden pb-[72px]">
+      <main
+        id="cjenko-main"
+        ref={mainRef}
+        tabIndex={-1}
+        className="flex-1 min-h-0 overflow-hidden pb-[72px] outline-none"
+      >
         {pages[activeTab]}
       </main>
       <BottomNav
@@ -250,6 +309,16 @@ export default function App() {
         favCount={favorites.size}
       />
       <UpdateBanner />
+      <OnboardingSheet
+        open={onboardingOpen}
+        favorites={favorites}
+        returnFocusEl={mainRef}
+        onClosed={() => {
+          setOnboardingOpen(false);
+          setPreferredStoresTick((n) => n + 1);
+          sessionSkipOnboardingRef.current = true;
+        }}
+      />
       <ProductSheet
         product={selectedProduct}
         isOpen={!!selectedProduct}

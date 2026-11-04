@@ -8,9 +8,16 @@ import {
   PUSH_ENDPOINT_KEY,
   FOLLOWED_CHAINS_KEY,
   CART_DRAFT_KEY,
+  PREFERRED_STORES_KEY,
+  INTEREST_KEY,
   shouldShowOnboarding,
   markOnboardingDone,
   readOnboardingDone,
+  writePreferredStores,
+  writeInterest,
+  readPreferredStores,
+  readInterest,
+  orderStoresPreferredFirst,
 } from "../src/lib/onboardingGate.js";
 
 function assert(cond, msg) {
@@ -215,5 +222,33 @@ assert(
 
 markOnboardingDone(throwingStorage()); // ne smije baciti
 assert(readOnboardingDone(throwingStorage()) === true, "read done pri throw → true (sigurno)");
+
+// Preferred stores + interest + order
+{
+  const s = memoryStorage();
+  writePreferredStores(["Plodine", "Lidl"], s);
+  assert(
+    JSON.stringify(readPreferredStores(s)) === JSON.stringify(["Plodine", "Lidl"]),
+    "preferred stores roundtrip"
+  );
+  assert(s.getItem(PREFERRED_STORES_KEY), "preferred key set");
+  writeInterest("higijena", s);
+  assert(readInterest(s) === "higijena", "interest higijena");
+  assert(s.getItem(INTEREST_KEY) === "higijena", "interest key");
+  writeInterest("nope", s);
+  assert(readInterest(s) === "higijena", "invalid interest ignored");
+
+  const stores = [
+    { id: "Lidl" },
+    { id: "Kaufland" },
+    { id: "Konzum" },
+    { id: "Plodine" },
+  ];
+  const ordered = orderStoresPreferredFirst(stores, ["Plodine", "Lidl"]);
+  assert(
+    ordered.map((x) => x.id).join(",") === "Plodine,Lidl,Kaufland,Konzum",
+    "preferred first order"
+  );
+}
 
 console.log("OK onboarding-gate");
