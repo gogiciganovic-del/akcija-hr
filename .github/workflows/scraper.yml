@@ -14,7 +14,8 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r scraper/requirements.txt
-      - run: python scraper/scraper.py --all
+      # Faza 1: --deactivate-stale = report-only u ISTOM prolazu (bez --apply, bez gašenja).
+      - run: python scraper/scraper.py --all --deactivate-stale
         working-directory: .
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

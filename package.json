@@ -24,7 +24,8 @@
     "test:show-expires-in": "node scripts/test-show-expires-in.mjs",
     "test:product-sheet-display": "node scripts/test-product-sheet-display.mjs",
     "test:umami-notrack": "node scripts/test-umami-notrack.mjs",
-    "test:onboarding-gate": "node scripts/test-onboarding-gate.mjs"
+    "test:onboarding-gate": "node scripts/test-onboarding-gate.mjs",
+    "test:deactivate-stale": "py -3 scripts/test-deactivate-stale.py"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
