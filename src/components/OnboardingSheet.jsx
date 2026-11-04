@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { STORES } from "../lib/constants";
 import { FLYER_FOLLOW_CHAINS } from "../lib/pushFlyerFollow";
 import {
@@ -57,7 +57,7 @@ export function OnboardingSheet({
     setStep(1);
     setSelectedStores([]);
     setInterest("sve");
-    setFlyerChains([...FLYER_FOLLOW_CHAINS]);
+    setFlyerChains([]);
     setBusy(false);
     trackOnboardingPrikazan();
     trackOnboardingKorak(1);
@@ -69,12 +69,12 @@ export function OnboardingSheet({
 
   useEffect(() => {
     if (!open) return;
-    // Predodabir letka = presjek koraka 1 ∩ FLYER_FOLLOW_CHAINS (inače sva tri).
-    const fromStep1 = selectedStores.filter((id) =>
-      FLYER_FOLLOW_CHAINS.includes(id)
-    );
+    // Predodabir: samo korak 1 ∩ Eurospin/Kaufland/Plodine; inače sva tri isključena.
     if (step === 3) {
-      setFlyerChains(fromStep1.length ? fromStep1 : [...FLYER_FOLLOW_CHAINS]);
+      const fromStep1 = selectedStores.filter((id) =>
+        FLYER_FOLLOW_CHAINS.includes(id)
+      );
+      setFlyerChains(fromStep1);
     }
   }, [step, selectedStores, open]);
 
@@ -244,7 +244,7 @@ export function OnboardingSheet({
           >
             {step === 1 && "Koje trgovine često koristiš?"}
             {step === 2 && "Što te zanima?"}
-            {step === 3 && "Obavijesti o letku"}
+            {step === 3 && "Obavijesti o akcijama"}
           </p>
           <button
             type="button"
@@ -336,18 +336,21 @@ export function OnboardingSheet({
                     key={opt.id}
                     type="button"
                     onClick={() => setInterest(opt.id)}
-                    className="rounded-xl font-semibold text-left px-3"
+                    className="rounded-xl font-semibold text-left px-3 flex items-center justify-between gap-2"
                     style={{
                       minHeight: BTN_MIN,
                       fontSize: 14,
-                      color: on ? "#020617" : "rgba(255,255,255,0.75)",
-                      background: on ? "#00ff88" : "rgba(255,255,255,0.06)",
+                      color: on ? "#fff" : "rgba(255,255,255,0.75)",
+                      background: "rgba(255,255,255,0.06)",
                       border: on
-                        ? "1px solid #00ff88"
+                        ? "2px solid rgba(255,255,255,0.55)"
                         : "1px solid rgba(255,255,255,0.1)",
                     }}
                   >
-                    {opt.label}
+                    <span>{opt.label}</span>
+                    {on ? (
+                      <Check size={18} strokeWidth={2.5} aria-hidden />
+                    ) : null}
                   </button>
                 );
               })}
@@ -385,7 +388,7 @@ export function OnboardingSheet({
         {step === 3 && (
           <>
             <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, marginBottom: 10 }}>
-              Javimo ti kad izađe novi letak: Eurospin, Kaufland, Plodine.
+              Javimo ti kad se pojave nove akcije: Eurospin, Kaufland, Plodine.
             </p>
             <div className="flex flex-wrap gap-2 mb-3">
               {FLYER_FOLLOW_CHAINS.map((id) => {
@@ -396,19 +399,20 @@ export function OnboardingSheet({
                     key={id}
                     type="button"
                     onClick={() => toggleFlyer(id)}
-                    className="rounded-xl font-semibold px-3"
+                    className="rounded-xl font-semibold px-3 flex items-center gap-1.5"
                     style={{
                       minHeight: BTN_MIN,
                       fontSize: 13,
-                      color: on ? "#fff" : "rgba(255,255,255,0.65)",
+                      color: on ? "#fff" : "rgba(255,255,255,0.45)",
                       background: on
-                        ? meta?.color || "#00ff88"
+                        ? meta?.color || "#334155"
                         : "rgba(255,255,255,0.06)",
                       border: on
-                        ? `1px solid ${meta?.color || "#00ff88"}`
-                        : "1px solid rgba(255,255,255,0.1)",
+                        ? `1px solid ${meta?.color || "#334155"}`
+                        : "1px solid rgba(255,255,255,0.12)",
                     }}
                   >
+                    {on ? <Check size={16} strokeWidth={2.5} aria-hidden /> : null}
                     {id}
                   </button>
                 );
