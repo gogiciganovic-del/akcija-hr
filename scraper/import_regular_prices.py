@@ -21,6 +21,7 @@ import os
 import re
 import sys
 from collections import defaultdict
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -379,10 +380,10 @@ def insert_price_history(client, changes: list[dict]) -> int:
     return total
 
 
-def upsert_batches(client, rows: list[dict]) -> int:
+def upsert_batches(client, rows: list[dict], *, imported_at: str) -> int:
     total = 0
     for i in range(0, len(rows), BATCH_SIZE):
-        batch = rows[i : i + BATCH_SIZE]
+        batch = [{**row, "updated_at": imported_at} for row in rows[i : i + BATCH_SIZE]]
         client.table("regular_prices").upsert(
             batch, on_conflict="chain,barcode"
         ).execute()
@@ -422,6 +423,7 @@ def main() -> int:
 
     chains = [c.strip().lower() for c in args.chains.split(",") if c.strip()]
     client = create_client(url.strip().strip('"'), key.strip().strip('"'))
+    imported_at = datetime.now(timezone.utc).isoformat()
 
     all_rows: list[dict] = []
     for slug in chains:
@@ -510,7 +512,7 @@ def main() -> int:
         print("  (none)")
 
     print(f"Upserting {len(deduped)} rows into regular_prices ...")
-    upsert_batches(client, deduped)
+    upsert_batches(client, deduped, imported_at=imported_at)
     print("Done.")
     emit_import_stats(
         ok=True,
