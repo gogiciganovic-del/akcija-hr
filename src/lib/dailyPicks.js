@@ -1282,7 +1282,7 @@ export function normalizeDailyInterest(interest) {
  */
 export function quotasForDailyInterest(interest) {
   const i = normalizeDailyInterest(interest);
-  if (i === "hrana") return { minFood: 6, maxHygiene: 2, maxOther: 2 };
+  // "hrana" = iste kvote kao default (algoritam je food-first kao "sve").
   if (i === "higijena") return { minFood: 3, maxHygiene: 5, maxOther: 2 };
   return {
     minFood: DAILY_MIN_FOOD,
@@ -1323,7 +1323,7 @@ export function orderDailyRowsPreferredFirst(rows, preferredKeys) {
 
 /**
  * Dnevni izbor: ≥5 hrana, ≤3 higijena, ≤2 ostalo; inače dopuna redom hrana→higijena→ostalo.
- * interest "hrana"|"higijena" mijenja kvote; "sve"/prazno = isti algoritam kao prije.
+ * interest "higijena" = posebne kvote; "sve"|"hrana"|prazno = food-first kao prije.
  * @param {Array<object>} products
  * @param {{
  *   now?: Date,
@@ -1427,8 +1427,8 @@ export function selectDailyPicks(products, opts = {}) {
     preferredKeys
   );
 
-  if (interest === "sve") {
-    // BAJT-ZA-BAJT isti redoslijed koraka kao prije (kad preferred prazan).
+  if (interest === "sve" || interest === "hrana") {
+    // Food-first do limita (isti put za "sve" i "hrana"; preferred samo reordering).
     takeFrom(foodRows, limit);
 
     {
@@ -1453,7 +1453,7 @@ export function selectDailyPicks(products, opts = {}) {
     if (picked.length < limit) takeFrom(hygieneRows, limit - picked.length);
     if (picked.length < limit) takeFrom(otherRows, limit - picked.length);
   } else {
-    // Interes: prvo min hrane, zatim soft capovi, pa dopuna.
+    // Samo "higijena": min hrane, zatim soft capovi, dopuna higijenom prvo.
     takeFrom(foodRows, minFood);
     {
       const remaining = limit - picked.length;
@@ -1463,15 +1463,9 @@ export function selectDailyPicks(products, opts = {}) {
       const remaining = limit - picked.length;
       takeFrom(otherRows, Math.min(maxOther, remaining));
     }
-    if (interest === "higijena") {
-      if (picked.length < limit) takeFrom(hygieneRows, limit - picked.length);
-      if (picked.length < limit) takeFrom(foodRows, limit - picked.length);
-      if (picked.length < limit) takeFrom(otherRows, limit - picked.length);
-    } else {
-      if (picked.length < limit) takeFrom(foodRows, limit - picked.length);
-      if (picked.length < limit) takeFrom(hygieneRows, limit - picked.length);
-      if (picked.length < limit) takeFrom(otherRows, limit - picked.length);
-    }
+    if (picked.length < limit) takeFrom(hygieneRows, limit - picked.length);
+    if (picked.length < limit) takeFrom(foodRows, limit - picked.length);
+    if (picked.length < limit) takeFrom(otherRows, limit - picked.length);
   }
 
   return picked;

@@ -505,10 +505,14 @@ assert(normalizeDailyInterest(null) === "sve", "null → sve");
 assert(normalizeDailyInterest("") === "sve", "empty → sve");
 assert(normalizeDailyInterest("HRANA") === "hrana", "HRANA");
 assert(quotasForDailyInterest("sve").minFood === 5, "sve minFood 5");
-assert(quotasForDailyInterest("hrana").minFood === 6, "hrana minFood 6");
-assert(quotasForDailyInterest("hrana").maxHygiene === 2, "hrana maxHyg 2");
+assert(
+  JSON.stringify(quotasForDailyInterest("hrana")) ===
+    JSON.stringify(quotasForDailyInterest("sve")),
+  "hrana kvote ≡ sve"
+);
 assert(quotasForDailyInterest("higijena").minFood === 3, "hyg minFood 3");
 assert(quotasForDailyInterest("higijena").maxHygiene === 5, "hyg maxHyg 5");
+assert(quotasForDailyInterest("higijena").maxOther === 2, "hyg maxOther 2");
 
 {
   const products = [];
@@ -574,16 +578,12 @@ assert(quotasForDailyInterest("higijena").maxHygiene === 5, "hyg maxHyg 5");
   assert(ids(base) === ids(asUndef), "interest undefined ≡ default");
 
   const hrana = selectDailyPicks(products, { now, interest: "hrana" });
+  assert(ids(hrana) === ids(base), "hrana ≡ sve (isti food-first put)");
+  const nFoodSve = base.filter((p) => classifyItem(p.name) === ITEM_CLASS_FOOD)
+    .length;
   const nFoodH = hrana.filter((p) => classifyItem(p.name) === ITEM_CLASS_FOOD)
     .length;
-  const nHygH = hrana.filter((p) => classifyItem(p.name) === ITEM_CLASS_HYGIENE)
-    .length;
-  const nOthH = hrana.filter((p) => classifyItem(p.name) === ITEM_CLASS_OTHER)
-    .length;
-  assert(hrana.length === 10, `hrana len 10 got ${hrana.length}`);
-  assert(nFoodH >= 6, `hrana food>=6 got ${nFoodH}`);
-  assert(nHygH <= 2, `hrana hyg<=2 got ${nHygH}`);
-  assert(nOthH <= 2, `hrana oth<=2 got ${nOthH}`);
+  assert(nFoodH >= nFoodSve, `hrana food >= sve food (${nFoodH} vs ${nFoodSve})`);
 
   const hig = selectDailyPicks(products, { now, interest: "higijena" });
   const nFoodG = hig.filter((p) => classifyItem(p.name) === ITEM_CLASS_FOOD)
