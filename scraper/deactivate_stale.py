@@ -4,9 +4,12 @@ Last-seen gašenje starih ponuda (Faza 1: report-only).
 
 Guard (sve mora proći):
   - fetch_ok
-  - complete listing (nije odrezano na --pages)
+  - complete listing (petlja završila prirodno, nije odrezana na --pages)
   - seen > 0
-  - seen >= 70% previous_active
+  - seen >= 70% visible_before
+
+visible_before / visible_not_seen = redovi iz active_deals semantike
+(is_active AND valid_until > now()), ne sirovi is_active.
 
 Ne koristi RSC datume. --apply je odvojen i po zadanom ISKLJUČEN.
 """
@@ -18,7 +21,6 @@ from typing import Any, Protocol
 
 
 DEFAULT_GUARD_RATIO = 0.70
-PAGE_CARD_FULL = 50
 
 
 class SupabaseLike(Protocol):
@@ -30,7 +32,8 @@ class ChainDeactivatePlan:
     chain: str
     store_id: str | None
     seen: int
-    previous_active: int
+    visible_before: int
+    visible_not_seen: int
     would_deactivate: int
     guard_ok: bool
     fetch_ok: bool
@@ -43,7 +46,8 @@ class ChainDeactivatePlan:
     def summary_line(self) -> str:
         return (
             f"{self.chain}: would_deactivate={self.would_deactivate}, "
-            f"seen={self.seen}, previous_active={self.previous_active}, "
+            f"seen={self.seen}, visible_before={self.visible_before}, "
+            f"visible_not_seen={self.visible_not_seen}, "
             f"guard_ok={str(self.guard_ok).lower()}, "
             f"pages_fetched={self.pages_fetched}, "
             f"last_page_cards={self.last_page_cards}, "
@@ -54,33 +58,22 @@ class ChainDeactivatePlan:
 
 def listing_complete(
     *,
-    pages_fetched: int,
-    last_page_cards: int,
-    max_pages: int,
-    hit_empty_page: bool,
+    fetch_ok: bool,
+    stopped_naturally: bool,
 ) -> bool:
     """
-    Complete when we reached the end of the listing:
-    - empty page (0 cards), or
-    - last page has < PAGE_CARD_FULL cards.
-    Truncated when we stopped at max_pages with a full page.
+    complete=True samo ako je petlja završila prirodno (nema novih ponuda)
+    i fetch nije pao. Iscrpljen max_pages bez prirodnog kraja → False.
     """
-    if pages_fetched <= 0:
-        return True  # nothing to fetch / empty store
-    if hit_empty_page:
-        return True
-    if last_page_cards < PAGE_CARD_FULL:
-        return True
-    # Full last page and we hit the page cap → truncated
-    if pages_fetched >= max_pages:
+    if not fetch_ok:
         return False
-    return True
+    return bool(stopped_naturally)
 
 
 def guard_allows_deactivate(
     *,
     seen: int,
-    previous_active: int,
+    visible_before: int,
     fetch_ok: bool,
     complete: bool,
     ratio: float = DEFAULT_GUARD_RATIO,
@@ -92,9 +85,9 @@ def guard_allows_deactivate(
         return False, "truncated"
     if seen <= 0:
         return False, "seen=0"
-    if previous_active <= 0:
+    if visible_before <= 0:
         return True, None
-    if seen < ratio * previous_active:
+    if seen < ratio * visible_before:
         return False, "coverage"
     return True, None
 
@@ -103,8 +96,8 @@ def plan_chain_deactivation(
     *,
     chain: str,
     seen: int,
-    previous_active: int,
-    stale_active_count: int,
+    visible_before: int,
+    visible_not_seen: int,
     fetch_ok: bool,
     pages_fetched: int,
     last_page_cards: int,
@@ -114,7 +107,7 @@ def plan_chain_deactivation(
 ) -> ChainDeactivatePlan:
     ok, reason = guard_allows_deactivate(
         seen=seen,
-        previous_active=previous_active,
+        visible_before=visible_before,
         fetch_ok=fetch_ok,
         complete=complete,
         ratio=ratio,
@@ -125,21 +118,23 @@ def plan_chain_deactivation(
     elif reason == "truncated":
         warning = (
             f"truncated: pages_fetched={pages_fetched} "
-            f"last_page_cards={last_page_cards} (need end of list)"
+            f"last_page_cards={last_page_cards} (need natural end)"
         )
     elif reason == "seen=0":
         warning = "seen=0: skip deactivate (possible empty catalog)"
     elif reason == "coverage":
         warning = (
-            f"guard_fail: seen={seen} < {ratio:.0%} of previous_active={previous_active}"
+            f"guard_fail: seen={seen} < {ratio:.0%} of "
+            f"visible_before={visible_before}"
         )
 
     return ChainDeactivatePlan(
         chain=chain,
         store_id=store_id,
         seen=seen,
-        previous_active=previous_active,
-        would_deactivate=stale_active_count if ok else 0,
+        visible_before=visible_before,
+        visible_not_seen=visible_not_seen,
+        would_deactivate=visible_not_seen if ok else 0,
         guard_ok=ok,
         fetch_ok=fetch_ok,
         pages_fetched=pages_fetched,
@@ -150,20 +145,30 @@ def plan_chain_deactivation(
     )
 
 
-def _paginate_select(client: SupabaseLike, table: str, columns: str, **filters):
+def _paginate_select(
+    client: SupabaseLike,
+    table: str,
+    columns: str,
+    *,
+    eq: dict | None = None,
+    gt: dict | None = None,
+    lt: dict | None = None,
+):
     """Simple pagination helper (1000/page)."""
     page_size = 1000
     offset = 0
     rows: list[dict] = []
     while True:
         q = client.table(table).select(columns).range(offset, offset + page_size - 1)
-        for key, value in filters.items():
-            if key == "eq":
-                for col, val in value.items():
-                    q = q.eq(col, val)
-            elif key == "in_":
-                for col, val in value.items():
-                    q = q.in_(col, list(val))
+        if eq:
+            for col, val in eq.items():
+                q = q.eq(col, val)
+        if gt:
+            for col, val in gt.items():
+                q = q.gt(col, val)
+        if lt:
+            for col, val in lt.items():
+                q = q.lt(col, val)
         res = q.execute()
         batch = res.data or []
         rows.extend(batch)
@@ -173,88 +178,42 @@ def _paginate_select(client: SupabaseLike, table: str, columns: str, **filters):
     return rows
 
 
-def count_active_deals_for_store(client: SupabaseLike, store_id: str) -> int:
-    rows = _paginate_select(
-        client,
-        "deals",
-        "id",
-        eq={"store_id": store_id, "is_active": True},
-    )
-    return len(rows)
-
-
-def active_deals_for_store(client: SupabaseLike, store_id: str) -> list[dict]:
+def visible_deals_for_store(client: SupabaseLike, store_id: str) -> list[dict]:
+    """
+    Same filter as active_deals view for one store:
+    is_active=true AND valid_until > now().
+    """
+    now_iso = datetime.now(timezone.utc).isoformat()
     return _paginate_select(
         client,
         "deals",
-        "id,product_id,scraped_at",
+        "id,product_id,scraped_at,valid_until",
         eq={"store_id": store_id, "is_active": True},
+        gt={"valid_until": now_iso},
     )
 
 
-def active_deal_product_ids_for_store(client: SupabaseLike, store_id: str) -> list[str]:
-    rows = active_deals_for_store(client, store_id)
-    return [r["product_id"] for r in rows if r.get("product_id")]
-
-
-def count_stale_active(
+def count_visible_not_seen(
+    rows: list[dict],
     *,
-    active_product_ids: list[str],
-    seen_product_ids: set[str],
+    pass_started_at: datetime,
 ) -> int:
-    """Active deals whose product was not seen in this pass."""
-    return sum(1 for pid in active_product_ids if pid not in seen_product_ids)
-
-
-def count_scraped_at_before_last_pass(rows: list[dict]) -> tuple[int, str | None]:
-    """
-    Among active rows, how many have scraped_at older than max(scraped_at)
-    for that chain (or null scraped_at). Returns (count, last_pass_iso).
-    """
-    timestamps: list[datetime] = []
-    parsed: list[tuple[dict, datetime | None]] = []
+    """Visible rows with scraped_at < pass_started_at (or null scraped_at)."""
+    pass_utc = pass_started_at.astimezone(timezone.utc)
+    n = 0
     for r in rows:
         scraped = r.get("scraped_at")
         if scraped is None:
-            parsed.append((r, None))
+            n += 1
             continue
         try:
             ts = datetime.fromisoformat(str(scraped).replace("Z", "+00:00"))
         except ValueError:
-            parsed.append((r, None))
+            n += 1
             continue
-        timestamps.append(ts)
-        parsed.append((r, ts))
-    if not timestamps:
-        # No scraped_at at all → all count as "older"/unknown vs last pass
-        return len(rows), None
-    last = max(timestamps)
-    older = sum(1 for _r, ts in parsed if ts is None or ts < last)
-    return older, last.isoformat()
-
-
-def seen_product_ids_from_active_names(
-    client: SupabaseLike,
-    *,
-    active_product_ids: list[str],
-    seen_names: list[str],
-) -> set[str]:
-    """
-    Read-only match: load names for currently-active product_ids, intersect
-    with normalized seen listing names (same strip/lower idea as upsert cache).
-    """
-    if not active_product_ids or not seen_names:
-        return set()
-    seen_norm = {n.strip().lower() for n in seen_names if n and n.strip()}
-    unique_pids = list(dict.fromkeys(active_product_ids))
-    names_by_id: dict[str, str] = {}
-    chunk_size = 200
-    for i in range(0, len(unique_pids), chunk_size):
-        chunk = unique_pids[i : i + chunk_size]
-        res = client.table("products").select("id,name").in_("id", chunk).execute()
-        for row in res.data or []:
-            names_by_id[row["id"]] = (row.get("name") or "").strip().lower()
-    return {pid for pid, name in names_by_id.items() if name in seen_norm}
+        if ts.astimezone(timezone.utc) < pass_utc:
+            n += 1
+    return n
 
 
 def apply_deactivate_before_scraped_at(
@@ -264,10 +223,10 @@ def apply_deactivate_before_scraped_at(
     pass_started_at: datetime,
 ) -> int:
     """
-    WRITE: set is_active=false for active deals of store with scraped_at < pass start.
+    WRITE: set is_active=false for visible deals of store with scraped_at < pass start.
     Faza 1 ne zove ovo bez eksplicitnog --apply.
     """
-    rows = active_deals_for_store(client, store_id)
+    rows = visible_deals_for_store(client, store_id)
     ids = []
     pass_utc = pass_started_at.astimezone(timezone.utc)
     for r in rows:
@@ -299,27 +258,25 @@ def build_plan_for_chain(
     *,
     chain: str,
     store_id: str,
-    seen_names: list[str],
+    seen: int,
+    visible_before: int,
     fetch_ok: bool,
     pages_fetched: int,
     last_page_cards: int,
     complete: bool,
+    pass_started_at: datetime,
     ratio: float = DEFAULT_GUARD_RATIO,
 ) -> ChainDeactivatePlan:
-    active_rows = active_deals_for_store(client, store_id)
-    active_pids = [r["product_id"] for r in active_rows if r.get("product_id")]
-    previous_active = len(active_rows)
-    seen_pids = seen_product_ids_from_active_names(
-        client, active_product_ids=active_pids, seen_names=seen_names
-    )
-    stale = count_stale_active(
-        active_product_ids=active_pids, seen_product_ids=seen_pids
+    # After save: visible rows still older than pass start = not refreshed.
+    visible_now = visible_deals_for_store(client, store_id)
+    visible_not_seen = count_visible_not_seen(
+        visible_now, pass_started_at=pass_started_at
     )
     return plan_chain_deactivation(
         chain=chain,
-        seen=len(seen_names),
-        previous_active=previous_active,
-        stale_active_count=stale,
+        seen=seen,
+        visible_before=visible_before,
+        visible_not_seen=visible_not_seen,
         fetch_ok=fetch_ok,
         pages_fetched=pages_fetched,
         last_page_cards=last_page_cards,

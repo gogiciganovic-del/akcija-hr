@@ -20,7 +20,7 @@ import httpx
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import BASE_URL, CHAIN_NAMES, STORES
-from deactivate_stale import PAGE_CARD_FULL, listing_complete
+from deactivate_stale import listing_complete
 from parser import parse_listing_page
 from parsers.najcijena import ScrapedDeal
 from supabase_writer import SupabaseWriter
@@ -93,8 +93,9 @@ def _listing_url(store_slug: str, page: int, use_vendor: bool) -> str:
 
 def fetch_store(client, store_slug, max_pages) -> StoreFetchResult:
     """
-    Dohvat listinga. complete=True samo kad smo stigli do kraja liste
-    (zadnja stranica <50 kartica ili prazna), ne kad nas je odrezao --pages.
+    Originalno pravilo zaustavljanja: staje kad stranica ne donese nijednu
+    NOVU ponudu (len(new)==0) ili kad dohvat padne. complete se računa
+    odvojeno (prirodni kraj vs odrezan max_pages) i ne utječe na petlju.
     """
     chain = CHAIN_NAMES[store_slug]
     all_deals: list[ScrapedDeal] = []
@@ -103,7 +104,7 @@ def fetch_store(client, store_slug, max_pages) -> StoreFetchResult:
     fetch_ok = True
     pages_fetched = 0
     last_page_cards = 0
-    hit_empty_page = False
+    stopped_naturally = False
 
     for page in range(1, max_pages + 1):
         url = _listing_url(store_slug, page, use_vendor)
@@ -136,26 +137,17 @@ def fetch_store(client, store_slug, max_pages) -> StoreFetchResult:
         for d in new:
             seen.add(d.external_id)
         all_deals.extend(new)
-        print(
-            f"    Pronadeno {len(new)} novih akcija "
-            f"(stranica {len(batch)} kartica, ukupno {len(all_deals)})"
-        )
+        print(f"    Pronadeno {len(new)} novih akcija (ukupno {len(all_deals)})")
 
-        if len(batch) == 0:
-            hit_empty_page = True
-            break
-        if len(batch) < PAGE_CARD_FULL:
+        if len(new) == 0:
+            stopped_naturally = True
             break
         time.sleep(0.8)
 
     complete = listing_complete(
-        pages_fetched=pages_fetched,
-        last_page_cards=last_page_cards,
-        max_pages=max_pages,
-        hit_empty_page=hit_empty_page,
+        fetch_ok=fetch_ok,
+        stopped_naturally=stopped_naturally,
     )
-    if not fetch_ok:
-        complete = False
 
     return StoreFetchResult(
         deals=all_deals,
@@ -171,44 +163,46 @@ def run_deactivate_stale_report(
     *,
     per_store: list[tuple[str, StoreFetchResult]],
     apply: bool,
-    pass_started_at: datetime | None = None,
-    writer: ScraperSupabaseWriter | None = None,
+    pass_started_at: datetime,
+    visible_before_by_store: dict[str, int],
+    writer: ScraperSupabaseWriter,
 ) -> int:
     """
     Faza 1: report-only (apply=False) — čita DB, ispisuje plan, ne gasi.
     apply=True samo uz eksplicitni --apply-deactivate-stale (Faza 2).
+    visible_before_by_store mora biti snimljen PRIJE save_deals.
     """
     from deactivate_stale import (
         apply_deactivate_before_scraped_at,
         build_plan_for_chain,
     )
 
-    started = pass_started_at or datetime.now().astimezone()
-    db = writer or ScraperSupabaseWriter()
     print("\n=== deactivate-stale (report-only=%s) ===" % (not apply))
-    print(f"pass_started_at={started.isoformat()} apply={apply}")
+    print(f"pass_started_at={pass_started_at.isoformat()} apply={apply}")
 
     for store_slug, result in per_store:
         chain = CHAIN_NAMES[store_slug]
-        store_id = db.get_store_id(chain)
+        store_id = writer.get_store_id(chain)
         plan = build_plan_for_chain(
-            db.client,
+            writer.client,
             chain=chain,
             store_id=store_id,
-            seen_names=[d.name for d in result.deals],
+            seen=len(result.deals),
+            visible_before=visible_before_by_store.get(store_slug, 0),
             fetch_ok=result.fetch_ok,
             pages_fetched=result.pages_fetched,
             last_page_cards=result.last_page_cards,
             complete=result.complete,
+            pass_started_at=pass_started_at,
         )
         print(f"  {plan.summary_line()}")
         if plan.warning:
             print(f"    ! {plan.warning}")
         if apply and plan.guard_ok:
             n = apply_deactivate_before_scraped_at(
-                db.client,
+                writer.client,
                 store_id=store_id,
-                pass_started_at=started,
+                pass_started_at=pass_started_at,
             )
             print(f"    applied_deactivate={n}")
         elif apply and not plan.guard_ok:
@@ -265,12 +259,34 @@ def main():
 
     print(f"\nUkupno: {len(all_deals)} akcija")
 
+    writer: ScraperSupabaseWriter | None = None
+    pass_started_at = datetime.now().astimezone()
+    visible_before_by_store: dict[str, int] = {}
+
+    if do_report or not args.dry_run:
+        writer = ScraperSupabaseWriter()
+
+    if do_report and writer is not None:
+        from deactivate_stale import visible_deals_for_store
+
+        # Snimka PRIJE upisa (active_deals semantika).
+        for store_slug, _result in per_store:
+            chain = CHAIN_NAMES[store_slug]
+            store_id = writer.get_store_id(chain)
+            visible_before_by_store[store_slug] = len(
+                visible_deals_for_store(writer.client, store_id)
+            )
+
     if args.dry_run:
         print("DRY RUN — nista nije spremljeno.")
-        if do_report:
+        if do_report and writer is not None:
             try:
                 return run_deactivate_stale_report(
-                    per_store=per_store, apply=False
+                    per_store=per_store,
+                    apply=False,
+                    pass_started_at=pass_started_at,
+                    visible_before_by_store=visible_before_by_store,
+                    writer=writer,
                 )
             except Exception as exc:
                 print(f"  ! deactivate-stale report nije uspio: {exc}")
@@ -278,9 +294,8 @@ def main():
         return 0
 
     print("\nSpremanje u Supabase...")
-    writer = ScraperSupabaseWriter()
-    # Cutoff PRIJE upisa: novi scraped_at mora biti >= pass_started_at.
-    pass_started_at = datetime.now().astimezone()
+    assert writer is not None
+    # Cutoff već snimljen PRIJE visible_before i upisa.
     stats = writer.save_deals(all_deals)
     print(f"Gotovo: {stats['deals']} akcija, {stats['errors']} gresaka")
 
@@ -307,6 +322,7 @@ def main():
                 per_store=per_store,
                 apply=do_apply,
                 pass_started_at=pass_started_at,
+                visible_before_by_store=visible_before_by_store,
                 writer=writer,
             )
         except Exception as exc:
