@@ -62,8 +62,8 @@ def build_flyer_payload(chain: str, flyer_week: str) -> dict:
     c = str(chain or "").strip()
     week = str(flyer_week or "").strip()
     return {
-        "title": "Izašao je novi letak",
-        "body": f"{c}: pogledaj nove akcije",
+        "title": f"Nove akcije: {c}",
+        "body": f"Pogledaj što je novo u trgovini {c}",
         "url": f"/?trgovina={quote(c, safe='')}",
         "tag": f"flyer-{c.lower()}-{week}",
     }

@@ -86,8 +86,8 @@ def make_jobs(n: int, chain: str = "Eurospin", week: str = "2026-W44") -> list[d
 
 # --- payload / hash / quote ---
 payload = build_flyer_payload("Eurospin", "2026-W44")
-assert_(payload["title"] == "Izašao je novi letak", payload["title"])
-assert_(payload["body"] == "Eurospin: pogledaj nove akcije", payload["body"])
+assert_(payload["title"] == "Nove akcije: Eurospin", payload["title"])
+assert_(payload["body"] == "Pogledaj što je novo u trgovini Eurospin", payload["body"])
 assert_(
     payload["url"] == f"/?trgovina={quote('Eurospin', safe='')}",
     payload["url"],

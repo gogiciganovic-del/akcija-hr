@@ -33,10 +33,10 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      # Faza 1: flyer push dry-run (bez --send). continue-on-error: ne ruši scrape.
-      - name: Send flyer pushes (dry-run)
+      # Faza 2: flyer push s --send (samo Eurospin/Kaufland/Plodine u skripti).
+      - name: Send flyer pushes
         continue-on-error: true
-        run: python scraper/send_flyer_pushes.py --limit 500
+        run: python scraper/send_flyer_pushes.py --limit 500 --send
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
