@@ -33,6 +33,18 @@ const INTEREST_OPTIONS = [
 
 const BTN_MIN = 44;
 
+/** Svijetla podloga čipa → tamni tekst (npr. Kaufland žuta). */
+function chipForeground(bgHex) {
+  const raw = String(bgHex || "").replace("#", "").trim();
+  if (raw.length !== 6) return "#fff";
+  const r = parseInt(raw.slice(0, 2), 16);
+  const g = parseInt(raw.slice(2, 4), 16);
+  const b = parseInt(raw.slice(4, 6), 16);
+  if (![r, g, b].every((n) => Number.isFinite(n))) return "#fff";
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.62 ? "#020617" : "#fff";
+}
+
 /**
  * Donji sheet (fixed) — ne gura layout. Zatvaranje uvijek označi done.
  */
@@ -280,7 +292,9 @@ export function OnboardingSheet({
                     style={{
                       minHeight: BTN_MIN,
                       fontSize: 12,
-                      color: on ? "#fff" : "rgba(255,255,255,0.65)",
+                      color: on
+                        ? chipForeground(store.color)
+                        : "rgba(255,255,255,0.65)",
                       background: on ? store.color : "rgba(255,255,255,0.06)",
                       border: on
                         ? `1px solid ${store.color}`
@@ -394,6 +408,8 @@ export function OnboardingSheet({
               {FLYER_FOLLOW_CHAINS.map((id) => {
                 const meta = STORES.find((s) => s.id === id);
                 const on = flyerChains.includes(id);
+                const bg = meta?.color || "#334155";
+                const fg = on ? chipForeground(bg) : "rgba(255,255,255,0.45)";
                 return (
                   <button
                     key={id}
@@ -403,16 +419,16 @@ export function OnboardingSheet({
                     style={{
                       minHeight: BTN_MIN,
                       fontSize: 13,
-                      color: on ? "#fff" : "rgba(255,255,255,0.45)",
-                      background: on
-                        ? meta?.color || "#334155"
-                        : "rgba(255,255,255,0.06)",
+                      color: fg,
+                      background: on ? bg : "rgba(255,255,255,0.06)",
                       border: on
-                        ? `1px solid ${meta?.color || "#334155"}`
+                        ? `1px solid ${bg}`
                         : "1px solid rgba(255,255,255,0.12)",
                     }}
                   >
-                    {on ? <Check size={16} strokeWidth={2.5} aria-hidden /> : null}
+                    {on ? (
+                      <Check size={16} strokeWidth={2.5} aria-hidden color={fg} />
+                    ) : null}
                     {id}
                   </button>
                 );

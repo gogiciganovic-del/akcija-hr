@@ -1266,7 +1266,64 @@ export function buildDailyCandidatePool(products, opts = {}) {
 }
 
 /**
+ * @param {unknown} interest
+ * @returns {"hrana"|"higijena"|"sve"}
+ */
+export function normalizeDailyInterest(interest) {
+  const i = String(interest ?? "sve").trim().toLowerCase();
+  if (i === "hrana" || i === "higijena") return i;
+  return "sve";
+}
+
+/**
+ * Kvote po interesu. "sve"/nepoznato = default 5/3/2.
+ * @param {unknown} interest
+ * @returns {{ minFood: number, maxHygiene: number, maxOther: number }}
+ */
+export function quotasForDailyInterest(interest) {
+  const i = normalizeDailyInterest(interest);
+  if (i === "hrana") return { minFood: 6, maxHygiene: 2, maxOther: 2 };
+  if (i === "higijena") return { minFood: 3, maxHygiene: 5, maxOther: 2 };
+  return {
+    minFood: DAILY_MIN_FOOD,
+    maxHygiene: DAILY_MAX_HYGIENE,
+    maxOther: DAILY_MAX_OTHER,
+  };
+}
+
+/** @param {unknown} preferredStores @returns {Set<string>} */
+function preferredStoreKeySet(preferredStores) {
+  const set = new Set();
+  if (!Array.isArray(preferredStores)) return set;
+  for (const id of preferredStores) {
+    const k = String(id || "").trim().toLowerCase();
+    if (k) set.add(k);
+  }
+  return set;
+}
+
+/**
+ * Unutar klase: preferirane trgovine prve (isti red unutar skupine).
+ * Prazan preferred → isti niz (referenca / kopija redoslijeda).
+ * @template {{ sk: string }} T
+ * @param {T[]} rows
+ * @param {Set<string>} preferredKeys
+ * @returns {T[]}
+ */
+export function orderDailyRowsPreferredFirst(rows, preferredKeys) {
+  if (!preferredKeys || preferredKeys.size === 0) return rows;
+  const pref = [];
+  const rest = [];
+  for (const row of rows) {
+    if (preferredKeys.has(row.sk)) pref.push(row);
+    else rest.push(row);
+  }
+  return [...pref, ...rest];
+}
+
+/**
  * Dnevni izbor: ≥5 hrana, ≤3 higijena, ≤2 ostalo; inače dopuna redom hrana→higijena→ostalo.
+ * interest "hrana"|"higijena" mijenja kvote; "sve"/prazno = isti algoritam kao prije.
  * @param {Array<object>} products
  * @param {{
  *   now?: Date,
@@ -1276,6 +1333,8 @@ export function buildDailyCandidatePool(products, opts = {}) {
  *   minFood?: number,
  *   maxHygiene?: number,
  *   maxOther?: number,
+ *   interest?: string,
+ *   preferredStores?: string[],
  * }} [opts]
  * @returns {object[]}
  */
@@ -1284,9 +1343,12 @@ export function selectDailyPicks(products, opts = {}) {
   const limit = opts.limit ?? DAILY_PICKS_LIMIT;
   const storeFilterActive = Boolean(opts.storeFilterActive);
   const maxPerStore = opts.maxPerStore ?? DAILY_MAX_PER_STORE;
-  const minFood = opts.minFood ?? DAILY_MIN_FOOD;
-  const maxHygiene = opts.maxHygiene ?? DAILY_MAX_HYGIENE;
-  const maxOther = opts.maxOther ?? DAILY_MAX_OTHER;
+  const interest = normalizeDailyInterest(opts.interest);
+  const q = quotasForDailyInterest(interest);
+  const minFood = opts.minFood ?? q.minFood;
+  const maxHygiene = opts.maxHygiene ?? q.maxHygiene;
+  const maxOther = opts.maxOther ?? q.maxOther;
+  const preferredKeys = preferredStoreKeySet(opts.preferredStores);
   const dayKey = calendarDayKey(now);
   if (!dayKey) return [];
 
@@ -1352,37 +1414,65 @@ export function selectDailyPicks(products, opts = {}) {
     }
   }
 
-  const foodRows = scored.filter((r) => r.cls === ITEM_CLASS_FOOD);
-  const hygieneRows = scored.filter((r) => r.cls === ITEM_CLASS_HYGIENE);
-  const otherRows = scored.filter((r) => r.cls === ITEM_CLASS_OTHER);
+  const foodRows = orderDailyRowsPreferredFirst(
+    scored.filter((r) => r.cls === ITEM_CLASS_FOOD),
+    preferredKeys
+  );
+  const hygieneRows = orderDailyRowsPreferredFirst(
+    scored.filter((r) => r.cls === ITEM_CLASS_HYGIENE),
+    preferredKeys
+  );
+  const otherRows = orderDailyRowsPreferredFirst(
+    scored.filter((r) => r.cls === ITEM_CLASS_OTHER),
+    preferredKeys
+  );
 
-  // 1) hrana — cilj barem minFood, smije ići do limita
-  takeFrom(foodRows, limit);
+  if (interest === "sve") {
+    // BAJT-ZA-BAJT isti redoslijed koraka kao prije (kad preferred prazan).
+    takeFrom(foodRows, limit);
 
-  // 2) higijena — soft cap ako ima dovoljno hrane
-  {
-    const remaining = limit - picked.length;
-    const soft =
-      counts[ITEM_CLASS_FOOD] >= minFood
-        ? Math.min(maxHygiene, remaining)
-        : remaining;
-    takeFrom(hygieneRows, soft);
+    {
+      const remaining = limit - picked.length;
+      const soft =
+        counts[ITEM_CLASS_FOOD] >= minFood
+          ? Math.min(maxHygiene, remaining)
+          : remaining;
+      takeFrom(hygieneRows, soft);
+    }
+
+    {
+      const remaining = limit - picked.length;
+      const soft =
+        counts[ITEM_CLASS_FOOD] >= minFood
+          ? Math.min(maxOther, remaining)
+          : remaining;
+      takeFrom(otherRows, soft);
+    }
+
+    if (picked.length < limit) takeFrom(foodRows, limit - picked.length);
+    if (picked.length < limit) takeFrom(hygieneRows, limit - picked.length);
+    if (picked.length < limit) takeFrom(otherRows, limit - picked.length);
+  } else {
+    // Interes: prvo min hrane, zatim soft capovi, pa dopuna.
+    takeFrom(foodRows, minFood);
+    {
+      const remaining = limit - picked.length;
+      takeFrom(hygieneRows, Math.min(maxHygiene, remaining));
+    }
+    {
+      const remaining = limit - picked.length;
+      takeFrom(otherRows, Math.min(maxOther, remaining));
+    }
+    if (interest === "higijena") {
+      if (picked.length < limit) takeFrom(hygieneRows, limit - picked.length);
+      if (picked.length < limit) takeFrom(foodRows, limit - picked.length);
+      if (picked.length < limit) takeFrom(otherRows, limit - picked.length);
+    } else {
+      if (picked.length < limit) takeFrom(foodRows, limit - picked.length);
+      if (picked.length < limit) takeFrom(hygieneRows, limit - picked.length);
+      if (picked.length < limit) takeFrom(otherRows, limit - picked.length);
+    }
   }
-
-  // 3) ostalo — soft cap ako ima dovoljno hrane
-  {
-    const remaining = limit - picked.length;
-    const soft =
-      counts[ITEM_CLASS_FOOD] >= minFood
-        ? Math.min(maxOther, remaining)
-        : remaining;
-    takeFrom(otherRows, soft);
-  }
-
-  // 4) dopuna redom hrana → higijena → ostalo
-  if (picked.length < limit) takeFrom(foodRows, limit - picked.length);
-  if (picked.length < limit) takeFrom(hygieneRows, limit - picked.length);
-  if (picked.length < limit) takeFrom(otherRows, limit - picked.length);
 
   return picked;
 }

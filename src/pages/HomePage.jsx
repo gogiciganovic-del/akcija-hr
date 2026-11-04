@@ -10,6 +10,7 @@ import { useUserLocation } from "../hooks/useUserLocation";
 import { CATEGORIES, STORES } from "../lib/constants";
 import {
   orderStoresPreferredFirst,
+  readInterest,
   readPreferredStores,
 } from "../lib/onboardingGate";
 import { isNewProduct, isExpiringTodayProduct } from "../lib/dealDates";
@@ -477,8 +478,11 @@ export function HomePage({
   const hasMoreNovo = newProducts.length > NOVO_PREVIEW;
   const novoVisible = novoExpanded ? newProducts : newProducts.slice(0, NOVO_PREVIEW);
 
+  const dailyInterest = readInterest() || "sve";
   const dailyPicks = selectDailyPicks(products, {
     storeFilterActive: Boolean(selectedStore),
+    interest: dailyInterest,
+    preferredStores,
   });
   const showDailyPicks =
     !isNovoMode && !isExpiringMode && shouldShowDailyPicks(dailyPicks);

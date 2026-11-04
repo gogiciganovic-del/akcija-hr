@@ -23,6 +23,8 @@ import {
   selectDailyPicks,
   shouldShowDailyPicks,
   tokenizeProductName,
+  normalizeDailyInterest,
+  quotasForDailyInterest,
 } from "../src/lib/dailyPicks.js";
 import { calendarDayKey } from "../src/lib/dealDates.js";
 
@@ -496,6 +498,232 @@ assert(DAILY_PICKS_MIN_VISIBLE === 3, "min visible 3");
     storeFilterActive: true,
   });
   assert(picksFb.length >= 3, "fallback can still pick");
+}
+
+// --- interest / preferredStores (2C) ---
+assert(normalizeDailyInterest(null) === "sve", "null → sve");
+assert(normalizeDailyInterest("") === "sve", "empty → sve");
+assert(normalizeDailyInterest("HRANA") === "hrana", "HRANA");
+assert(quotasForDailyInterest("sve").minFood === 5, "sve minFood 5");
+assert(quotasForDailyInterest("hrana").minFood === 6, "hrana minFood 6");
+assert(quotasForDailyInterest("hrana").maxHygiene === 2, "hrana maxHyg 2");
+assert(quotasForDailyInterest("higijena").minFood === 3, "hyg minFood 3");
+assert(quotasForDailyInterest("higijena").maxHygiene === 5, "hyg maxHyg 5");
+
+{
+  const products = [];
+  const food =
+    "mlijeko jogurt kruh sir maslac jaja tjestenina riza brasno secer kava caj sok pivo cokolada keks tuna sunka".split(
+      " "
+    );
+  const hygiene = "persil ariel nivea colgate bref jar fa dove rexona".split(" ");
+  const other =
+    "vijenac posteljina navlaka vjesalice igracka tipkovnica slusalice romobil".split(
+      " "
+    );
+  const chains = [
+    "Lidl",
+    "Konzum",
+    "Spar",
+    "Plodine",
+    "Tommy",
+    "Kaufland",
+    "Eurospin",
+    "Dm",
+  ];
+  food.forEach((w, i) => {
+    products.push(
+      makeP({
+        id: `if${i}`,
+        product_id: `if${i}`,
+        name: `${w} ekstra`,
+        chain: chains[i % chains.length],
+        discount: 30,
+      })
+    );
+  });
+  hygiene.forEach((w, i) => {
+    products.push(
+      makeP({
+        id: `ih${i}`,
+        product_id: `ih${i}`,
+        name: `${w} ekstra`,
+        chain: chains[i % chains.length],
+        discount: 40,
+      })
+    );
+  });
+  other.forEach((w, i) => {
+    products.push(
+      makeP({
+        id: `io${i}`,
+        product_id: `io${i}`,
+        name: `${w} ekstra`,
+        chain: chains[i % chains.length],
+        discount: 45,
+      })
+    );
+  });
+  const now = new Date("2026-11-04T12:00:00+01:00");
+  const base = selectDailyPicks(products, { now });
+  const asSve = selectDailyPicks(products, { now, interest: "sve" });
+  const asEmpty = selectDailyPicks(products, { now, interest: "" });
+  const asUndef = selectDailyPicks(products, { now, interest: undefined });
+  assert(ids(base) === ids(asSve), "interest sve ≡ default");
+  assert(ids(base) === ids(asEmpty), "interest '' ≡ default");
+  assert(ids(base) === ids(asUndef), "interest undefined ≡ default");
+
+  const hrana = selectDailyPicks(products, { now, interest: "hrana" });
+  const nFoodH = hrana.filter((p) => classifyItem(p.name) === ITEM_CLASS_FOOD)
+    .length;
+  const nHygH = hrana.filter((p) => classifyItem(p.name) === ITEM_CLASS_HYGIENE)
+    .length;
+  const nOthH = hrana.filter((p) => classifyItem(p.name) === ITEM_CLASS_OTHER)
+    .length;
+  assert(hrana.length === 10, `hrana len 10 got ${hrana.length}`);
+  assert(nFoodH >= 6, `hrana food>=6 got ${nFoodH}`);
+  assert(nHygH <= 2, `hrana hyg<=2 got ${nHygH}`);
+  assert(nOthH <= 2, `hrana oth<=2 got ${nOthH}`);
+
+  const hig = selectDailyPicks(products, { now, interest: "higijena" });
+  const nFoodG = hig.filter((p) => classifyItem(p.name) === ITEM_CLASS_FOOD)
+    .length;
+  const nHygG = hig.filter((p) => classifyItem(p.name) === ITEM_CLASS_HYGIENE)
+    .length;
+  const nOthG = hig.filter((p) => classifyItem(p.name) === ITEM_CLASS_OTHER)
+    .length;
+  assert(hig.length === 10, `hig len 10 got ${hig.length}`);
+  assert(nFoodG >= 3, `hig food>=3 got ${nFoodG}`);
+  assert(nHygG <= 5, `hig hyg<=5 got ${nHygG}`);
+  assert(nOthG <= 2, `hig oth<=2 got ${nOthG}`);
+  assert(nHygG >= 1, `hig should include hygiene got ${nHygG}`);
+}
+
+// preferred stores: prednost unutar klase, max 2 po trgovini
+{
+  const now = new Date("2026-11-04T12:00:00+01:00");
+  const products = [];
+  // Mnogo hrane u Lidl/Kaufland + drugim lancima
+  const foodWords =
+    "mlijeko jogurt kruh sir maslac jaja tjestenina riza brasno secer kava caj sok pivo cokolada keks".split(
+      " "
+    );
+  foodWords.forEach((w, i) => {
+    products.push(
+      makeP({
+        id: `pfL${i}`,
+        product_id: `pfL${i}`,
+        name: `${w} lidl`,
+        chain: "Lidl",
+        discount: 35,
+      })
+    );
+    products.push(
+      makeP({
+        id: `pfK${i}`,
+        product_id: `pfK${i}`,
+        name: `${w} kaufland`,
+        chain: "Kaufland",
+        discount: 34,
+      })
+    );
+    products.push(
+      makeP({
+        id: `pfO${i}`,
+        product_id: `pfO${i}`,
+        name: `${w} drugi`,
+        chain: i % 2 === 0 ? "Konzum" : "Spar",
+        discount: 33,
+      })
+    );
+  });
+  for (let i = 0; i < 8; i++) {
+    products.push(
+      makeP({
+        id: `ph${i}`,
+        product_id: `ph${i}`,
+        name: `persil ariel nivea colgate bref jar dove fa`.split(" ")[i % 8] +
+          ` hyg ${i}`,
+        chain: i % 2 === 0 ? "Lidl" : "Dm",
+        discount: 40,
+      })
+    );
+  }
+
+  const pref = selectDailyPicks(products, {
+    now,
+    interest: "higijena",
+    preferredStores: ["Lidl", "Kaufland"],
+  });
+  assert(pref.length === 10, "pref length 10");
+  const byStore = new Map();
+  for (const p of pref) {
+    const k = String(p.chain).toLowerCase();
+    byStore.set(k, (byStore.get(k) || 0) + 1);
+  }
+  for (const [k, n] of byStore) {
+    assert(n <= 2, `max 2 per store ${k}=${n}`);
+  }
+  const prefCount = pref.filter((p) =>
+    ["Lidl", "Kaufland"].includes(p.chain)
+  ).length;
+  const noPref = selectDailyPicks(products, { now, interest: "higijena" });
+  const prefCountBase = noPref.filter((p) =>
+    ["Lidl", "Kaufland"].includes(p.chain)
+  ).length;
+  assert(
+    prefCount >= prefCountBase,
+    `preferred should not reduce Lidl/Kaufland share ${prefCount} vs ${prefCountBase}`
+  );
+
+  // fallback: preferred chain ima premali pool → i dalje puni iz ostalih
+  const tiny = [
+    makeP({
+      id: "t1",
+      product_id: "t1",
+      name: "mlijeko A",
+      chain: "Lidl",
+      discount: 30,
+    }),
+    makeP({
+      id: "t2",
+      product_id: "t2",
+      name: "jogurt B",
+      chain: "Lidl",
+      discount: 30,
+    }),
+    ...foodWords.slice(0, 12).map((w, i) =>
+      makeP({
+        id: `tf${i}`,
+        product_id: `tf${i}`,
+        name: `${w} ekstra`,
+        chain: chainsSafe(i),
+        discount: 28,
+      })
+    ),
+    ...["persil", "ariel", "nivea", "colgate", "bref", "jar"].map((w, i) =>
+      makeP({
+        id: `th${i}`,
+        product_id: `th${i}`,
+        name: `${w} ekstra`,
+        chain: i % 2 === 0 ? "Spar" : "Konzum",
+        discount: 40,
+      })
+    ),
+  ];
+  function chainsSafe(i) {
+    return ["Konzum", "Spar", "Plodine", "Tommy"][i % 4];
+  }
+  const fb = selectDailyPicks(tiny, {
+    now,
+    interest: "sve",
+    preferredStores: ["Lidl"],
+  });
+  assert(fb.length >= 3, `fallback preferred still fills got ${fb.length}`);
+  assert(
+    fb.some((p) => p.chain !== "Lidl"),
+    "fallback includes non-preferred"
+  );
 }
 
 console.log("OK daily-picks");
