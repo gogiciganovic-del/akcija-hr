@@ -23,7 +23,8 @@
     "test:product-display-name": "node scripts/test-product-display-name.mjs",
     "test:show-expires-in": "node scripts/test-show-expires-in.mjs",
     "test:product-sheet-display": "node scripts/test-product-sheet-display.mjs",
-    "test:umami-notrack": "node scripts/test-umami-notrack.mjs"
+    "test:umami-notrack": "node scripts/test-umami-notrack.mjs",
+    "test:onboarding-gate": "node scripts/test-onboarding-gate.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
