@@ -70,7 +70,11 @@ class StoreFetchResult:
 
 
 def get_with_retry(client: httpx.Client, url: str) -> httpx.Response:
-    """Na 429/503 čeka 10s i pokušava još MAX_RETRIES puta."""
+    """Na 429/503 čeka 10s i pokušava još MAX_RETRIES puta.
+
+    HTTP 404 se vraća bez raise — fetch_store odlučuje je li prirodni kraj
+    (nakon uspješne stranice) ili greška (page=1).
+    """
     for attempt in range(MAX_RETRIES + 1):
         resp = client.get(url, headers=HEADERS, timeout=30)
         if resp.status_code in RETRY_STATUS and attempt < MAX_RETRIES:
@@ -80,6 +84,8 @@ def get_with_retry(client: httpx.Client, url: str) -> httpx.Response:
             )
             time.sleep(RETRY_WAIT_SEC)
             continue
+        if resp.status_code == 404:
+            return resp
         resp.raise_for_status()
         return resp
     raise RuntimeError(f"Prekoracen broj pokusaja za {url}")
@@ -91,11 +97,27 @@ def _listing_url(store_slug: str, page: int, use_vendor: bool) -> str:
     return f"{BASE_URL}/trgovina/{store_slug}?page={page}"
 
 
+def _handle_listing_404(*, pages_fetched: int, context: str) -> tuple[bool, bool]:
+    """
+    404 nakon barem jedne uspješne stranice → prirodni kraj.
+    404 na page=1 (pages_fetched==0) → greška.
+    Returns (fetch_ok, stopped_naturally).
+    """
+    if pages_fetched >= 1:
+        print(f"  -> HTTP 404{context} nakon uspjesnih stranica — prirodni kraj")
+        return True, True
+    print(f"  X Greska: HTTP 404{context} na prvoj stranici")
+    return False, False
+
+
 def fetch_store(client, store_slug, max_pages) -> StoreFetchResult:
     """
     Originalno pravilo zaustavljanja: staje kad stranica ne donese nijednu
     NOVU ponudu (len(new)==0) ili kad dohvat padne. complete se računa
     odvojeno (prirodni kraj vs odrezan max_pages) i ne utječe na petlju.
+
+    HTTP 404 nakon barem jedne uspješno skinute stranice = prirodni kraj
+    (NajCijena tako označava kraj paginacije). 404 na page=1 ostaje greška.
     """
     chain = CHAIN_NAMES[store_slug]
     all_deals: list[ScrapedDeal] = []
@@ -116,6 +138,12 @@ def fetch_store(client, store_slug, max_pages) -> StoreFetchResult:
             fetch_ok = False
             break
 
+        if resp.status_code == 404:
+            fetch_ok, stopped_naturally = _handle_listing_404(
+                pages_fetched=pages_fetched, context=""
+            )
+            break
+
         batch = parse_listing_page(resp.text, chain)
 
         if page == 1 and len(batch) == 0 and not use_vendor:
@@ -127,6 +155,11 @@ def fetch_store(client, store_slug, max_pages) -> StoreFetchResult:
             except Exception as e:
                 print(f"  X Greska (vendor): {e}")
                 fetch_ok = False
+                break
+            if resp.status_code == 404:
+                fetch_ok, stopped_naturally = _handle_listing_404(
+                    pages_fetched=pages_fetched, context=" (vendor)"
+                )
                 break
             batch = parse_listing_page(resp.text, chain)
 
