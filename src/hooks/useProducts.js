@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { adaptDeal, adaptDealRow } from '../lib/adapters'
-import { buildWatchwordIlikeQuery } from '../lib/ilikeQuery'
+import { buildWatchwordIlikeQuery, matchesFoldedTerm } from '../lib/ilikeQuery'
 
 const DEALS_SELECT = `
   id,
@@ -74,7 +74,12 @@ export function useProducts({ category, search, sortBy, chain, enabled = true } 
           const { data: viewData, error: viewError } = await fallback
           if (viewError) throw viewError
           if (cancelled) return
-          setProducts((viewData || []).map(adaptDeal))
+          const filtered = (viewData || []).filter(
+            (row) =>
+              matchesFoldedTerm(row.name, search) ||
+              matchesFoldedTerm(row.brand, search)
+          )
+          setProducts(filtered.map(adaptDeal))
           return
         }
 

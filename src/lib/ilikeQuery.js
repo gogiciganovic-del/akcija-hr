@@ -3,7 +3,7 @@
  * escape posebnih znakova; bez dijakritike c/s/z/d → "_" (jedan znak).
  */
 
-import { WATCHWORDS_MIN_LEN } from "./watchwords.js";
+import { WATCHWORDS_MIN_LEN, foldWatchText } from "./watchwords.js";
 
 /** Koliko kandidata dohvatiti (ilike), prije klijentskog filtera/sorta. */
 export const ILIKE_FETCH_LIMIT = 40;
@@ -15,6 +15,18 @@ export const ILIKE_FETCH_LIMIT_WIDENED = 80;
  */
 export function escapeIlike(s) {
   return String(s || "").replace(/[%_,()"\\*]/g, "");
+}
+
+/**
+ * Folded podniz (ne word-boundary): foldWatchText(text) sadrži foldWatchText(term).
+ * Prazan term nakon escapeIlike → true (ne filtriraj).
+ */
+export function matchesFoldedTerm(text, term) {
+  const trimmed = String(term || "").trim();
+  if (!escapeIlike(trimmed)) return true;
+  const needle = foldWatchText(trimmed).trim();
+  if (!needle) return true;
+  return foldWatchText(text).includes(needle);
 }
 
 /**

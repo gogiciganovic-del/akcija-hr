@@ -8,6 +8,7 @@ import {
   ILIKE_FETCH_LIMIT_WIDENED,
   buildWatchwordIlikeQuery,
   escapeIlike,
+  matchesFoldedTerm,
 } from "../src/lib/ilikeQuery.js";
 import {
   WATCHWORDS_FETCH_LIMIT,
@@ -65,5 +66,14 @@ assert.equal(qSpecial.widened, true);
 // minLen 2 za search (za razliku od watchwords min 3)
 assert.equal(buildWatchwordIlikeQuery("ab"), null); // default min 3
 assert.ok(buildWatchwordIlikeQuery("ab", { minLen: 2 }));
+
+// Folded substring filter (odbija ILIKE šum tip/kipi za "cips")
+assert.equal(matchesFoldedTerm("Čips Lay's", "cips"), true);
+assert.equal(matchesFoldedTerm("Kipi tip", "cips"), false);
+assert.equal(matchesFoldedTerm("Šampon", "sampon"), true);
+assert.equal(matchesFoldedTerm("Šampon", "šampon"), true);
+assert.equal(matchesFoldedTerm("što god", "%%%"), true);
+assert.equal(matchesFoldedTerm("što god", "   "), true);
+assert.equal(matchesFoldedTerm("što god", ""), true);
 
 console.log("OK test-search-diacritics");

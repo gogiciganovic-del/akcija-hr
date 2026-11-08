@@ -19,7 +19,7 @@ import {
 } from "../lib/quantityParse";
 import { matchProductType } from "../lib/productTypes";
 import { sortBySearchRelevance } from "../lib/searchRelevance";
-import { buildWatchwordIlikeQuery } from "../lib/ilikeQuery";
+import { buildWatchwordIlikeQuery, matchesFoldedTerm } from "../lib/ilikeQuery";
 import {
   trackPratiCijenu,
   trackSkenOtvoren,
@@ -563,7 +563,11 @@ export function SearchPage({
   }, [pendingOpenScanner, onPendingOpenScannerConsumed, openScanner]);
 
   useEffect(() => {
-    const qinfo = buildWatchwordIlikeQuery(searchTerm, { minLen: 2 });
+    const qinfo = buildWatchwordIlikeQuery(searchTerm, {
+      minLen: 2,
+      limit: 40,
+      limitWidened: 300,
+    });
     if (!qinfo) {
       setRegularProducts([]);
       setRegularLoading(false);
@@ -586,6 +590,12 @@ export function SearchPage({
         if (cancelled) return;
 
         const adapted = (data || [])
+          .filter(
+            (row) =>
+              matchesFoldedTerm(row.name, searchTerm) ||
+              matchesFoldedTerm(row.brand, searchTerm)
+          )
+          .slice(0, 40)
           .map((row, i) => {
             const p = adaptRegularPrice(row);
             return {
