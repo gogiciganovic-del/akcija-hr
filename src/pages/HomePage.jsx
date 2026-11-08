@@ -13,6 +13,8 @@ import {
   hasMoreItems,
   nextVisibleCount,
   resetVisibleCount,
+  resolveActionsCountLabel,
+  shouldShowActionsTruncationNote,
   visibleSlice,
 } from "../lib/homeRenderCap";
 import { CATEGORIES, STORES } from "../lib/constants";
@@ -525,10 +527,19 @@ export function HomePage({
   );
   const regularVisible = visibleSlice(regularProducts, actionsVisible);
   const regularHasMore = hasMoreItems(regularProducts, actionsVisible);
-  const regularCountLabel =
-    typeof activeDealsCount === "number"
-      ? activeDealsCount
-      : regularProducts.length;
+  const regularCountLabel = resolveActionsCountLabel({
+    activeCat,
+    specialFilter,
+    activeDealsCount,
+    listLength: regularProducts.length,
+  });
+  const showActionsTruncationNote = shouldShowActionsTruncationNote({
+    activeCat,
+    specialFilter,
+    hasMore: regularHasMore,
+    activeDealsCount,
+    listLength: regularProducts.length,
+  });
   const filterLabel = selectedStore ? storeMeta?.label : null;
   const specialFilterMeta = SPECIAL_FILTERS_ALL.find((f) => f.id === specialFilter);
   const headerFilterParts = [
@@ -998,6 +1009,41 @@ export function HomePage({
                       }}
                     >
                       Prikaži još
+                    </button>
+                  </div>
+                ) : null}
+                {showActionsTruncationNote ? (
+                  <div
+                    className="px-4 mt-3"
+                    data-testid="home-actions-truncation-note"
+                  >
+                    <p
+                      style={{
+                        color: "rgba(255,255,255,0.35)",
+                        fontSize: 12,
+                        lineHeight: 1.45,
+                        marginBottom: 8,
+                      }}
+                    >
+                      Prikazano je najboljih {regularProducts.length} po popustu.
+                      Ostale ponude potraži u pretrazi.
+                    </p>
+                    <button
+                      type="button"
+                      data-testid="home-actions-open-search"
+                      onClick={() => {
+                        onEarlyEngage?.();
+                        onSearchFocus?.();
+                      }}
+                      className="w-full rounded-xl py-2.5 font-bold"
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        color: "rgba(255,255,255,0.75)",
+                        fontSize: 13,
+                      }}
+                    >
+                      Otvori pretragu
                     </button>
                   </div>
                 ) : null}

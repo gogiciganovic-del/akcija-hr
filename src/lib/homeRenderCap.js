@@ -26,3 +26,43 @@ export function hasMoreItems(totalOrList, visibleCount) {
   const shown = Math.max(0, Math.floor(Number(visibleCount) || 0));
   return total > shown;
 }
+
+/**
+ * Broj za oznaku „N aktivnih”:
+ * - bez kategorije i bez specialFilter → activeDealsCount (ako je broj)
+ * - inače → duljina učitane (filtrirane) liste
+ */
+export function resolveActionsCountLabel({
+  activeCat = null,
+  specialFilter = null,
+  activeDealsCount = null,
+  listLength = 0,
+} = {}) {
+  const filtered = Boolean(activeCat) || Boolean(specialFilter);
+  const loaded = Math.max(0, Math.floor(Number(listLength) || 0));
+  if (filtered) return loaded;
+  if (typeof activeDealsCount === "number" && Number.isFinite(activeDealsCount)) {
+    return Math.max(0, Math.floor(activeDealsCount));
+  }
+  return loaded;
+}
+
+/**
+ * Napomena ispod liste kad je učitani set iscrpljen, a stvarni count veći
+ * (samo bez kategorije / special filtera).
+ */
+export function shouldShowActionsTruncationNote({
+  activeCat = null,
+  specialFilter = null,
+  hasMore = false,
+  activeDealsCount = null,
+  listLength = 0,
+} = {}) {
+  if (hasMore) return false;
+  if (activeCat || specialFilter) return false;
+  if (typeof activeDealsCount !== "number" || !Number.isFinite(activeDealsCount)) {
+    return false;
+  }
+  const loaded = Math.max(0, Math.floor(Number(listLength) || 0));
+  return activeDealsCount > loaded;
+}

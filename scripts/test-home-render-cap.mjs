@@ -7,6 +7,8 @@ import {
   hasMoreItems,
   nextVisibleCount,
   resetVisibleCount,
+  resolveActionsCountLabel,
+  shouldShowActionsTruncationNote,
   visibleSlice,
 } from "../src/lib/homeRenderCap.js";
 
@@ -44,5 +46,94 @@ n = nextVisibleCount(nextVisibleCount(48));
 assert(n === 144, "pre-reset");
 n = resetVisibleCount();
 assert(n === 48, "reset after filter change");
+
+// Oznaka: bez filtera → pravi count; s kategorijom/special → duljina liste
+assert(
+  resolveActionsCountLabel({
+    activeCat: null,
+    specialFilter: null,
+    activeDealsCount: 2711,
+    listLength: 800,
+  }) === 2711,
+  "bez filtera → activeDealsCount"
+);
+assert(
+  resolveActionsCountLabel({
+    activeCat: "hrana",
+    specialFilter: null,
+    activeDealsCount: 2711,
+    listLength: 120,
+  }) === 120,
+  "kategorija → listLength"
+);
+assert(
+  resolveActionsCountLabel({
+    activeCat: null,
+    specialFilter: "novo",
+    activeDealsCount: 2711,
+    listLength: 40,
+  }) === 40,
+  "specialFilter → listLength"
+);
+assert(
+  resolveActionsCountLabel({
+    activeCat: null,
+    specialFilter: null,
+    activeDealsCount: null,
+    listLength: 800,
+  }) === 800,
+  "count null → listLength"
+);
+
+assert(
+  shouldShowActionsTruncationNote({
+    activeCat: null,
+    specialFilter: null,
+    hasMore: false,
+    activeDealsCount: 2711,
+    listLength: 800,
+  }),
+  "napomena kad iscrpljeno i count > lista"
+);
+assert(
+  !shouldShowActionsTruncationNote({
+    activeCat: null,
+    specialFilter: null,
+    hasMore: true,
+    activeDealsCount: 2711,
+    listLength: 800,
+  }),
+  "nema napomene dok ima Prikaži još"
+);
+assert(
+  !shouldShowActionsTruncationNote({
+    activeCat: "hrana",
+    specialFilter: null,
+    hasMore: false,
+    activeDealsCount: 2711,
+    listLength: 120,
+  }),
+  "nema napomene s kategorijom"
+);
+assert(
+  !shouldShowActionsTruncationNote({
+    activeCat: null,
+    specialFilter: "expiring",
+    hasMore: false,
+    activeDealsCount: 2711,
+    listLength: 40,
+  }),
+  "nema napomene sa special filterom"
+);
+assert(
+  !shouldShowActionsTruncationNote({
+    activeCat: null,
+    specialFilter: null,
+    hasMore: false,
+    activeDealsCount: 800,
+    listLength: 800,
+  }),
+  "nema napomene kad count == lista"
+);
 
 console.log("OK test-home-render-cap");

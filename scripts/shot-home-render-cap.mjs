@@ -1,5 +1,5 @@
 /**
- * Screenshot: „Sve akcije” s gumbom Prikaži još (375×812).
+ * Screenshot: napomena na kraju „Sve akcije” (375×812).
  * Usage: node scripts/shot-home-render-cap.mjs
  */
 import { chromium } from "playwright";
@@ -28,22 +28,33 @@ await page.waitForTimeout(4000);
 
 const section = page.locator('[data-testid="home-all-actions"]');
 await section.waitFor({ timeout: 25000 });
-const more = page.locator('[data-testid="home-actions-show-more"]');
-await more.waitFor({ timeout: 15000 });
-await more.scrollIntoViewIfNeeded();
-await page.waitForTimeout(500);
 
-const out = path.join(outDir, "home-all-actions-375.png");
-const moreBox = await more.boundingBox();
-if (moreBox) {
-  const y = Math.max(0, moreBox.y - 420);
+const more = page.locator('[data-testid="home-actions-show-more"]');
+const note = page.locator('[data-testid="home-actions-truncation-note"]');
+
+// Klikaj „Prikaži još” dok se ne pojavi napomena (max ~30 × 48)
+for (let i = 0; i < 35; i++) {
+  if (await note.count()) break;
+  if (!(await more.count())) break;
+  await more.click();
+  await page.waitForTimeout(120);
+}
+
+await note.waitFor({ timeout: 15000 });
+await note.scrollIntoViewIfNeeded();
+await page.waitForTimeout(400);
+
+const out = path.join(outDir, "home-all-actions-truncation-375.png");
+const box = await note.boundingBox();
+if (box) {
+  const y = Math.max(0, box.y - 200);
   await page.screenshot({
     path: out,
     clip: {
       x: 0,
       y,
       width: 375,
-      height: Math.min(812, moreBox.y + moreBox.height + 24 - y),
+      height: Math.min(812, box.y + box.height + 40 - y),
     },
   });
 } else {
