@@ -1,6 +1,7 @@
 /**
  * Screenshot ProductSheet CTA: s barkodom i bez (390px).
- * Pretpostavlja vite na http://127.0.0.1:5173
+ * Pretpostavlja Vite DEV (`npm run dev`) na http://127.0.0.1:5173
+ * (?shot=1 + import.meta.env.DEV). Preview/produkcija nema hook.
  * Pokreni: node scripts/shot-track-regular-cta.mjs
  */
 import { chromium } from "playwright";

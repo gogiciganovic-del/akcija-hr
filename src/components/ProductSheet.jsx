@@ -10,11 +10,14 @@ import { normalizeImageUrl } from "../lib/productImage";
 import { TrackPriceButton } from "./TrackPriceButton";
 import {
   TRACK_REGULAR_CONFIRM,
+  TRACK_REGULAR_DENIED,
   TRACK_REGULAR_LABEL_IDLE,
   TRACK_REGULAR_LABEL_TRACKING,
   TRACK_REGULAR_NOTE,
+  isBarcodeInFavorites,
   isTrackingRegularPrice,
   showTrackRegularPriceCta,
+  trackEnableErrorMessage,
 } from "../lib/trackRegularPrice";
 import {
   trackPratiCijenuKlik,
@@ -87,7 +90,11 @@ export function ProductSheet({
   }, [product?.id, product?.barcode, product?.name, isOpen]);
 
   const showTrackCta = showTrackRegularPriceCta(product);
-  const trackingRegular = isTrackingRegularPrice(product, isBarcodeFavorite);
+  const trackingRegular = isTrackingRegularPrice(
+    product,
+    isBarcodeFavorite,
+    pushStatus
+  );
 
   useEffect(() => {
     if (!isOpen) {
@@ -208,13 +215,16 @@ export function ProductSheet({
     trackPratiCijenuKlik();
     setTrackFeedback(null);
 
-    const alreadyTracking = isTrackingRegularPrice(product, isBarcodeFavorite);
-    if (!alreadyTracking) {
+    if (!isBarcodeInFavorites(product, isBarcodeFavorite)) {
       onToggleFavorite?.(product);
     }
 
-    const pushOn = pushStatus === "subscribed";
-    if (pushOn) {
+    if (pushStatus === "denied") {
+      setTrackFeedback(TRACK_REGULAR_DENIED);
+      return;
+    }
+
+    if (pushStatus === "subscribed") {
       setTrackFeedback("ok");
       return;
     }
@@ -230,20 +240,15 @@ export function ProductSheet({
         extraBarcodes: [String(product.barcode || "").trim()],
       });
       if (res && res.ok === false) {
-        setTrackFeedback(
-          res.error?.message ||
-            "Obavijesti nisu uključene. Možeš ih uključiti kasnije u Favoritima."
-        );
+        const msg = trackEnableErrorMessage(res.error);
+        if (msg) setTrackFeedback(msg);
         return;
       }
       trackPratiCijenuPushUkljucen();
       setTrackFeedback("ok");
     } catch (e) {
-      const msg =
-        e && typeof e === "object" && e.message
-          ? String(e.message)
-          : "Obavijesti nisu uključene. Možeš ih uključiti kasnije u Favoritima.";
-      setTrackFeedback(msg);
+      const msg = trackEnableErrorMessage(e);
+      if (msg) setTrackFeedback(msg);
     } finally {
       setTrackBusy(false);
     }
@@ -349,7 +354,7 @@ export function ProductSheet({
           {showTrackCta && (
             <div className="mb-4">
               <TrackPriceButton
-                tracking={trackingRegular || trackFeedback === "ok"}
+                tracking={trackingRegular}
                 onClick={handleTrackRegular}
                 disabled={trackBusy || pushBusy}
                 labelIdle={TRACK_REGULAR_LABEL_IDLE}

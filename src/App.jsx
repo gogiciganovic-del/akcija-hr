@@ -79,8 +79,9 @@ export default function App() {
     trackTabOnce(activeTab);
   }, [activeTab]);
 
-  // Samo za Playwright screenshot (?shot=1) — otvori ProductSheet s fixture proizvodom.
+  // Samo Vite DEV + ?shot=1 (Playwright). U produkcijskom buildu import.meta.env.DEV === false.
   useEffect(() => {
+    if (import.meta.env.DEV !== true) return undefined;
     const params = new URLSearchParams(window.location.search);
     if (params.get("shot") !== "1") return undefined;
     window.__cjenkoOpenProductSheet = (product) => {
