@@ -19,7 +19,7 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import BASE_URL, CHAIN_NAMES, STORES
+from config import BASE_URL, CHAIN_NAMES, DEFAULT_PAGES, STORES, pages_for_store
 from deactivate_stale import listing_complete
 from parser import parse_listing_page
 from parsers.najcijena import ScrapedDeal
@@ -247,7 +247,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--store", choices=STORES, help="Jedna trgovina")
     parser.add_argument("--all", action="store_true", help="Sve trgovine")
-    parser.add_argument("--pages", type=int, default=3)
+    parser.add_argument(
+        "--pages",
+        type=int,
+        default=None,
+        help=(
+            f"Max stranica po lancu (override). Bez ovoga: "
+            f"{DEFAULT_PAGES} default, 12 za veće lance."
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--deactivate-stale",
@@ -279,8 +287,9 @@ def main():
     with httpx.Client() as client:
         all_deals: list[ScrapedDeal] = []
         for store in stores:
-            print(f"\nScraping: {store.upper()}")
-            result = fetch_store(client, store, args.pages)
+            max_pages = pages_for_store(store, args.pages)
+            print(f"\nScraping: {store.upper()} (max_pages={max_pages})")
+            result = fetch_store(client, store, max_pages)
             per_store.append((store, result))
             all_deals.extend(result.deals)
             print(

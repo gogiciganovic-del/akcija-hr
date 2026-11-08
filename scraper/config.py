@@ -47,3 +47,30 @@ CHAIN_NAMES = {
 }
 
 STORES = list(STORE_SLUGS.keys())
+
+# Default listing depth when --pages is not passed on CLI.
+DEFAULT_PAGES = 3
+BIGGER_PAGES = 12
+# Slugovi (isti ključevi kao STORE_SLUGS) s dubljim katalogom na NajCijeni.
+BIGGER_PAGE_CHAINS = frozenset(
+    {
+        "lidl",
+        "kaufland",
+        "konzum",
+        "plodine",
+        "spar",
+        "interspar",
+    }
+)
+
+
+def pages_for_store(store_slug: str, pages_override: int | None = None) -> int:
+    """
+    CLI --pages (pages_override) ima prednost kad je izričito zadan.
+    Inače: 12 za BIGGER_PAGE_CHAINS, inače DEFAULT_PAGES (3).
+    """
+    if pages_override is not None:
+        return pages_override
+    if store_slug in BIGGER_PAGE_CHAINS:
+        return BIGGER_PAGES
+    return DEFAULT_PAGES
