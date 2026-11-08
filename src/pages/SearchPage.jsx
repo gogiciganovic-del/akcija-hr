@@ -19,6 +19,7 @@ import {
 } from "../lib/quantityParse";
 import { matchProductType } from "../lib/productTypes";
 import { sortBySearchRelevance } from "../lib/searchRelevance";
+import { buildWatchwordIlikeQuery } from "../lib/ilikeQuery";
 import {
   trackPratiCijenu,
   trackSkenOtvoren,
@@ -562,12 +563,14 @@ export function SearchPage({
   }, [pendingOpenScanner, onPendingOpenScannerConsumed, openScanner]);
 
   useEffect(() => {
-    if (searchTerm.length < 2) {
+    const qinfo = buildWatchwordIlikeQuery(searchTerm, { minLen: 2 });
+    if (!qinfo) {
       setRegularProducts([]);
       setRegularLoading(false);
       return;
     }
 
+    const { needle, limit } = qinfo;
     let cancelled = false;
     const timer = setTimeout(async () => {
       setRegularLoading(true);
@@ -575,9 +578,9 @@ export function SearchPage({
         const { data, error } = await supabase
           .from("regular_prices")
           .select("barcode, name, brand, chain, price, category, special_price")
-          .or(`name.ilike.%${searchTerm}%,brand.ilike.%${searchTerm}%`)
+          .or(`name.ilike.%${needle}%,brand.ilike.%${needle}%`)
           .order("price", { ascending: true })
-          .limit(40);
+          .limit(limit);
 
         if (error) throw error;
         if (cancelled) return;

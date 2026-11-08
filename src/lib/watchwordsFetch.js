@@ -12,52 +12,23 @@
 import {
   WATCHWORDS_MAX,
   WATCHWORDS_MAX_OFFERS,
-  WATCHWORDS_MIN_LEN,
   foldWatchText,
   nameMatchesWatchword,
 } from "./watchwords.js";
+import {
+  ILIKE_FETCH_LIMIT,
+  ILIKE_FETCH_LIMIT_WIDENED,
+  buildWatchwordIlikeQuery,
+  escapeIlike,
+} from "./ilikeQuery.js";
 
 /** Koliko kandidata dohvatiti po riječi (ilike), prije word-boundary filtera. */
-export const WATCHWORDS_FETCH_LIMIT = 40;
+export const WATCHWORDS_FETCH_LIMIT = ILIKE_FETCH_LIMIT;
 /** Limit kad se dijakritika proširuje (c/s/z/d → _). */
-export const WATCHWORDS_FETCH_LIMIT_WIDENED = 80;
+export const WATCHWORDS_FETCH_LIMIT_WIDENED = ILIKE_FETCH_LIMIT_WIDENED;
 export const WATCHWORDS_CACHE_TTL_MS = 5 * 60 * 1000;
 
-/**
- * Isto kao useProducts.escapeIlike + dodatno ( ) * " \ .
- * Uklanja i _ / % da wildcardi ne dođu iz korisničkog unosa.
- */
-export function escapeIlike(s) {
-  return String(s || "").replace(/[%_,()"\\*]/g, "");
-}
-
-/**
- * Sastavi ilike needle + limit.
- * Bez dijakritike u riječi: c/s/z/d → "_" (ILIKE jedan znak), limit 80.
- * S dijakritikom: needle ostaje (escape), limit 40.
- * @returns {{ needle: string, limit: number, widened: boolean } | null}
- */
-export function buildWatchwordIlikeQuery(raw) {
-  const trimmed = String(raw || "").trim();
-  const needleBase = escapeIlike(trimmed);
-  if (needleBase.length < WATCHWORDS_MIN_LEN) return null;
-
-  const hasDiacritic = /[čćšžđ]/i.test(trimmed);
-  if (hasDiacritic) {
-    return {
-      needle: needleBase,
-      limit: WATCHWORDS_FETCH_LIMIT,
-      widened: false,
-    };
-  }
-
-  const needle = needleBase.replace(/[cszd]/gi, "_");
-  return {
-    needle,
-    limit: WATCHWORDS_FETCH_LIMIT_WIDENED,
-    widened: needle !== needleBase,
-  };
-}
+export { buildWatchwordIlikeQuery, escapeIlike };
 
 /** @type {Map<string, { at: number, offers: any[], error: string|null }>} */
 const cache = new Map();

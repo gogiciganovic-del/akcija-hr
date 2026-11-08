@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { adaptDeal, adaptDealRow } from '../lib/adapters'
+import { buildWatchwordIlikeQuery } from '../lib/ilikeQuery'
 
 const DEALS_SELECT = `
   id,
@@ -24,10 +25,6 @@ const DEALS_SELECT = `
     name
   )
 `
-
-function escapeIlike(s) {
-  return String(s || '').replace(/[%_,]/g, '')
-}
 
 function applySort(query, sortBy) {
   if (sortBy === 'price_asc') return query.order('price', { ascending: true })
@@ -55,16 +52,24 @@ export function useProducts({ category, search, sortBy, chain, enabled = true } 
       setError(null)
 
       try {
-        const needle = escapeIlike(search).trim()
+        // Pretraga: isti dijakritika-tolerantni ilike kao watchwords (c/s/z/d → _).
+        // Limit: PostgREST max ~1000; widened diže kandidata kad _ zamijeni c/s/z/d.
+        const qinfo = buildWatchwordIlikeQuery(search, {
+          minLen: 2,
+          limit: 500,
+          limitWidened: 1000,
+        })
 
         // Pretraga po imenu: active_deals (name/brand kolone).
         // deals + products.name.or() često vrati sve (do 1000) ili padne na fallback.
-        if (needle) {
+        if (qinfo) {
+          const { needle, limit } = qinfo
           let fallback = supabase.from('active_deals').select('*')
           if (category) fallback = fallback.eq('category', category)
           if (chain) fallback = fallback.ilike('store_name', `${chain}%`)
           fallback = fallback.or(`name.ilike.%${needle}%,brand.ilike.%${needle}%`)
           fallback = applySort(fallback, sortBy)
+          fallback = fallback.limit(limit)
 
           const { data: viewData, error: viewError } = await fallback
           if (viewError) throw viewError
