@@ -5,8 +5,16 @@ import { CjenkoFace } from "../components/CjenkoFace";
 import { ProductCard } from "../components/ProductCard";
 import { BarcodeScannerModal, ScanBarcodeButton } from "../components/BarcodeScannerModal";
 import { useProducts } from "../hooks/useProducts";
+import { useActiveDealsCount } from "../hooks/useActiveDealsCount";
 import { useStoreStats } from "../hooks/useStoreStats";
 import { useUserLocation } from "../hooks/useUserLocation";
+import {
+  HOME_ACTIONS_PAGE_SIZE,
+  hasMoreItems,
+  nextVisibleCount,
+  resetVisibleCount,
+  visibleSlice,
+} from "../lib/homeRenderCap";
 import { CATEGORIES, STORES } from "../lib/constants";
 import {
   orderStoresPreferredFirst,
@@ -21,6 +29,7 @@ import {
   shouldShowDailyPicks,
 } from "../lib/dailyPicks";
 import {
+  trackAkcijePrikaziJos,
   trackLetakPratim,
   trackLetakPrestani,
   trackPonudaDanaTap,
@@ -371,6 +380,9 @@ export function HomePage({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [howOpen, setHowOpen] = useState(readHowItWorksOpen);
   const [watchwords, setWatchwords] = useState(() => readWatchwords());
+  const [actionsVisible, setActionsVisible] = useState(() =>
+    resetVisibleCount(HOME_ACTIONS_PAGE_SIZE)
+  );
 
   useEffect(() => {
     if (!homeResetSignal) return;
@@ -380,6 +392,7 @@ export function HomePage({
     setHotExpanded(false);
     setExpiringExpanded(false);
     setNovoExpanded(false);
+    setActionsVisible(resetVisibleCount(HOME_ACTIONS_PAGE_SIZE));
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [homeResetSignal]);
@@ -409,6 +422,11 @@ export function HomePage({
     sortBy: "discount",
     chain: selectedStore ?? undefined,
   });
+  const activeDealsCount = useActiveDealsCount(selectedStore ?? undefined);
+
+  useEffect(() => {
+    setActionsVisible(resetVisibleCount(HOME_ACTIONS_PAGE_SIZE));
+  }, [selectedStore, activeCat]);
 
   const visibleCategories = CATEGORIES.filter(
     (c) =>
@@ -505,6 +523,12 @@ export function HomePage({
   const regularProducts = products.filter(
     (p) => !p.isGlitch && !expiringTodayIds.has(p.id) && !dailyPickIds.has(p.id)
   );
+  const regularVisible = visibleSlice(regularProducts, actionsVisible);
+  const regularHasMore = hasMoreItems(regularProducts, actionsVisible);
+  const regularCountLabel =
+    typeof activeDealsCount === "number"
+      ? activeDealsCount
+      : regularProducts.length;
   const filterLabel = selectedStore ? storeMeta?.label : null;
   const specialFilterMeta = SPECIAL_FILTERS_ALL.find((f) => f.id === specialFilter);
   const headerFilterParts = [
@@ -934,12 +958,12 @@ export function HomePage({
           )}
 
           {!hotExpanded && (
-          <section className="mb-5">
+          <section className="mb-5" data-testid="home-all-actions">
             <div className="flex items-center justify-between px-4 mb-3">
               <div>
                 <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>🏷️ Sve akcije</h2>
                 <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
-                  {regularProducts.length} aktivnih{filterLabel ? ` · ${filterLabel}` : ""}
+                  {regularCountLabel} aktivnih{filterLabel ? ` · ${filterLabel}` : ""}
                 </p>
               </div>
             </div>
@@ -948,11 +972,36 @@ export function HomePage({
                 {filterLabel ? `Nema aktivnih akcija u ${filterLabel}.` : "Nema aktivnih akcija."}
               </p>
             ) : (
-              <div className="grid grid-cols-2 gap-2.5 px-4">
-                {regularProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} isFavorite={isFav(p.id)} onToggleFavorite={onToggleFav} onClick={() => onProductSelect(p)} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-2.5 px-4">
+                  {regularVisible.map((p) => (
+                    <ProductCard key={p.id} product={p} isFavorite={isFav(p.id)} onToggleFavorite={onToggleFav} onClick={() => onProductSelect(p)} />
+                  ))}
+                </div>
+                {regularHasMore ? (
+                  <div className="px-4 mt-3">
+                    <button
+                      type="button"
+                      data-testid="home-actions-show-more"
+                      onClick={() => {
+                        trackAkcijePrikaziJos();
+                        setActionsVisible((n) =>
+                          nextVisibleCount(n, HOME_ACTIONS_PAGE_SIZE)
+                        );
+                      }}
+                      className="w-full rounded-xl py-2.5 font-bold"
+                      style={{
+                        background: "rgba(0,255,136,0.08)",
+                        border: "1px solid rgba(0,255,136,0.28)",
+                        color: "#00ff88",
+                        fontSize: 13,
+                      }}
+                    >
+                      Prikaži još
+                    </button>
+                  </div>
+                ) : null}
+              </>
             )}
           </section>
           )}

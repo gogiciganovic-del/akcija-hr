@@ -26,6 +26,7 @@
     "test:umami-notrack": "node scripts/test-umami-notrack.mjs",
     "test:onboarding-gate": "node scripts/test-onboarding-gate.mjs",
     "test:watchwords": "node scripts/test-watchwords.mjs",
+    "test:home-render-cap": "node scripts/test-home-render-cap.mjs",
     "test:deactivate-stale": "py -3 scripts/test-deactivate-stale.py"
   },
   "dependencies": {

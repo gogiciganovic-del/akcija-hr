@@ -6,7 +6,8 @@
  * push_klik, push_ukljucen, push_odbijen, push_greska, push_otvoren, push_iskljucen,
  * letak_pratim, letak_prestani, otvoreno_iz_appa,
  * onboarding_prikazan, onboarding_korak_1..3, onboarding_zavrsen, onboarding_preskocen,
- * keyword_dodana, keyword_uklonjena, keyword_zatrazen_prikaz, keyword_ponuda_klik.
+ * keyword_dodana, keyword_uklonjena, keyword_zatrazen_prikaz, keyword_ponuda_klik,
+ * akcije_prikazi_jos.
  */
 
 const TAB_EVENTS = {
@@ -218,6 +219,11 @@ export function trackKeywordZatrazenPrikaz(_hitCount = 0) {
 /** keyword_ponuda_klik — klik na ponudu u „Za tebe”. */
 export function trackKeywordPonudaKlik() {
   track("keyword_ponuda_klik");
+}
+
+/** akcije_prikazi_jos — klik na „Prikaži još” u bloku Sve akcije. */
+export function trackAkcijePrikaziJos() {
+  track("akcije_prikazi_jos");
 }
 
 export function trackOnboardingPrikazan() {
