@@ -1,7 +1,8 @@
 ﻿import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Plus, ShoppingCart, Heart } from "lucide-react";
+import { X, Plus, ShoppingCart } from "lucide-react";
 import { CjenkoFace } from "../components/CjenkoFace";
 import { BarcodeScannerModal, ScanBarcodeButton } from "../components/BarcodeScannerModal";
+import { TrackPriceButton } from "../components/TrackPriceButton";
 import { useProducts } from "../hooks/useProducts";
 import { supabase } from "../lib/supabase";
 import { adaptRegularPrice } from "../lib/adapters";
@@ -224,31 +225,6 @@ function trackProductFromScan(code, offIdentity, prices, cheapestPrice) {
     category: best?.category || null,
     image: offIdentity?.imageUrl || best?.image || null,
   };
-}
-
-function TrackPriceButton({ tracking, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2"
-      style={{
-        background: tracking ? "rgba(255,255,255,0.05)" : "rgba(0,255,136,0.1)",
-        border: tracking
-          ? "1px solid rgba(255,255,255,0.12)"
-          : "1px solid rgba(0,255,136,0.28)",
-        color: tracking ? "rgba(255,255,255,0.7)" : "#00ff88",
-        fontSize: 13,
-      }}
-    >
-      <Heart
-        size={15}
-        fill={tracking ? "#ff6b6b" : "none"}
-        stroke={tracking ? "#ff6b6b" : "#00ff88"}
-      />
-      {tracking ? "Prati se u favoritima" : "Prati cijenu"}
-    </button>
-  );
 }
 
 function ProductResultCard({ p, highlightQuery, onSelect, onAddToCart, showMeta, isCheapest }) {

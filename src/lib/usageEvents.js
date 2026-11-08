@@ -2,7 +2,8 @@
  * Anonimno brojanje korištenja (samo ime događaja).
  * Skripta se ne učitava dok VITE_UMAMI_ENABLED !== "true".
  * Događaji: tab_home, tab_search, tab_cart, tab_fav, sken_otvoren, sken_uspjeh,
- * favorit_dodan, prati_cijenu, tap_redovna, kosarica_izracunaj, kosarica_dodan,
+ * favorit_dodan, prati_cijenu, prati_cijenu_prikazan, prati_cijenu_klik,
+ * prati_cijenu_push_ukljucen, tap_redovna, kosarica_izracunaj, kosarica_dodan,
  * push_klik, push_ukljucen, push_odbijen, push_greska, push_otvoren, push_iskljucen,
  * letak_pratim, letak_prestani, otvoreno_iz_appa,
  * onboarding_prikazan, onboarding_korak_1..3, onboarding_zavrsen, onboarding_preskocen,
@@ -110,6 +111,18 @@ export function trackFavoritDodan() {
 
 export function trackPratiCijenu() {
   track("prati_cijenu");
+}
+
+export function trackPratiCijenuPrikazan() {
+  track("prati_cijenu_prikazan");
+}
+
+export function trackPratiCijenuKlik() {
+  track("prati_cijenu_klik");
+}
+
+export function trackPratiCijenuPushUkljucen() {
+  track("prati_cijenu_push_ukljucen");
 }
 
 export function trackTapRedovna() {

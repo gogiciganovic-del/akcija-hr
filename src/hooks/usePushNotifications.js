@@ -8,6 +8,7 @@ import {
   isPushSupported,
   syncPushTrackedBarcodes,
 } from "../lib/pushNotifications";
+import { isTrackableBarcode } from "../lib/pushTrackedBarcodes";
 import {
   trackPushGreska,
   trackPushIskljucen,
@@ -69,30 +70,47 @@ export function usePushNotifications(favorites, favoritesLoading = false) {
     syncPushTrackedBarcodes(favorites, { isInitialLoad });
   }, [favorites, favoritesLoading]);
 
-  const enable = useCallback(async () => {
-    if (busy) return;
-    trackPushKlik();
-    setBusy(true);
-    setError(null);
-    try {
-      const barcodes = barcodesFromFavorites(favorites);
-      await enablePushNotifications(barcodes);
-      setStatus("subscribed");
-      trackPushUkljucen();
-    } catch (e) {
-      const code = e?.code || Notification.permission;
-      const { setDenied, event } = classifyPushEnableFailure(
-        code,
-        Notification.permission
-      );
-      if (setDenied) setStatus("denied");
-      if (event === "push_odbijen") trackPushOdbijen();
-      else trackPushGreska();
-      setError(e?.message || "Pretplata nije uspjela");
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, favorites]);
+  /**
+   * @param {{ extraBarcodes?: string[] }} [opts]
+   * @returns {Promise<{ ok: boolean, error?: Error|null }|void>}
+   */
+  const enable = useCallback(
+    async (opts = {}) => {
+      if (busy) return { ok: false, error: new Error("busy") };
+      trackPushKlik();
+      setBusy(true);
+      setError(null);
+      try {
+        const merged = new Set(barcodesFromFavorites(favorites));
+        for (const raw of opts.extraBarcodes || []) {
+          const bc = String(raw || "").trim();
+          if (isTrackableBarcode(bc)) merged.add(bc);
+        }
+        await enablePushNotifications([...merged]);
+        setStatus("subscribed");
+        trackPushUkljucen();
+        return { ok: true };
+      } catch (e) {
+        const code = e?.code || Notification.permission;
+        const { setDenied, event } = classifyPushEnableFailure(
+          code,
+          Notification.permission
+        );
+        if (setDenied) setStatus("denied");
+        if (event === "push_odbijen") trackPushOdbijen();
+        else trackPushGreska();
+        const err =
+          e instanceof Error
+            ? e
+            : new Error(e?.message || "Pretplata nije uspjela");
+        setError(err.message || "Pretplata nije uspjela");
+        return { ok: false, error: err };
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, favorites]
+  );
 
   const disable = useCallback(async () => {
     if (busy) return;

@@ -28,6 +28,7 @@
     "test:watchwords": "node scripts/test-watchwords.mjs",
     "test:home-render-cap": "node scripts/test-home-render-cap.mjs",
     "test:search-diacritics": "node scripts/test-search-diacritics.mjs",
+    "test:track-regular-price": "node scripts/test-track-regular-price.mjs",
     "test:deactivate-stale": "py -3 scripts/test-deactivate-stale.py"
   },
   "dependencies": {

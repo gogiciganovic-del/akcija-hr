@@ -79,6 +79,22 @@ export default function App() {
     trackTabOnce(activeTab);
   }, [activeTab]);
 
+  // Samo za Playwright screenshot (?shot=1) — otvori ProductSheet s fixture proizvodom.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("shot") !== "1") return undefined;
+    window.__cjenkoOpenProductSheet = (product) => {
+      setSelectedProduct(product && typeof product === "object" ? product : null);
+    };
+    return () => {
+      try {
+        delete window.__cjenkoOpenProductSheet;
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
+
   // Onboarding: ~3s na Homeu; engažman prije toga → samo ova sesija.
   // Timer se ne resetira na svaki re-render (cleanup ne briše timeout).
   useEffect(() => {
@@ -333,6 +349,17 @@ export default function App() {
         onClose={handleCloseSheet}
         isFavorite={selectedProduct ? isFav(selectedProduct.id) : false}
         onToggleFavorite={toggle}
+        isBarcodeFavorite={(code) => {
+          const c = String(code || "").trim();
+          if (!c) return false;
+          for (const p of favorites.values()) {
+            if (String(p.barcode || "").trim() === c) return true;
+          }
+          return false;
+        }}
+        pushStatus={pushStatus}
+        pushBusy={pushBusy}
+        onEnablePush={enablePush}
         onGoCart={() => {
           handleCloseSheet();
           goTab("cart");

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Heart, ListPlus, Check } from "lucide-react";
 import { usePriceHistory } from "../hooks/usePriceHistory";
 import { PRICE_DISCLAIMER, productDateLabel } from "../lib/priceTrust";
@@ -7,6 +7,20 @@ import { enqueueCartAdd } from "../lib/cartDraft";
 import { chainFromStoreName } from "../lib/constants";
 import { fetchCheaperAlternatives } from "../lib/cheaperAlternatives";
 import { normalizeImageUrl } from "../lib/productImage";
+import { TrackPriceButton } from "./TrackPriceButton";
+import {
+  TRACK_REGULAR_CONFIRM,
+  TRACK_REGULAR_LABEL_IDLE,
+  TRACK_REGULAR_LABEL_TRACKING,
+  TRACK_REGULAR_NOTE,
+  isTrackingRegularPrice,
+  showTrackRegularPriceCta,
+} from "../lib/trackRegularPrice";
+import {
+  trackPratiCijenuKlik,
+  trackPratiCijenuPrikazan,
+  trackPratiCijenuPushUkljucen,
+} from "../lib/usageEvents";
 
 const fmt = (v) =>
   Number(v).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -40,7 +54,18 @@ async function addProductToList(entry) {
   });
 }
 
-export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFavorite, onGoCart }) {
+export function ProductSheet({
+  product,
+  isOpen,
+  onClose,
+  isFavorite,
+  onToggleFavorite,
+  onGoCart,
+  isBarcodeFavorite,
+  pushStatus,
+  pushBusy = false,
+  onEnablePush,
+}) {
   const { history, loading } = usePriceHistory(product?.barcode, product?.chain);
   const dateLabel = productDateLabel(product);
   const [listFeedback, setListFeedback] = useState(null); // 'ok' | string error
@@ -48,13 +73,33 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
   const [cheaper, setCheaper] = useState([]);
   const [cheaperLoading, setCheaperLoading] = useState(false);
   const [altAdded, setAltAdded] = useState({}); // key -> true
+  const [trackFeedback, setTrackFeedback] = useState(null); // 'ok' | string error
+  const [trackBusy, setTrackBusy] = useState(false);
+  const shownTrackCtaKey = useRef(null);
 
   useEffect(() => {
     setListFeedback(null);
     setAdding(false);
     setCheaper([]);
     setAltAdded({});
+    setTrackFeedback(null);
+    setTrackBusy(false);
   }, [product?.id, product?.barcode, product?.name, isOpen]);
+
+  const showTrackCta = showTrackRegularPriceCta(product);
+  const trackingRegular = isTrackingRegularPrice(product, isBarcodeFavorite);
+
+  useEffect(() => {
+    if (!isOpen) {
+      shownTrackCtaKey.current = null;
+      return;
+    }
+    if (!showTrackCta || !product) return;
+    const key = String(product.barcode || product.id || "");
+    if (!key || shownTrackCtaKey.current === key) return;
+    shownTrackCtaKey.current = key;
+    trackPratiCijenuPrikazan();
+  }, [isOpen, showTrackCta, product]);
 
   useEffect(() => {
     if (listFeedback !== "ok") return;
@@ -156,6 +201,62 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
     setAltAdded((prev) => ({ ...prev, [key]: true }));
   }, [altAdded]);
 
+  const handleTrackRegular = useCallback(async () => {
+    if (!product || trackBusy || pushBusy) return;
+    if (!showTrackRegularPriceCta(product)) return;
+
+    trackPratiCijenuKlik();
+    setTrackFeedback(null);
+
+    const alreadyTracking = isTrackingRegularPrice(product, isBarcodeFavorite);
+    if (!alreadyTracking) {
+      onToggleFavorite?.(product);
+    }
+
+    const pushOn = pushStatus === "subscribed";
+    if (pushOn) {
+      setTrackFeedback("ok");
+      return;
+    }
+
+    if (typeof onEnablePush !== "function") {
+      setTrackFeedback("ok");
+      return;
+    }
+
+    setTrackBusy(true);
+    try {
+      const res = await onEnablePush({
+        extraBarcodes: [String(product.barcode || "").trim()],
+      });
+      if (res && res.ok === false) {
+        setTrackFeedback(
+          res.error?.message ||
+            "Obavijesti nisu uključene. Možeš ih uključiti kasnije u Favoritima."
+        );
+        return;
+      }
+      trackPratiCijenuPushUkljucen();
+      setTrackFeedback("ok");
+    } catch (e) {
+      const msg =
+        e && typeof e === "object" && e.message
+          ? String(e.message)
+          : "Obavijesti nisu uključene. Možeš ih uključiti kasnije u Favoritima.";
+      setTrackFeedback(msg);
+    } finally {
+      setTrackBusy(false);
+    }
+  }, [
+    product,
+    trackBusy,
+    pushBusy,
+    isBarcodeFavorite,
+    onToggleFavorite,
+    pushStatus,
+    onEnablePush,
+  ]);
+
   if (!isOpen || !product) return null;
 
   const addedOk = listFeedback === "ok";
@@ -244,6 +345,46 @@ export function ProductSheet({ product, isOpen, onClose, isFavorite, onToggleFav
               </div>
             )}
           </div>
+
+          {showTrackCta && (
+            <div className="mb-4">
+              <TrackPriceButton
+                tracking={trackingRegular || trackFeedback === "ok"}
+                onClick={handleTrackRegular}
+                disabled={trackBusy || pushBusy}
+                labelIdle={TRACK_REGULAR_LABEL_IDLE}
+                labelTracking={TRACK_REGULAR_LABEL_TRACKING}
+              />
+              <p
+                style={{
+                  color: "rgba(255,255,255,0.38)",
+                  fontSize: 11,
+                  lineHeight: 1.45,
+                  marginTop: 8,
+                }}
+              >
+                {TRACK_REGULAR_NOTE}
+              </p>
+              {trackFeedback === "ok" && (
+                <p
+                  className="mt-2"
+                  style={{ color: "rgba(0,255,136,0.9)", fontSize: 12, lineHeight: 1.4 }}
+                  role="status"
+                >
+                  {TRACK_REGULAR_CONFIRM}
+                </p>
+              )}
+              {trackFeedback && trackFeedback !== "ok" && (
+                <p
+                  className="mt-2"
+                  style={{ color: "rgba(255,107,107,0.9)", fontSize: 12, lineHeight: 1.4 }}
+                  role="status"
+                >
+                  {trackFeedback}
+                </p>
+              )}
+            </div>
+          )}
 
           <button
             type="button"

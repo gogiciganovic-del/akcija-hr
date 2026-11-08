@@ -246,9 +246,9 @@ def build_payload(drop: dict, product_name: str | None = None) -> dict:
     new_s = fmt_price(drop.get("new_price"))
     barcode = str(drop.get("barcode") or "").strip()
     if product_name:
-        body = f"Cijena pala: {product_name} ({chain}) {old_s} -> {new_s} €"
+        body = f"Redovna cijena pala: {product_name} ({chain}) {old_s} -> {new_s} €"
     else:
-        body = f"Cijena pala u {chain}: {old_s} -> {new_s} €"
+        body = f"Redovna cijena pala u {chain}: {old_s} -> {new_s} €"
     return {
         "title": "Cjenko",
         "body": body,
