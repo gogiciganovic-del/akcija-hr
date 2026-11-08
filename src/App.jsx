@@ -54,6 +54,7 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [homeResetSignal, setHomeResetSignal] = useState(0);
   const [pendingBarcode, setPendingBarcode] = useState(null);
+  const [pendingSearchQuery, setPendingSearchQuery] = useState(null);
   const [pendingOpenScanner, setPendingOpenScanner] = useState(false);
   const [scanToast, setScanToast] = useState(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
@@ -238,6 +239,11 @@ export default function App() {
           cancelOnboardingForSession();
           goTab("search");
         }}
+        onSearchKeyword={(kw) => {
+          cancelOnboardingForSession();
+          setPendingSearchQuery(String(kw || "").trim() || null);
+          goTab("search");
+        }}
         onBarcodeScanned={handleBarcodeScanned}
         isFav={isFav}
         onToggleFav={toggle}
@@ -253,6 +259,8 @@ export default function App() {
         onProductSelect={handleProductSelect}
         pendingBarcode={pendingBarcode}
         onPendingBarcodeConsumed={handlePendingBarcodeConsumed}
+        pendingSearchQuery={pendingSearchQuery}
+        onPendingSearchQueryConsumed={() => setPendingSearchQuery(null)}
         pendingOpenScanner={pendingOpenScanner}
         onPendingOpenScannerConsumed={handlePendingOpenScannerConsumed}
         onCartFeedback={handleCartFeedback}

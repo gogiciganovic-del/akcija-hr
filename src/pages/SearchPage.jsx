@@ -387,6 +387,8 @@ export function SearchPage({
   onProductSelect,
   pendingBarcode = null,
   onPendingBarcodeConsumed,
+  pendingSearchQuery = null,
+  onPendingSearchQueryConsumed,
   pendingOpenScanner = false,
   onPendingOpenScannerConsumed,
   onCartFeedback,
@@ -540,6 +542,18 @@ export function SearchPage({
     runBarcodeLookup(pendingBarcode);
     onPendingBarcodeConsumed?.();
   }, [pendingBarcode, runBarcodeLookup, onPendingBarcodeConsumed]);
+
+  useEffect(() => {
+    const q = String(pendingSearchQuery || "").trim();
+    if (!q) return;
+    setQuery(q);
+    onPendingSearchQueryConsumed?.();
+    try {
+      inputRef.current?.focus?.();
+    } catch {
+      // ignore
+    }
+  }, [pendingSearchQuery, onPendingSearchQueryConsumed]);
 
   useEffect(() => {
     if (!pendingOpenScanner) return;

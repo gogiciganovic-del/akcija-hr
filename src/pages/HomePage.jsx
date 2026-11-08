@@ -28,6 +28,11 @@ import {
 } from "../lib/usageEvents";
 import { readHowItWorksOpen, writeHowItWorksOpen } from "../lib/howItWorksPref";
 import { SHOW_EXPIRING_CHIP } from "../lib/priceTrust";
+import { readWatchwords } from "../lib/watchwords";
+import {
+  WatchwordsQuietEntry,
+  WatchwordsSection,
+} from "../components/WatchwordsSection";
 import {
   barcodesFromFavorites,
   enablePushNotifications,
@@ -343,6 +348,7 @@ const HOW_IT_WORKS_STEPS = [
 export function HomePage({
   onProductSelect,
   onSearchFocus,
+  onSearchKeyword = null,
   onBarcodeScanned,
   isFav,
   onToggleFav,
@@ -364,6 +370,7 @@ export function HomePage({
   const [novoExpanded, setNovoExpanded] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [howOpen, setHowOpen] = useState(readHowItWorksOpen);
+  const [watchwords, setWatchwords] = useState(() => readWatchwords());
 
   useEffect(() => {
     if (!homeResetSignal) return;
@@ -788,6 +795,22 @@ export function HomePage({
         </section>
       ) : (
         <>
+          {watchwords.length > 0 ? (
+            <WatchwordsSection
+              words={watchwords}
+              onWordsChange={setWatchwords}
+              isFav={isFav}
+              onToggleFav={onToggleFav}
+              onProductSelect={onProductSelect}
+              onSearchKeyword={(kw) => {
+                if (onSearchKeyword) onSearchKeyword(kw);
+                else onSearchFocus?.();
+              }}
+            />
+          ) : (
+            <WatchwordsQuietEntry onAdded={setWatchwords} />
+          )}
+
           {showDailyPicks && (
             <section className="mb-5">
               <div className="flex items-center justify-between px-4 mb-3">

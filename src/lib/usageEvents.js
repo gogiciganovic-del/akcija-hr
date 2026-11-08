@@ -5,7 +5,8 @@
  * favorit_dodan, prati_cijenu, tap_redovna, kosarica_izracunaj, kosarica_dodan,
  * push_klik, push_ukljucen, push_odbijen, push_greska, push_otvoren, push_iskljucen,
  * letak_pratim, letak_prestani, otvoreno_iz_appa,
- * onboarding_prikazan, onboarding_korak_1..3, onboarding_zavrsen, onboarding_preskocen.
+ * onboarding_prikazan, onboarding_korak_1..3, onboarding_zavrsen, onboarding_preskocen,
+ * keyword_dodana, keyword_uklonjena, keyword_zatrazen_prikaz, keyword_ponuda_klik.
  */
 
 const TAB_EVENTS = {
@@ -194,6 +195,29 @@ export function trackLetakPrestani() {
 /** ponuda_dana_tap — dodir kartice u bloku Ponuda dana (samo ime događaja). */
 export function trackPonudaDanaTap() {
   track("ponuda_dana_tap");
+}
+
+/** keyword_dodana — dodana ključna riječ u „Za tebe”. */
+export function trackKeywordDodana() {
+  track("keyword_dodana");
+}
+
+/** keyword_uklonjena — uklonjena ključna riječ. */
+export function trackKeywordUklonjena() {
+  track("keyword_uklonjena");
+}
+
+/**
+ * keyword_zatrazen_prikaz — odjeljak „Za tebe” prikazan (jednom po mountu s riječima).
+ * hitCount: broj pogodaka u trenutku prikaza (Umami šalje samo ime događaja).
+ */
+export function trackKeywordZatrazenPrikaz(_hitCount = 0) {
+  track("keyword_zatrazen_prikaz");
+}
+
+/** keyword_ponuda_klik — klik na ponudu u „Za tebe”. */
+export function trackKeywordPonudaKlik() {
+  track("keyword_ponuda_klik");
 }
 
 export function trackOnboardingPrikazan() {
