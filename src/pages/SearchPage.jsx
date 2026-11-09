@@ -25,8 +25,8 @@ import {
   trackPratiCijenu,
   trackSkenOtvoren,
   trackSkenUspjeh,
-  trackTapRedovna,
 } from "../lib/usageEvents";
+import { SourceBadge } from "../components/SourceBadge";
 
 const HIGHLIGHT_GLOW_MS = 3000;
 const HIGHLIGHT_GLOW_SHADOW =
@@ -52,24 +52,6 @@ function fmt(v) {
     style: "currency",
     currency: "EUR",
   });
-}
-
-function SourceBadge({ source }) {
-  const isRegular = source === "regular";
-  return (
-    <span
-      className="flex-shrink-0 font-bold rounded px-1.5 py-0.5"
-      style={{
-        fontSize: 9,
-        letterSpacing: "0.04em",
-        color: isRegular ? "rgba(255,255,255,0.85)" : "#633806",
-        background: isRegular ? "rgba(255,255,255,0.12)" : "rgba(239,159,39,0.95)",
-      }}
-      onClick={isRegular ? () => trackTapRedovna() : undefined}
-    >
-      {isRegular ? "REDOVNA" : "AKCIJA"}
-    </span>
-  );
 }
 
 /** Jedinična cijena — slična težina kao REDOVNA/AKCIJA, diskretnije boje. */
@@ -557,7 +539,7 @@ export function SearchPage({
       try {
         const { data, error } = await supabase
           .from("regular_prices")
-          .select("barcode, name, brand, chain, price, category, special_price")
+          .select("barcode, name, brand, chain, price, category, special_price, updated_at")
           .or(`name.ilike.%${needle}%,brand.ilike.%${needle}%`)
           .order("price", { ascending: true })
           .limit(limit);

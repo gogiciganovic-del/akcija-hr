@@ -166,7 +166,7 @@ async function searchPricesByName(offName, barcode) {
       .limit(80),
     supabase
       .from("regular_prices")
-      .select("barcode, name, brand, chain, price, category, special_price")
+      .select("barcode, name, brand, chain, price, category, special_price, updated_at")
       .ilike("name", pattern)
       .order("price", { ascending: true })
       .limit(80),
@@ -250,7 +250,7 @@ export async function lookupByBarcode(barcode) {
       .limit(40),
     supabase
       .from("regular_prices")
-      .select("barcode, name, brand, chain, price, category, special_price")
+      .select("barcode, name, brand, chain, price, category, special_price, updated_at")
       .eq("barcode", code)
       .order("price", { ascending: true }),
   ]);

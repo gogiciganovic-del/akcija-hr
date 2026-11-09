@@ -5,6 +5,7 @@ import { CjenkoFace } from "../components/CjenkoFace";
 import { CjenkoShrug } from "../components/CjenkoShrug";
 import { isExpiringTodayProduct } from "../lib/dealDates";
 import { favoriteHasTrackableBarcode } from "../lib/pushTrackedBarcodes";
+import { SourceBadge } from "../components/SourceBadge";
 
 const fmtEur = (v) =>
   (Number.isFinite(v) ? v : 0).toLocaleString("hr-HR", {
@@ -558,6 +559,15 @@ export function FavoritesPage({
                   >
                     Ne prati se · Skeniraj
                   </button>
+                )}
+                {(p.priceSource === "sale" || p.priceSource === "regular") && (
+                  <span
+                    className="absolute z-10"
+                    style={{ top: 8, right: 8 }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <SourceBadge source={p.priceSource} />
+                  </span>
                 )}
                 <ProductCard
                   product={p}

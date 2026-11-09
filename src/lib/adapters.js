@@ -80,7 +80,7 @@ export function adaptRegularPrice(row) {
     validFrom:     null,
     createdAt:     null,
     productCreatedAt: null,
-    scrapedAt:     null,
+    scrapedAt:     row.updated_at ?? null,
     expiresIn:     null,
     expiryUrgency: 'ok',
     distanceM:     null,

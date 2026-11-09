@@ -8,6 +8,7 @@ import { chainFromStoreName } from "../lib/constants";
 import { fetchCheaperAlternatives } from "../lib/cheaperAlternatives";
 import { normalizeImageUrl } from "../lib/productImage";
 import { TrackPriceButton } from "./TrackPriceButton";
+import { SourceBadge } from "./SourceBadge";
 import {
   TRACK_REGULAR_CONFIRM,
   TRACK_REGULAR_DENIED,
@@ -326,28 +327,38 @@ export function ProductSheet({
             </p>
           )}
 
-          <div className="flex items-center gap-3 mb-5">
-            <div>
-              <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, textDecoration: "line-through" }}>
-                {fmt(product.originalPrice)}
-              </p>
-              <p className="font-black text-white" style={{ fontSize: 28, letterSpacing: "-0.03em" }}>
-                {fmt(product.salePrice)}
-              </p>
-            </div>
-            {product.discount > 0 && (
-              <div
-                className="px-3 py-1.5 rounded-xl font-black"
-                style={{
-                  fontSize: 14,
-                  background: product.isGlitch
-                    ? "linear-gradient(135deg,#00ff88,#00cc6a)"
-                    : "linear-gradient(135deg,#ffd700,#ffaa00)",
-                  color: "#020617",
-                }}
-              >
-                -{product.discount}%
+          <div className="mb-5">
+            <div className="flex items-center gap-3">
+              <div>
+                <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, textDecoration: "line-through" }}>
+                  {fmt(product.originalPrice)}
+                </p>
+                <p className="font-black text-white" style={{ fontSize: 28, letterSpacing: "-0.03em" }}>
+                  {fmt(product.salePrice)}
+                </p>
               </div>
+              {product.discount > 0 && (
+                <div
+                  className="px-3 py-1.5 rounded-xl font-black"
+                  style={{
+                    fontSize: 14,
+                    background: product.isGlitch
+                      ? "linear-gradient(135deg,#00ff88,#00cc6a)"
+                      : "linear-gradient(135deg,#ffd700,#ffaa00)",
+                    color: "#020617",
+                  }}
+                >
+                  -{product.discount}%
+                </div>
+              )}
+              {(product.priceSource === "sale" || product.priceSource === "regular") && (
+                <SourceBadge source={product.priceSource} />
+              )}
+            </div>
+            {dateLabel && (
+              <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginTop: 6 }}>
+                {dateLabel}
+              </p>
             )}
           </div>
 
@@ -445,11 +456,6 @@ export function ProductSheet({
             </p>
           )}
 
-          {dateLabel && (
-            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginBottom: 8 }}>
-              {dateLabel}
-            </p>
-          )}
           <p style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.45, marginBottom: 16 }}>
             {PRICE_DISCLAIMER}
           </p>

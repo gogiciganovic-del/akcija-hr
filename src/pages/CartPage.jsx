@@ -15,7 +15,8 @@ import {
 } from "../lib/quantityParse";
 import { normalizeImageUrl } from "../lib/productImage";
 import { applyDisplayOverrides, overrideKey } from "../lib/cartDisplayOverrides";
-import { notifyCartAdded, trackKosaricaIzracunaj, trackTapRedovna } from "../lib/usageEvents";
+import { notifyCartAdded, trackKosaricaIzracunaj } from "../lib/usageEvents";
+import { SourceBadge } from "../components/SourceBadge";
 
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -188,24 +189,6 @@ function OpenInMapsButton({ chainLabel, requestLocation }) {
       <MapPin size={13} />
       Otvori u Google Maps
     </button>
-  );
-}
-
-function SourceBadge({ source }) {
-  const isRegular = source === "regular";
-  return (
-    <span
-      className="flex-shrink-0 font-bold rounded px-1.5 py-0.5"
-      style={{
-        fontSize: 9,
-        letterSpacing: "0.04em",
-        color: isRegular ? "rgba(255,255,255,0.85)" : "#633806",
-        background: isRegular ? "rgba(255,255,255,0.12)" : "rgba(239,159,39,0.95)",
-      }}
-      onClick={isRegular ? () => trackTapRedovna() : undefined}
-    >
-      {isRegular ? "REDOVNA" : "AKCIJA"}
-    </span>
   );
 }
 
