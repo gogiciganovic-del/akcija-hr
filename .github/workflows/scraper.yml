@@ -35,10 +35,9 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       # Faza 2: flyer push s --send (samo Eurospin/Kaufland/Plodine u skripti).
-      # PRIVREMENO bez --send: prvi duboki scrape (bigger-pages). Vratiti --send nakon prvog runa.
       - name: Send flyer pushes
         continue-on-error: true
-        run: python scraper/send_flyer_pushes.py --limit 500
+        run: python scraper/send_flyer_pushes.py --send --limit 500
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
