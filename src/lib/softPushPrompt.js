@@ -94,3 +94,29 @@ export function shouldShowSoftPushPrompt(opts = {}) {
   if (isSoftPushPromptDone(opts.storage)) return false;
   return resolveSoftPushOffer(opts.product) != null;
 }
+
+/**
+ * Drugi argument togglea: { silent: true } vs DOM/React event vs undefined.
+ * Event (preventDefault / nativeEvent) → nije silent.
+ * @param {unknown} opts
+ */
+export function isSilentFavoriteToggleOpts(opts) {
+  if (!opts || typeof opts !== "object") return false;
+  if (typeof opts.preventDefault === "function" || opts.nativeEvent != null) {
+    return false;
+  }
+  return opts.silent === true;
+}
+
+/**
+ * Treba li nakon togglea pokušati soft snackbar (prije shouldShowSoftPushPrompt).
+ * @param {{ wasFavorite?: boolean, opts?: unknown }} [args]
+ */
+export function shouldAttemptSoftPushAfterToggle(args = {}) {
+  if (args.wasFavorite) return false; // uklanjanje
+  if (isSilentFavoriteToggleOpts(args.opts)) return false;
+  return true;
+}
+
+/** Auto-zatvaranje soft snackbara (ms) — bez push_soft_zatvoren / session block. */
+export const SOFT_PUSH_AUTO_DISMISS_MS = 15000;

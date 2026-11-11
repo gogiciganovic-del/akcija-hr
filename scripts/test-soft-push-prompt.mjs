@@ -6,9 +6,11 @@ import {
   SOFT_PUSH_DONE_KEY,
   SOFT_PUSH_DONE_VALUE,
   SOFT_PUSH_LABEL_PRICE,
+  isSilentFavoriteToggleOpts,
   isSoftPushPromptDone,
   markSoftPushPromptDone,
   resolveSoftPushOffer,
+  shouldAttemptSoftPushAfterToggle,
   shouldShowSoftPushPrompt,
 } from "../src/lib/softPushPrompt.js";
 
@@ -143,5 +145,44 @@ assert(
   }) === false,
   "sessionBlocked → false"
 );
+
+// --- shouldAttemptSoftPushAfterToggle / silent ---
+assert(
+  shouldAttemptSoftPushAfterToggle({ wasFavorite: false, opts: undefined }) ===
+    true,
+  "add without opts → attempt"
+);
+assert(
+  shouldAttemptSoftPushAfterToggle({
+    wasFavorite: false,
+    opts: { silent: true },
+  }) === false,
+  "silent true → no attempt"
+);
+assert(
+  shouldAttemptSoftPushAfterToggle({ wasFavorite: true, opts: undefined }) ===
+    false,
+  "remove → no attempt"
+);
+assert(
+  shouldAttemptSoftPushAfterToggle({
+    wasFavorite: true,
+    opts: { silent: true },
+  }) === false,
+  "remove+silent → no attempt"
+);
+assert(
+  shouldAttemptSoftPushAfterToggle({
+    wasFavorite: false,
+    opts: { preventDefault() {}, type: "click" },
+  }) === true,
+  "event-like opts → not silent, attempt"
+);
+assert(isSilentFavoriteToggleOpts({ silent: true }) === true, "silent flag");
+assert(
+  isSilentFavoriteToggleOpts({ preventDefault() {} }) === false,
+  "event not silent"
+);
+assert(isSilentFavoriteToggleOpts(undefined) === false, "undefined not silent");
 
 console.log("OK soft-push-prompt");

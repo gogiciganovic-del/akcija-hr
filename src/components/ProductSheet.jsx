@@ -217,7 +217,7 @@ export function ProductSheet({
     setTrackFeedback(null);
 
     if (!isBarcodeInFavorites(product, isBarcodeFavorite)) {
-      onToggleFavorite?.(product);
+      onToggleFavorite?.(product, { silent: true });
     }
 
     if (pushStatus === "denied") {

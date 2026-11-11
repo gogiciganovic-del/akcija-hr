@@ -23,8 +23,10 @@ import {
   shouldShowOnboarding,
 } from "./lib/onboardingGate";
 import {
+  SOFT_PUSH_AUTO_DISMISS_MS,
   markSoftPushPromptDone,
   resolveSoftPushOffer,
+  shouldAttemptSoftPushAfterToggle,
   shouldShowSoftPushPrompt,
 } from "./lib/softPushPrompt";
 import {
@@ -150,14 +152,37 @@ export default function App() {
   }, []);
 
   const handleToggleFavorite = useCallback(
-    (product) => {
+    (product, opts) => {
       const id = product?.id;
       const wasFav = id != null && favoritesRef.current.has(id);
       toggle(product);
-      if (!wasFav && product) maybeOpenSoftPush(product);
+      if (
+        product &&
+        shouldAttemptSoftPushAfterToggle({ wasFavorite: wasFav, opts })
+      ) {
+        maybeOpenSoftPush(product);
+      }
     },
     [toggle, maybeOpenSoftPush]
   );
+
+  // Soft snackbar nestaje kad push više nije "prompt".
+  useEffect(() => {
+    if (pushStatus === "subscribed" || pushStatus === "denied") {
+      setSoftPushOffer(null);
+      setSoftPushFeedback(null);
+    }
+  }, [pushStatus]);
+
+  // Auto-zatvori ~15s bez događaja / session block.
+  useEffect(() => {
+    if (!softPushOffer) return undefined;
+    const t = window.setTimeout(() => {
+      setSoftPushOffer(null);
+      setSoftPushFeedback(null);
+    }, SOFT_PUSH_AUTO_DISMISS_MS);
+    return () => window.clearTimeout(t);
+  }, [softPushOffer]);
 
   const handleSoftPushDismiss = useCallback(() => {
     trackPushSoftZatvoren();
