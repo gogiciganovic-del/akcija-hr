@@ -143,6 +143,15 @@ export function trackBlagdanskaListaDodana() {
   track("blagdanska_lista_dodana");
 }
 
+/** BF traka na Homeu — samo ime događaja, bez proizvoda u payloadu. */
+export function trackBfTrakaPrikazana() {
+  track("bf_traka_prikazana");
+}
+
+export function trackBfTrakaKlik() {
+  track("bf_traka_klik");
+}
+
 /** kosarica_dodan — samo ime; samo kad je stavka stvarno dodana. */
 export function shouldTrackKosaricaDodan(ok) {
   return ok === true;

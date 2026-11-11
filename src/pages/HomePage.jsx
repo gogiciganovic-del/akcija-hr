@@ -31,7 +31,13 @@ import {
   shouldShowDailyPicks,
 } from "../lib/dailyPicks";
 import {
+  selectTopDiscounts,
+  shouldShowTopDiscountStrip,
+} from "../lib/topDiscounts";
+import {
   trackAkcijePrikaziJos,
+  trackBfTrakaKlik,
+  trackBfTrakaPrikazana,
   trackLetakPratim,
   trackLetakPrestani,
   trackPonudaDanaTap,
@@ -394,6 +400,7 @@ export function HomePage({
   onEarlyEngage = null,
 }) {
   const scrollRef = useRef(null);
+  const bfStripTrackedRef = useRef(false);
   const [activeCat, setActiveCat] = useState(null);
   const [specialFilter, setSpecialFilter] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
@@ -465,6 +472,20 @@ export function HomePage({
       setActiveCat(null);
     }
   }, [activeCat, storeProducts]);
+
+  useEffect(() => {
+    if (bfStripTrackedRef.current) return;
+    if (loading) return;
+    if (specialFilter === "novo" || specialFilter === "expiring") return;
+    const open = shouldShowTopDiscountStrip(new Date(), {
+      isDev: import.meta.env.DEV,
+      search: window.location.search,
+    });
+    if (!open) return;
+    if (selectTopDiscounts(storeProducts).length === 0) return;
+    bfStripTrackedRef.current = true;
+    trackBfTrakaPrikazana();
+  }, [loading, specialFilter, storeProducts]);
 
   const handleStoreSelect = useCallback((storeId) => {
     setSelectedStore((prev) => (prev === storeId ? null : storeId));
@@ -538,6 +559,17 @@ export function HomePage({
   const showDailyPicks =
     !isNovoMode && !isExpiringMode && shouldShowDailyPicks(dailyPicks);
   const dailyPicksDateLabel = formatZagrebShortDate();
+  const topDiscountPicks = selectTopDiscounts(storeProducts);
+  const bfWindowOpen = shouldShowTopDiscountStrip(new Date(), {
+    isDev: import.meta.env.DEV,
+    search: typeof window !== "undefined" ? window.location.search : "",
+  });
+  const showTopDiscountStrip =
+    !loading &&
+    !isNovoMode &&
+    !isExpiringMode &&
+    bfWindowOpen &&
+    topDiscountPicks.length > 0;
   const hotProducts = rankHotDeals(products);
   const expiringTodayProducts = products.filter((p) => isExpiringTodayProduct(p));
   const expiringTodayIds = new Set(expiringTodayProducts.map((p) => p.id));
@@ -720,6 +752,45 @@ export function HomePage({
           favorites={favorites}
           favoritesLoading={favoritesLoading}
         />
+      )}
+
+      {/* Kompaktna traka najvećih popusta — iznad Ponude dana, bez novog upita. */}
+      {showTopDiscountStrip && (
+        <section className="mb-2.5" data-testid="home-top-discounts">
+          <div className="px-4 mb-1.5">
+            <h2 className="font-black text-white" style={{ fontSize: 15, letterSpacing: "-0.02em" }}>
+              Najveći popusti ovaj tjedan
+            </h2>
+            <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+              Iz trenutnih akcija u trgovinama
+            </p>
+          </div>
+          <div
+            className="flex gap-2 px-4 overflow-x-auto pb-0.5"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {topDiscountPicks.map((p) => (
+              <div
+                key={p.id}
+                className="flex-shrink-0"
+                style={{ width: 132 }}
+                data-testid="home-top-discount-card"
+                data-chain={p.chain || ""}
+                data-discount={p.discount ?? ""}
+              >
+                <ProductCard
+                  product={p}
+                  isFavorite={isFav(p.id)}
+                  onToggleFavorite={onToggleFav}
+                  onClick={() => {
+                    trackBfTrakaKlik();
+                    onProductSelect(p);
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Ponuda dana odmah ispod trgovina (iznad kategorija / watchwords) — samo layout. */}

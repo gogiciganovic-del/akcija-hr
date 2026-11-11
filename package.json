@@ -32,6 +32,7 @@
     "test:price-trust": "node scripts/test-price-trust.mjs",
     "test:soft-push-prompt": "node scripts/test-soft-push-prompt.mjs",
     "test:holiday-carts": "node scripts/test-holiday-carts.mjs",
+    "test:top-discounts": "node scripts/test-top-discounts.mjs",
     "test:deactivate-stale": "py -3 scripts/test-deactivate-stale.py"
   },
   "dependencies": {
