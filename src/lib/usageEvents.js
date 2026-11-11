@@ -134,6 +134,15 @@ export function trackKosaricaIzracunaj() {
   track("kosarica_izracunaj");
 }
 
+/** Blagdanska košarica — samo ime događaja, bez stavki u payloadu. */
+export function trackBlagdanskaListaPrikazana() {
+  track("blagdanska_lista_prikazana");
+}
+
+export function trackBlagdanskaListaDodana() {
+  track("blagdanska_lista_dodana");
+}
+
 /** kosarica_dodan — samo ime; samo kad je stavka stvarno dodana. */
 export function shouldTrackKosaricaDodan(ok) {
   return ok === true;

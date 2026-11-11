@@ -15,8 +15,17 @@ import {
 } from "../lib/quantityParse";
 import { normalizeImageUrl } from "../lib/productImage";
 import { applyDisplayOverrides, overrideKey } from "../lib/cartDisplayOverrides";
-import { notifyCartAdded, trackKosaricaIzracunaj } from "../lib/usageEvents";
+import {
+  notifyCartAdded,
+  trackKosaricaIzracunaj,
+  trackBlagdanskaListaPrikazana,
+  trackBlagdanskaListaDodana,
+} from "../lib/usageEvents";
 import { SourceBadge } from "../components/SourceBadge";
+import { getHolidayCarts, holidayListToCartItems } from "../lib/holidayCarts";
+
+const HOLIDAY_COMPARE_HINT =
+  "Usporedba po vrsti i veličini pakiranja, najjeftiniji sličan proizvod. Nije isti artikl.";
 
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -369,6 +378,8 @@ export function CartPage() {
   const { requestLocation } = useUserLocation();
 
   const { suggestions } = useProductSuggestions(input, selectedChain);
+  const holidayCarts = useMemo(() => getHolidayCarts(), []);
+  const showHolidayCarts = Boolean(selectedChain) && items.length === 0;
 
   const displayResults = useMemo(
     () => applyDisplayOverrides(results, lineOverrides),
@@ -379,6 +390,11 @@ export function CartPage() {
   useEffect(() => {
     saveCartDraft({ selectedChain, items, lineOverrides });
   }, [selectedChain, items, lineOverrides]);
+
+  useEffect(() => {
+    if (!showHolidayCarts || holidayCarts.length === 0) return;
+    trackBlagdanskaListaPrikazana();
+  }, [showHolidayCarts, holidayCarts.length]);
 
   const clearCartState = useCallback(() => {
     setItems([]);
@@ -487,27 +503,50 @@ export function CartPage() {
     clearCartState();
   }, [clearCartState]);
 
+  const runAnalyze = useCallback(
+    async (chain, nextItems) => {
+      if (!chain || !nextItems?.length) return;
+      trackKosaricaIzracunaj();
+      setLoading(true);
+      setError(null);
+      setResults(null);
+      setSubstitutePicker(null);
+      setShareFeedback(null);
+      setSuggestionsOpen(false);
+      try {
+        const enriched = await enrichItemsWithBarcodes(nextItems, chain);
+        setItems(enriched);
+        const data = await analyzeChainCart(chain, enriched);
+        setResults(data);
+      } catch (e) {
+        setError(e.message || "Greška pri izračunu košarice.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   const handleAnalyze = useCallback(async () => {
     if (!selectedChain || items.length === 0) return;
-    trackKosaricaIzracunaj();
-    setLoading(true);
-    setError(null);
-    setResults(null);
-    setSubstitutePicker(null);
-    setShareFeedback(null);
-    setSuggestionsOpen(false);
-    try {
-      // Prije izračuna dopuni barkode (točan naziv+lanac) — bez soft matcha.
-      const enriched = await enrichItemsWithBarcodes(items, selectedChain);
-      setItems(enriched);
-      const data = await analyzeChainCart(selectedChain, enriched);
-      setResults(data);
-    } catch (e) {
-      setError(e.message || "Greška pri izračunu košarice.");
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedChain, items]);
+    await runAnalyze(selectedChain, items);
+  }, [selectedChain, items, runAnalyze]);
+
+  const handleHolidayListAdd = useCallback(
+    async (list) => {
+      if (!selectedChain || !list?.items?.length) return;
+      const nextItems = holidayListToCartItems(list);
+      if (!nextItems.length) return;
+      trackBlagdanskaListaDodana();
+      setLineOverrides({});
+      setSubstitutePicker(null);
+      setInput("");
+      setSuggestionsOpen(false);
+      setItems(nextItems);
+      await runAnalyze(selectedChain, nextItems);
+    },
+    [selectedChain, runAnalyze]
+  );
 
   const handleShareSavings = useCallback(async () => {
     const primary = displayResults?.primary;
@@ -804,14 +843,14 @@ export function CartPage() {
                 </p>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
-                    {fmtEur(item.price)}
+                    {item.price != null ? fmtEur(item.price) : "—"}
                   </span>
                   {perHint && (
                     <span style={{ fontSize: 11, color: "rgba(255,255,255,0.32)" }}>
                       {perHint}
                     </span>
                   )}
-                  <SourceBadge source={item.priceSource} />
+                  {item.price != null && <SourceBadge source={item.priceSource} />}
                 </div>
               </div>
               <button
@@ -836,9 +875,56 @@ export function CartPage() {
       )}
 
       {selectedChain && items.length === 0 && (
-        <p className="px-4 text-center py-8" style={{ color: "rgba(255,255,255,0.25)", fontSize: 13 }}>
-          Dodaj proizvode iz {selectedMeta?.label} — Cjenko će izračunati ukupno, uštedu i usporedbu s drugim lancima.
-        </p>
+        <div className="px-4 pb-4">
+          <p className="text-center py-6" style={{ color: "rgba(255,255,255,0.25)", fontSize: 13 }}>
+            Dodaj proizvode iz {selectedMeta?.label} — Cjenko će izračunati ukupno, uštedu i usporedbu s drugim lancima.
+          </p>
+          {holidayCarts.length > 0 && (
+            <div className="space-y-2.5 mb-3">
+              <p
+                className="font-bold px-0.5"
+                style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, letterSpacing: "0.04em" }}
+              >
+                BLAGDANSKA KOŠARICA
+              </p>
+              {holidayCarts.map((list) => {
+                const count = Array.isArray(list.items) ? list.items.length : 0;
+                return (
+                  <button
+                    key={list.id}
+                    type="button"
+                    data-testid={`holiday-cart-${list.id}`}
+                    onClick={() => handleHolidayListAdd(list)}
+                    disabled={loading}
+                    className="w-full text-left rounded-2xl px-4 py-3.5 transition-opacity"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      opacity: loading ? 0.7 : 1,
+                    }}
+                  >
+                    <p className="font-bold text-white" style={{ fontSize: 15 }}>
+                      {list.title}
+                    </p>
+                    <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginTop: 4 }}>
+                      {count} {count === 1 ? "stavka" : "stavki"} · dodaj i usporedi
+                    </p>
+                  </button>
+                );
+              })}
+              <p
+                style={{
+                  color: "rgba(255,255,255,0.32)",
+                  fontSize: 11,
+                  lineHeight: 1.45,
+                  marginTop: 4,
+                }}
+              >
+                {HOLIDAY_COMPARE_HINT}
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       {items.length > 0 && (

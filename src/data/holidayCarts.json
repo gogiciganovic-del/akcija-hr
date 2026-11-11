@@ -1,0 +1,26 @@
+[
+  {
+    "id": "blagdansko-pecenje",
+    "title": "Blagdansko pečenje",
+    "items": [
+      { "name": "brašno 1 kg" },
+      { "name": "šećer 1 kg" },
+      { "name": "maslac 250 g" },
+      { "name": "jaja 10 kom" },
+      { "name": "mlijeko 1 l" },
+      { "name": "ulje suncokretovo 1 l" },
+      { "name": "čokolada 100 g" }
+    ]
+  },
+  {
+    "id": "osnovno-kuhanje",
+    "title": "Osnovno za kuhanje",
+    "items": [
+      { "name": "tjestenina 500 g" },
+      { "name": "krumpir 2 kg" },
+      { "name": "mlijeko 1 l" },
+      { "name": "jaja 10 kom" },
+      { "name": "ulje suncokretovo 1 l" }
+    ]
+  }
+]
