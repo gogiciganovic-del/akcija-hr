@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { BottomNav }     from "./components/BottomNav";
 import { ProductSheet }  from "./components/ProductSheet";
 import { OnboardingSheet } from "./components/OnboardingSheet";
+import { SoftPushSnackbar } from "./components/SoftPushSnackbar";
 import { HomePage }      from "./pages/HomePage";
 import { SearchPage }    from "./pages/SearchPage";
 import { FavoritesPage } from "./pages/FavoritesPage";
@@ -11,11 +12,32 @@ import { useFavorites }  from "./hooks/useFavorites";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { CjenkoPeek }    from "./components/CjenkoPeek";
 import { UpdateBanner } from "./components/UpdateBanner";
-import { trackTabOnce } from "./lib/usageEvents";
+import {
+  trackPushSoftKlik,
+  trackPushSoftPrikazan,
+  trackPushSoftZatvoren,
+  trackTabOnce,
+} from "./lib/usageEvents";
 import {
   ONBOARDING_DELAY_MS,
   shouldShowOnboarding,
 } from "./lib/onboardingGate";
+import {
+  markSoftPushPromptDone,
+  resolveSoftPushOffer,
+  shouldShowSoftPushPrompt,
+} from "./lib/softPushPrompt";
+import {
+  TRACK_REGULAR_DENIED,
+  TRACK_REGULAR_ENABLE_FALLBACK,
+  trackEnableErrorMessage,
+} from "./lib/trackRegularPrice";
+import {
+  barcodesFromFavorites,
+  followChain,
+  needsEnableBeforeFollow,
+  resolvePushEndpoint,
+} from "./lib/pushNotifications";
 
 const VALID_TABS = new Set(["home", "search", "cart", "fav"]);
 
@@ -59,6 +81,9 @@ export default function App() {
   const [scanToast, setScanToast] = useState(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [preferredStoresTick, setPreferredStoresTick] = useState(0);
+  const [softPushOffer, setSoftPushOffer] = useState(null);
+  const [softPushBusy, setSoftPushBusy] = useState(false);
+  const [softPushFeedback, setSoftPushFeedback] = useState(null);
 
   const activeTabRef = useRef(activeTab);
   activeTabRef.current = activeTab;
@@ -66,6 +91,11 @@ export default function App() {
   const mainRef = useRef(null);
   const onboardingTimerRef = useRef(null);
   const sessionSkipOnboardingRef = useRef(false);
+  const sessionSoftPushBlockedRef = useRef(false);
+  const pushStatusRef = useRef(pushStatus);
+  pushStatusRef.current = pushStatus;
+  const favoritesRef = useRef(favorites);
+  favoritesRef.current = favorites;
 
   const cancelOnboardingForSession = useCallback(() => {
     if (onboardingTimerRef.current) {
@@ -87,14 +117,113 @@ export default function App() {
     window.__cjenkoOpenProductSheet = (product) => {
       setSelectedProduct(product && typeof product === "object" ? product : null);
     };
+    window.__cjenkoOpenSoftPush = (offer) => {
+      setSoftPushFeedback(null);
+      setSoftPushOffer(offer && typeof offer === "object" ? offer : null);
+    };
     return () => {
       try {
         delete window.__cjenkoOpenProductSheet;
+        delete window.__cjenkoOpenSoftPush;
       } catch {
         // ignore
       }
     };
   }, []);
+
+  const maybeOpenSoftPush = useCallback((product) => {
+    if (
+      !shouldShowSoftPushPrompt({
+        pushStatus: pushStatusRef.current,
+        product,
+        sessionBlocked: sessionSoftPushBlockedRef.current,
+      })
+    ) {
+      return;
+    }
+    const offer = resolveSoftPushOffer(product);
+    if (!offer) return;
+    markSoftPushPromptDone();
+    trackPushSoftPrikazan();
+    setSoftPushFeedback(null);
+    setSoftPushOffer(offer);
+  }, []);
+
+  const handleToggleFavorite = useCallback(
+    (product) => {
+      const id = product?.id;
+      const wasFav = id != null && favoritesRef.current.has(id);
+      toggle(product);
+      if (!wasFav && product) maybeOpenSoftPush(product);
+    },
+    [toggle, maybeOpenSoftPush]
+  );
+
+  const handleSoftPushDismiss = useCallback(() => {
+    trackPushSoftZatvoren();
+    sessionSoftPushBlockedRef.current = true;
+    setSoftPushOffer(null);
+    setSoftPushFeedback(null);
+  }, []);
+
+  const handleSoftPushEnable = useCallback(async () => {
+    if (!softPushOffer || softPushBusy) return;
+    trackPushSoftKlik();
+    setSoftPushBusy(true);
+    setSoftPushFeedback(null);
+    try {
+      if (softPushOffer.kind === "price") {
+        const res = await enablePush({
+          extraBarcodes: [softPushOffer.barcode],
+        });
+        if (res && res.ok === false) {
+          const msg =
+            pushStatusRef.current === "denied"
+              ? TRACK_REGULAR_DENIED
+              : trackEnableErrorMessage(res.error);
+          if (msg) setSoftPushFeedback(msg);
+          sessionSoftPushBlockedRef.current = true;
+          return;
+        }
+        setSoftPushOffer(null);
+        return;
+      }
+
+      // flyer
+      const barcodes = barcodesFromFavorites(favoritesRef.current);
+      const endpoint = await resolvePushEndpoint();
+      if (needsEnableBeforeFollow(endpoint)) {
+        const res = await enablePush({ extraBarcodes: barcodes });
+        if (res && res.ok === false) {
+          const msg =
+            pushStatusRef.current === "denied"
+              ? TRACK_REGULAR_DENIED
+              : trackEnableErrorMessage(res.error);
+          if (msg) setSoftPushFeedback(msg);
+          sessionSoftPushBlockedRef.current = true;
+          return;
+        }
+      }
+      const followRes = await followChain(softPushOffer.chain, {
+        trackedBarcodes: barcodesFromFavorites(favoritesRef.current),
+      });
+      if (!followRes?.ok) {
+        setSoftPushFeedback(TRACK_REGULAR_ENABLE_FALLBACK);
+        sessionSoftPushBlockedRef.current = true;
+        return;
+      }
+      setSoftPushOffer(null);
+    } catch (e) {
+      const msg =
+        pushStatusRef.current === "denied"
+          ? TRACK_REGULAR_DENIED
+          : trackEnableErrorMessage(e);
+      if (msg) setSoftPushFeedback(msg);
+      sessionSoftPushBlockedRef.current = true;
+    } finally {
+      setSoftPushBusy(false);
+    }
+  }, [softPushOffer, softPushBusy, enablePush]);
 
   // Onboarding: ~3s na Homeu; engažman prije toga → samo ova sesija.
   // Timer se ne resetira na svaki re-render (cleanup ne briše timeout).
@@ -263,7 +392,7 @@ export default function App() {
         }}
         onBarcodeScanned={handleBarcodeScanned}
         isFav={isFav}
-        onToggleFav={toggle}
+        onToggleFav={handleToggleFavorite}
         homeResetSignal={homeResetSignal}
         favorites={favorites}
         favoritesLoading={favoritesLoading}
@@ -282,7 +411,7 @@ export default function App() {
         onPendingOpenScannerConsumed={handlePendingOpenScannerConsumed}
         onCartFeedback={handleCartFeedback}
         onGoCart={() => goTab("cart")}
-        onToggleFavorite={toggle}
+        onToggleFavorite={handleToggleFavorite}
         isBarcodeFavorite={(code) => {
           const c = String(code || "").trim();
           if (!c) return false;
@@ -299,7 +428,7 @@ export default function App() {
       <FavoritesPage
         favorites={favorites}
         favoritesLoading={favoritesLoading}
-        onToggleFavorite={toggle}
+        onToggleFavorite={handleToggleFavorite}
         onClearAll={clear}
         onProductSelect={handleProductSelect}
         onGoHome={() => goTab("home")}
@@ -335,6 +464,14 @@ export default function App() {
         favCount={favorites.size}
       />
       <UpdateBanner />
+      <SoftPushSnackbar
+        open={Boolean(softPushOffer)}
+        message={softPushOffer?.message || null}
+        busy={softPushBusy}
+        feedback={softPushFeedback}
+        onEnable={handleSoftPushEnable}
+        onDismiss={handleSoftPushDismiss}
+      />
       <OnboardingSheet
         open={onboardingOpen}
         favorites={favorites}
@@ -350,7 +487,7 @@ export default function App() {
         isOpen={!!selectedProduct}
         onClose={handleCloseSheet}
         isFavorite={selectedProduct ? isFav(selectedProduct.id) : false}
-        onToggleFavorite={toggle}
+        onToggleFavorite={handleToggleFavorite}
         isBarcodeFavorite={(code) => {
           const c = String(code || "").trim();
           if (!c) return false;

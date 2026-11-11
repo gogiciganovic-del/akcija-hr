@@ -5,6 +5,7 @@
  * favorit_dodan, prati_cijenu, prati_cijenu_prikazan, prati_cijenu_klik,
  * prati_cijenu_push_ukljucen, tap_redovna, kosarica_izracunaj, kosarica_dodan,
  * push_klik, push_ukljucen, push_odbijen, push_greska, push_otvoren, push_iskljucen,
+ * push_soft_prikazan, push_soft_klik, push_soft_zatvoren,
  * letak_pratim, letak_prestani, otvoreno_iz_appa,
  * onboarding_prikazan, onboarding_korak_1..3, onboarding_zavrsen, onboarding_preskocen,
  * keyword_dodana, keyword_uklonjena, keyword_zatrazen_prikaz, keyword_ponuda_klik,
@@ -194,6 +195,18 @@ export function trackPushOtvoren() {
 /** push_iskljucen — korisnik je isključio obavijesti (samo ime događaja). */
 export function trackPushIskljucen() {
   track("push_iskljucen");
+}
+
+export function trackPushSoftPrikazan() {
+  track("push_soft_prikazan");
+}
+
+export function trackPushSoftKlik() {
+  track("push_soft_klik");
+}
+
+export function trackPushSoftZatvoren() {
+  track("push_soft_zatvoren");
 }
 
 /** letak_pratim — uključeno praćenje novog letka (samo ime događaja). */

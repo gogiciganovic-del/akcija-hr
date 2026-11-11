@@ -82,53 +82,69 @@ function StoreFilterRow({ selectedStore, onSelect, preferredStores = [] }) {
       >
         TRGOVINE
       </p>
-      <div
-        className="flex gap-2 overflow-x-auto"
-        style={{ scrollbarWidth: "none" }}
-        data-testid="home-stores-scroll"
-      >
-        {ordered.map((store) => {
-          const active = selectedStore === store.id;
-          return (
-            <button
-              key={store.id}
-              type="button"
-              onClick={() => onSelect(store.id)}
-              className="flex flex-col items-center gap-1 flex-shrink-0 transition-all duration-200"
-              style={{ width: 52 }}
-            >
-              <div
-                className="flex items-center justify-center rounded-xl overflow-hidden w-full transition-all duration-200"
-                style={{
-                  aspectRatio: "1",
-                  maxHeight: 40,
-                  background: "#fff",
-                  border: active ? `2px solid ${store.color}` : "1px solid rgba(255,255,255,0.12)",
-                  boxShadow: active ? `0 0 10px ${store.color}44` : "none",
-                }}
+      <div className="relative" data-testid="home-stores-scroll-wrap">
+        <div
+          className="flex gap-2 overflow-x-auto"
+          style={{ scrollbarWidth: "none" }}
+          data-testid="home-stores-scroll"
+        >
+          {ordered.map((store) => {
+            const active = selectedStore === store.id;
+            return (
+              <button
+                key={store.id}
+                type="button"
+                onClick={() => onSelect(store.id)}
+                className="flex flex-col items-center gap-1 flex-shrink-0 transition-all duration-200"
+                style={{ width: 52 }}
               >
-                <img
-                  src={store.logo}
-                  alt={store.label}
-                  className="object-contain"
-                  style={{ width: "78%", height: "78%" }}
-                  loading="lazy"
-                />
-              </div>
-              <span
-                className="font-semibold rounded-full px-1 py-0.5 w-full text-center truncate"
-                style={{
-                  fontSize: 8,
-                  lineHeight: 1.2,
-                  color: active ? "#fff" : "rgba(255,255,255,0.45)",
-                  background: active ? store.color : "rgba(255,255,255,0.06)",
-                }}
-              >
-                {store.label}
-              </span>
-            </button>
-          );
-        })}
+                <div
+                  className="flex items-center justify-center rounded-xl overflow-hidden w-full transition-all duration-200"
+                  style={{
+                    aspectRatio: "1",
+                    maxHeight: 40,
+                    background: "#fff",
+                    border: active ? `2px solid ${store.color}` : "1px solid rgba(255,255,255,0.12)",
+                    boxShadow: active ? `0 0 10px ${store.color}44` : "none",
+                  }}
+                >
+                  <img
+                    src={store.logo}
+                    alt={store.label}
+                    className="object-contain"
+                    style={{ width: "78%", height: "78%" }}
+                    loading="lazy"
+                  />
+                </div>
+                <span
+                  className="font-semibold rounded-full px-1 py-0.5 w-full text-center truncate"
+                  style={{
+                    fontSize: 8,
+                    lineHeight: 1.2,
+                    color: active ? "#fff" : "rgba(255,255,255,0.45)",
+                    background: active ? store.color : "rgba(255,255,255,0.06)",
+                  }}
+                >
+                  {store.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div
+          aria-hidden
+          data-testid="home-stores-fade"
+          style={{
+            pointerEvents: "none",
+            position: "absolute",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: 28,
+            background:
+              "linear-gradient(90deg, rgba(2,6,23,0) 0%, rgba(2,6,23,0.92) 100%)",
+          }}
+        />
       </div>
     </div>
   );
@@ -607,7 +623,7 @@ export function HomePage({
           className="mx-4 mb-1.5"
           data-testid="home-value-line"
           style={{
-            color: "rgba(255,255,255,0.42)",
+            color: "rgba(255,255,255,0.62)",
             fontSize: 12,
             lineHeight: 1.35,
           }}

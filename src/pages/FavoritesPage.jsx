@@ -481,13 +481,15 @@ export function FavoritesPage({
         )}
       </div>
 
-      <PushNotifyBanner
-        status={pushStatus}
-        busy={pushBusy}
-        error={pushError}
-        onEnable={onEnablePush}
-        onDisable={onDisablePush}
-      />
+      {hasItems ? (
+        <PushNotifyBanner
+          status={pushStatus}
+          busy={pushBusy}
+          error={pushError}
+          onEnable={onEnablePush}
+          onDisable={onDisablePush}
+        />
+      ) : null}
 
       {hasItems ? (
         <SavingsCard
