@@ -10,7 +10,6 @@ import { CartPage }      from "./pages/CartPage";
 import { Admin }         from "./pages/Admin";
 import { useFavorites }  from "./hooks/useFavorites";
 import { usePushNotifications } from "./hooks/usePushNotifications";
-import { CjenkoPeek }    from "./components/CjenkoPeek";
 import { UpdateBanner } from "./components/UpdateBanner";
 import {
   trackPushSoftKlik,
@@ -472,8 +471,7 @@ export default function App() {
       className="relative flex flex-col h-screen max-w-sm mx-auto"
       style={{ background: "#020617", fontFamily: "'DM Sans','Inter',sans-serif" }}
     >
-      {/* Peek preklapa horizontalni red trgovina na Homeu — ostaje na drugim tabovima. */}
-      {activeTab !== "home" && <CjenkoPeek />}
+      {/* CjenkoPeek na 390×844 (top:38%, right:0) preklapa cijene/gumbe na Pretrazi, Košarici i Favoritima; Home već isključen. */}
       <main
         id="cjenko-main"
         ref={mainRef}

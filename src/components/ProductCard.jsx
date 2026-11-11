@@ -4,6 +4,7 @@ import { storeDisplayLabel } from "../lib/constants";
 import { productDisplayName } from "../lib/productDisplayName";
 import { productPlaceholderDataUri } from "../lib/productImage";
 import { SHOW_EXPIRES_IN } from "../lib/priceTrust";
+import { SourceBadge } from "./SourceBadge";
 
 const fmt = (v) => v.toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
 
@@ -11,17 +12,29 @@ function isRemoteSrc(src) {
   return typeof src === "string" && (src.startsWith("http://") || src.startsWith("https://"));
 }
 
-export function ProductCard({ product, size = "normal", isFavorite, onToggleFavorite, onClick }) {
+export function ProductCard({
+  product,
+  size = "normal",
+  isFavorite,
+  onToggleFavorite,
+  onClick,
+  showPriceSource = false,
+}) {
   const large = size === "large";
   const imageHeight = large ? 140 : 100;
   const title = productDisplayName(product.name);
   const fallbackSrc = productPlaceholderDataUri(product.name, imageHeight);
   const storeLabel = storeDisplayLabel(product);
-  const metaLine = storeLabel
+  const metaText = storeLabel
     ? `${storeLabel}${product.isHot ? " · 🔥" : ""}`
     : product.isHot
       ? "🔥"
       : null;
+  const priceSource =
+    showPriceSource && (product.priceSource === "sale" || product.priceSource === "regular")
+      ? product.priceSource
+      : null;
+  const showMeta = Boolean(metaText || priceSource);
 
   const [displaySrc, setDisplaySrc] = useState(product.image || fallbackSrc);
   const [imageLoading, setImageLoading] = useState(() => isRemoteSrc(product.image));
@@ -94,10 +107,22 @@ export function ProductCard({ product, size = "normal", isFavorite, onToggleFavo
         >
           {title}
         </p>
-        {metaLine && (
-          <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, marginBottom: 6 }}>
-            {metaLine}
-          </p>
+        {showMeta && (
+          <div
+            className="flex items-center gap-1.5 min-w-0"
+            style={{ marginBottom: 6 }}
+            onClick={priceSource ? (e) => e.stopPropagation() : undefined}
+          >
+            {metaText && (
+              <p
+                className="truncate min-w-0"
+                style={{ color: "rgba(255,255,255,0.3)", fontSize: 9 }}
+              >
+                {metaText}
+              </p>
+            )}
+            {priceSource && <SourceBadge source={priceSource} />}
+          </div>
         )}
         <div className="flex items-end justify-between">
           <div>
