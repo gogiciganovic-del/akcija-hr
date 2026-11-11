@@ -70,6 +70,10 @@ assert.match(cartSrc, /trackBlagdanskaListaPrikazana/);
 assert.match(cartSrc, /trackBlagdanskaListaDodana/);
 assert.match(cartSrc, /holidayListToCartItems/);
 assert.match(cartSrc, /Usporedba po vrsti i veličini pakiranja/);
+assert.match(cartSrc, /fromHolidayList/);
+assert.match(cartSrc, /setFromHolidayList\(true\)/);
+assert.match(cartSrc, /setFromHolidayList\(false\)/);
+assert.match(cartSrc, /data-testid="holiday-compare-hint"/);
 
 const eventsSrc = readFileSync(resolve(__dir, "../src/lib/usageEvents.js"), "utf8");
 assert.match(eventsSrc, /blagdanska_lista_prikazana/);

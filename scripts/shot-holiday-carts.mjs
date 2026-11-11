@@ -50,12 +50,15 @@ console.log("wrote", path.basename(emptyOut));
 await page.locator('[data-testid="holiday-cart-blagdansko-pecenje"]').click();
 await page.getByText("brašno 1 kg").first().waitFor({ timeout: 20000 });
 await page.getByText(/Košarica u/i).waitFor({ timeout: 90000 });
-await page.waitForTimeout(500);
-await page.getByText(/Košarica u/i).scrollIntoViewIfNeeded();
+const hint = page.locator('[data-testid="holiday-compare-hint"]');
+await hint.waitFor({ state: "visible", timeout: 10000 });
+await hint.scrollIntoViewIfNeeded();
 await page.waitForTimeout(400);
 const afterOut = path.join(outDir, "holiday-cart-after-add-390x844.png");
 await page.screenshot({ path: afterOut, fullPage: false });
 console.log("wrote", path.basename(afterOut));
+const hintText = await hint.innerText();
+console.log("hint:", hintText);
 
 await browser.close();
 console.log("OK shot-holiday-carts");

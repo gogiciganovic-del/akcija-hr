@@ -371,6 +371,7 @@ export function CartPage() {
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [chainMenuOpen, setChainMenuOpen] = useState(false);
   const [shareFeedback, setShareFeedback] = useState(null);
+  const [fromHolidayList, setFromHolidayList] = useState(false);
   const inputRef = useRef(null);
   const inputWrapRef = useRef(null);
   const chainWrapRef = useRef(null);
@@ -403,6 +404,7 @@ export function CartPage() {
     setSubstitutePicker(null);
     setError(null);
     setInput("");
+    setFromHolidayList(false);
   }, []);
 
   const openSubstitutePicker = useCallback((chain, chainLabel, lineIndex, cartName) => {
@@ -480,6 +482,7 @@ export function CartPage() {
         },
       ]);
       notifyCartAdded(true);
+      setFromHolidayList(false);
       setInput("");
       setSuggestionsOpen(false);
       setResults(null);
@@ -493,6 +496,7 @@ export function CartPage() {
   const removeItem = useCallback((id) => {
     const idx = items.findIndex((i) => i.id === id);
     if (idx < 0) return;
+    setFromHolidayList(false);
     setItems((prev) => prev.filter((i) => i.id !== id));
     setLineOverrides((prev) => reindexLineOverrides(prev, idx));
     setResults(null);
@@ -538,6 +542,7 @@ export function CartPage() {
       const nextItems = holidayListToCartItems(list);
       if (!nextItems.length) return;
       trackBlagdanskaListaDodana();
+      setFromHolidayList(true);
       setLineOverrides({});
       setSubstitutePicker(null);
       setInput("");
@@ -991,6 +996,20 @@ export function CartPage() {
               })()}
             </div>
           </div>
+
+          {fromHolidayList && (
+            <p
+              data-testid="holiday-compare-hint"
+              className="mb-4 px-0.5"
+              style={{
+                color: "rgba(255,255,255,0.32)",
+                fontSize: 11,
+                lineHeight: 1.45,
+              }}
+            >
+              {HOLIDAY_COMPARE_HINT}
+            </p>
+          )}
 
           <div
             className="rounded-2xl p-4 mb-4"
