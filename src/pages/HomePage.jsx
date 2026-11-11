@@ -60,67 +60,75 @@ import {
   unfollowChain,
 } from "../lib/pushNotifications";
 
-function StoreGrid({ stores, selectedStore, onSelect }) {
-  return (
-    <div className="grid grid-cols-6 gap-1">
-      {stores.map((store) => {
-        const active = selectedStore === store.id;
-        return (
-          <button
-            key={store.id}
-            type="button"
-            onClick={() => onSelect(store.id)}
-            className="flex flex-col items-center gap-1 min-w-0 transition-all duration-200"
-          >
-            <div
-              className="flex items-center justify-center rounded-xl overflow-hidden w-full transition-all duration-200"
-              style={{
-                aspectRatio: "1",
-                maxHeight: 40,
-                background: "#fff",
-                border: active ? `2px solid ${store.color}` : "1px solid rgba(255,255,255,0.12)",
-                boxShadow: active ? `0 0 10px ${store.color}44` : "none",
-              }}
-            >
-              <img
-                src={store.logo}
-                alt={store.label}
-                className="object-contain"
-                style={{ width: "78%", height: "78%" }}
-                loading="lazy"
-              />
-            </div>
-            <span
-              className="font-semibold rounded-full px-1 py-0.5 w-full text-center truncate"
-              style={{
-                fontSize: 8,
-                lineHeight: 1.2,
-                color: active ? "#fff" : "rgba(255,255,255,0.45)",
-                background: active ? store.color : "rgba(255,255,255,0.06)",
-              }}
-            >
-              {store.label}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+/** Isti broj lanaca kao STORES — value line na Homeu. */
+const HOME_VALUE_LINE = `Akcije i cijene iz ${STORES.length} trgovina na jednom mjestu`;
 
 function StoreFilterRow({ selectedStore, onSelect, preferredStores = [] }) {
   const ordered = orderStoresPreferredFirst(STORES, preferredStores);
-  const row1 = ordered.slice(0, 6);
-  const row2 = ordered.slice(6, 12);
   return (
-    <div className="mx-4 mb-3 rounded-2xl px-2.5 py-2.5"
-      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-      <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 8, fontWeight: 700, letterSpacing: "0.16em", marginBottom: 8, paddingLeft: 2 }}>
+    <div
+      className="mx-4 mb-2 rounded-2xl px-2.5 py-2"
+      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+    >
+      <p
+        style={{
+          color: "rgba(255,255,255,0.35)",
+          fontSize: 8,
+          fontWeight: 700,
+          letterSpacing: "0.16em",
+          marginBottom: 6,
+          paddingLeft: 2,
+        }}
+      >
         TRGOVINE
       </p>
-      <StoreGrid stores={row1} selectedStore={selectedStore} onSelect={onSelect} />
-      <div className="mt-1.5">
-        <StoreGrid stores={row2} selectedStore={selectedStore} onSelect={onSelect} />
+      <div
+        className="flex gap-2 overflow-x-auto"
+        style={{ scrollbarWidth: "none" }}
+        data-testid="home-stores-scroll"
+      >
+        {ordered.map((store) => {
+          const active = selectedStore === store.id;
+          return (
+            <button
+              key={store.id}
+              type="button"
+              onClick={() => onSelect(store.id)}
+              className="flex flex-col items-center gap-1 flex-shrink-0 transition-all duration-200"
+              style={{ width: 52 }}
+            >
+              <div
+                className="flex items-center justify-center rounded-xl overflow-hidden w-full transition-all duration-200"
+                style={{
+                  aspectRatio: "1",
+                  maxHeight: 40,
+                  background: "#fff",
+                  border: active ? `2px solid ${store.color}` : "1px solid rgba(255,255,255,0.12)",
+                  boxShadow: active ? `0 0 10px ${store.color}44` : "none",
+                }}
+              >
+                <img
+                  src={store.logo}
+                  alt={store.label}
+                  className="object-contain"
+                  style={{ width: "78%", height: "78%" }}
+                  loading="lazy"
+                />
+              </div>
+              <span
+                className="font-semibold rounded-full px-1 py-0.5 w-full text-center truncate"
+                style={{
+                  fontSize: 8,
+                  lineHeight: 1.2,
+                  color: active ? "#fff" : "rgba(255,255,255,0.45)",
+                  background: active ? store.color : "rgba(255,255,255,0.06)",
+                }}
+              >
+                {store.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -595,6 +603,17 @@ export function HomePage({
             }}
           />
         </div>
+        <p
+          className="mx-4 mb-1.5"
+          data-testid="home-value-line"
+          style={{
+            color: "rgba(255,255,255,0.42)",
+            fontSize: 12,
+            lineHeight: 1.35,
+          }}
+        >
+          {HOME_VALUE_LINE}
+        </p>
         {!selectedStore && (
           <div className="mx-4 mb-2">
             <button
@@ -687,7 +706,39 @@ export function HomePage({
         />
       )}
 
-      <div className="flex gap-2 px-4 pb-4 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+      {/* Ponuda dana odmah ispod trgovina (iznad kategorija / watchwords) — samo layout. */}
+      {!loading && !isNovoMode && !isExpiringMode && showDailyPicks && (
+        <section className="mb-3" data-testid="home-daily-picks-early">
+          <div className="flex items-center justify-between px-4 mb-2">
+            <div>
+              <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>
+                Ponuda dana
+              </h2>
+              <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+                {dailyPicksDateLabel}
+                {filterLabel ? ` · ${filterLabel}` : ""}
+                {` · ${dailyPicks.length} ponuda`}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5 px-4">
+            {dailyPicks.map((p) => (
+              <ProductCard
+                key={p.id}
+                product={p}
+                isFavorite={isFav(p.id)}
+                onToggleFavorite={onToggleFav}
+                onClick={() => {
+                  trackPonudaDanaTap();
+                  onProductSelect(p);
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="flex gap-2 px-4 pb-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
         {visibleCategories.map((c) => (
           <button
             key={c.label}
@@ -830,6 +881,49 @@ export function HomePage({
         </section>
       ) : (
         <>
+          {/* Fallback kad nema Ponude dana: prve vruće kartice iznad watchwords. */}
+          {!showDailyPicks && (
+            <section className="mb-3" data-testid="home-hot-early">
+              <div className="flex items-center justify-between px-4 mb-2">
+                <div>
+                  <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>⚡ Vruće ponude</h2>
+                  <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+                    {hotProducts.length} aktivnih{filterLabel ? ` · ${filterLabel}` : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleHotExpand}
+                  className="flex items-center gap-0.5 transition-opacity duration-200"
+                  style={{
+                    color: hotExpanded ? "#ffd700" : "#00ff88",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  {hotExpanded ? "Manje" : "Sve"} <ChevronRight size={12} style={{ transform: hotExpanded ? "rotate(90deg)" : "none" }} />
+                </button>
+              </div>
+              {hotProducts.length === 0 ? (
+                <p className="px-4" style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>
+                  {filterLabel ? `Nema vrućih ponuda u ${filterLabel}.` : "Nema vrućih ponuda trenutno."}
+                </p>
+              ) : hotExpanded ? (
+                <div className="grid grid-cols-2 gap-2.5 px-4">
+                  {hotProducts.map((p) => (
+                    <ProductCard key={p.id} product={p} isFavorite={isFav(p.id)} onToggleFavorite={onToggleFav} onClick={() => onProductSelect(p)} />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5 px-4">
+                  {hotProducts.slice(0, 2).map((p) => (
+                    <ProductCard key={p.id} product={p} isFavorite={isFav(p.id)} onToggleFavorite={onToggleFav} onClick={() => onProductSelect(p)} />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {watchwords.length > 0 ? (
             <WatchwordsSection
               words={watchwords}
@@ -847,36 +941,6 @@ export function HomePage({
           )}
 
           {showDailyPicks && (
-            <section className="mb-5">
-              <div className="flex items-center justify-between px-4 mb-3">
-                <div>
-                  <h2 className="font-black text-white" style={{ fontSize: 16, letterSpacing: "-0.02em" }}>
-                    Ponuda dana
-                  </h2>
-                  <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
-                    {dailyPicksDateLabel}
-                    {filterLabel ? ` · ${filterLabel}` : ""}
-                    {` · ${dailyPicks.length} ponuda`}
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2.5 px-4">
-                {dailyPicks.map((p) => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    isFavorite={isFav(p.id)}
-                    onToggleFavorite={onToggleFav}
-                    onClick={() => {
-                      trackPonudaDanaTap();
-                      onProductSelect(p);
-                    }}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
           <section className="mb-5">
             <div className="flex items-center justify-between px-4 mb-3">
               <div>
@@ -923,6 +987,7 @@ export function HomePage({
               </>
             )}
           </section>
+          )}
 
           {!hotExpanded && specialFilter !== "expiring" && expiringTodayProducts.length > 0 && (
             <section className="mb-5">
