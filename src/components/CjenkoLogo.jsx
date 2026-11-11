@@ -7,7 +7,8 @@ export function CjenkoLogo({ height = 32 }) {
       <CjenkoFace size={height} showTag />
       <span
         style={{
-          color: "#633806",
+          // Brand narančasta na tamnoj pozadini (#020617) — čitljivo (~4.5:1+)
+          color: "#EF9F27",
           fontSize: height * 0.97,
           fontWeight: 700,
           fontFamily: "'DM Sans', 'Inter', system-ui, sans-serif",

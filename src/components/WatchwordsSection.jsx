@@ -323,9 +323,12 @@ export function WatchwordsQuietEntry({ onAdded }) {
           type="button"
           onClick={() => setOpen(true)}
           style={{
-            color: "rgba(255,255,255,0.35)",
+            color: "rgba(255,255,255,0.78)",
             fontSize: 12,
-            fontWeight: 600,
+            fontWeight: 700,
+            lineHeight: 1.35,
+            paddingTop: 2,
+            paddingBottom: 2,
           }}
         >
           + Prati riječ

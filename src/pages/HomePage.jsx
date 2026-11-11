@@ -569,10 +569,10 @@ export function HomePage({
       >
         <div className="px-5 pt-12 pb-2">
           <CjenkoLogo height={34} />
-          <p style={{ color: "rgba(255,255,255,0.22)", fontSize: 11, marginTop: 1, marginLeft: 42 }}>
+          <p style={{ color: "rgba(255,255,255,0.72)", fontSize: 11, marginTop: 1, marginLeft: 42 }}>
             akcije
           </p>
-          <p style={{ color: "rgba(255,255,255,0.28)", fontSize: 10, marginTop: 2 }}>
+          <p style={{ color: "rgba(255,255,255,0.68)", fontSize: 10, marginTop: 2 }}>
             {headerFilterParts.length
               ? `Filtar: ${headerFilterParts.join(" · ")}`
               : locationLabel

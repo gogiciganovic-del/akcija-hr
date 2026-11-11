@@ -318,7 +318,8 @@ export default function App() {
       className="relative flex flex-col h-screen max-w-sm mx-auto"
       style={{ background: "#020617", fontFamily: "'DM Sans','Inter',sans-serif" }}
     >
-      <CjenkoPeek />
+      {/* Peek preklapa horizontalni red trgovina na Homeu — ostaje na drugim tabovima. */}
+      {activeTab !== "home" && <CjenkoPeek />}
       <main
         id="cjenko-main"
         ref={mainRef}
