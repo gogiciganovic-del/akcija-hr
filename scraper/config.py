@@ -52,11 +52,11 @@ STORES = list(STORE_SLUGS.keys())
 DEFAULT_PAGES = 3
 # Per-chain max listing pages (slug → pages). Ostali lanci → DEFAULT_PAGES.
 PAGES_BY_CHAIN: dict[str, int] = {
-    "lidl": 20,
-    "kaufland": 18,
-    "plodine": 18,
-    "konzum": 16,
-    "interspar": 16,
+    "lidl": 24,
+    "kaufland": 20,
+    "plodine": 19,
+    "konzum": 17,
+    "interspar": 17,
     "spar": 12,
 }
 

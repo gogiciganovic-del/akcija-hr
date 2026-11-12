@@ -69,11 +69,11 @@ class CountingClient:
 
 def main() -> int:
     expected = {
-        "lidl": 20,
-        "kaufland": 18,
-        "plodine": 18,
-        "konzum": 16,
-        "interspar": 16,
+        "lidl": 24,
+        "kaufland": 20,
+        "plodine": 19,
+        "konzum": 17,
+        "interspar": 17,
         "spar": 12,
     }
     assert_true(DEFAULT_PAGES == 3, f"DEFAULT_PAGES={DEFAULT_PAGES}")
@@ -87,28 +87,28 @@ def main() -> int:
     assert_true(pages_for_store("lidl", 5) == 5, "CLI override lidl")
     assert_true(pages_for_store("eurospin", 5) == 5, "CLI override eurospin")
     assert_true(pages_for_store("lidl", 3) == 3, "CLI --pages 3 forces 3")
-    assert_true(pages_for_store("kaufland", 18) == 18, "CLI override equals default")
+    assert_true(pages_for_store("kaufland", 20) == 20, "CLI override equals default")
     print("pages_for_store mapping: OK")
 
-    # fetch_store respects per-chain max_pages (lidl=20; no early empty/404)
+    # fetch_store respects per-chain max_pages (lidl=24; no early empty/404)
     client = CountingClient()
     with patch("scraper.time.sleep", lambda _s: None):
         with patch("scraper.BASE_URL", "https://najcijena.hr"):
             result = fetch_store(client, "lidl", pages_for_store("lidl"))
-    assert_true(client.requests == 20, f"lidl requests={client.requests}")
-    assert_true(result.pages_fetched == 20, f"pages_fetched={result.pages_fetched}")
-    assert_true(len(result.deals) == 1000, f"deals={len(result.deals)}")
+    assert_true(client.requests == 24, f"lidl requests={client.requests}")
+    assert_true(result.pages_fetched == 24, f"pages_fetched={result.pages_fetched}")
+    assert_true(len(result.deals) == 1200, f"deals={len(result.deals)}")
     assert_true(result.complete is False, "hit max_pages → truncated/complete=False")
-    print("lidl fetch uses 20 pages: OK")
+    print("lidl fetch uses 24 pages: OK")
 
     client_k = CountingClient()
     with patch("scraper.time.sleep", lambda _s: None):
         with patch("scraper.BASE_URL", "https://najcijena.hr"):
             rk = fetch_store(client_k, "kaufland", pages_for_store("kaufland"))
-    assert_true(client_k.requests == 18, f"kaufland requests={client_k.requests}")
-    assert_true(rk.pages_fetched == 18, f"kaufland pages_fetched={rk.pages_fetched}")
-    assert_true(len(rk.deals) == 900, f"kaufland deals={len(rk.deals)}")
-    print("kaufland fetch uses 18 pages: OK")
+    assert_true(client_k.requests == 20, f"kaufland requests={client_k.requests}")
+    assert_true(rk.pages_fetched == 20, f"kaufland pages_fetched={rk.pages_fetched}")
+    assert_true(len(rk.deals) == 1000, f"kaufland deals={len(rk.deals)}")
+    print("kaufland fetch uses 20 pages: OK")
 
     client_s = CountingClient()
     with patch("scraper.time.sleep", lambda _s: None):
