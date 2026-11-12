@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Per-chain page caps: big six → 12, others → 3; CLI --pages overrides."""
+"""Per-chain page caps via PAGES_BY_CHAIN; others → DEFAULT_PAGES; CLI --pages overrides."""
 from __future__ import annotations
 
 import sys
@@ -10,9 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scraper"))
 
 from config import (  # noqa: E402
-    BIGGER_PAGE_CHAINS,
-    BIGGER_PAGES,
     DEFAULT_PAGES,
+    PAGES_BY_CHAIN,
     STORES,
     pages_for_store,
 )
@@ -69,39 +68,47 @@ class CountingClient:
 
 
 def main() -> int:
-    expected_big = {
-        "lidl",
-        "kaufland",
-        "konzum",
-        "plodine",
-        "spar",
-        "interspar",
+    expected = {
+        "lidl": 20,
+        "kaufland": 18,
+        "plodine": 18,
+        "konzum": 16,
+        "interspar": 16,
+        "spar": 12,
     }
-    assert_true(BIGGER_PAGE_CHAINS == expected_big, f"chains={BIGGER_PAGE_CHAINS}")
     assert_true(DEFAULT_PAGES == 3, f"DEFAULT_PAGES={DEFAULT_PAGES}")
-    assert_true(BIGGER_PAGES == 12, f"BIGGER_PAGES={BIGGER_PAGES}")
-    assert_true("interspar" in BIGGER_PAGE_CHAINS, "interspar slug missing")
+    assert_true(PAGES_BY_CHAIN == expected, f"PAGES_BY_CHAIN={PAGES_BY_CHAIN}")
 
     for slug in STORES:
-        want = 12 if slug in expected_big else 3
+        want = expected.get(slug, DEFAULT_PAGES)
         got = pages_for_store(slug)
         assert_true(got == want, f"{slug}: default pages {got} != {want}")
 
     assert_true(pages_for_store("lidl", 5) == 5, "CLI override lidl")
     assert_true(pages_for_store("eurospin", 5) == 5, "CLI override eurospin")
     assert_true(pages_for_store("lidl", 3) == 3, "CLI --pages 3 forces 3")
+    assert_true(pages_for_store("kaufland", 18) == 18, "CLI override equals default")
     print("pages_for_store mapping: OK")
 
-    # fetch_store respects max_pages=12 for a big chain (no early empty/404)
+    # fetch_store respects per-chain max_pages (lidl=20; no early empty/404)
     client = CountingClient()
     with patch("scraper.time.sleep", lambda _s: None):
         with patch("scraper.BASE_URL", "https://najcijena.hr"):
             result = fetch_store(client, "lidl", pages_for_store("lidl"))
-    assert_true(client.requests == 12, f"lidl requests={client.requests}")
-    assert_true(result.pages_fetched == 12, f"pages_fetched={result.pages_fetched}")
-    assert_true(len(result.deals) == 600, f"deals={len(result.deals)}")
+    assert_true(client.requests == 20, f"lidl requests={client.requests}")
+    assert_true(result.pages_fetched == 20, f"pages_fetched={result.pages_fetched}")
+    assert_true(len(result.deals) == 1000, f"deals={len(result.deals)}")
     assert_true(result.complete is False, "hit max_pages → truncated/complete=False")
-    print("lidl fetch uses 12 pages: OK")
+    print("lidl fetch uses 20 pages: OK")
+
+    client_k = CountingClient()
+    with patch("scraper.time.sleep", lambda _s: None):
+        with patch("scraper.BASE_URL", "https://najcijena.hr"):
+            rk = fetch_store(client_k, "kaufland", pages_for_store("kaufland"))
+    assert_true(client_k.requests == 18, f"kaufland requests={client_k.requests}")
+    assert_true(rk.pages_fetched == 18, f"kaufland pages_fetched={rk.pages_fetched}")
+    assert_true(len(rk.deals) == 900, f"kaufland deals={len(rk.deals)}")
+    print("kaufland fetch uses 18 pages: OK")
 
     client_s = CountingClient()
     with patch("scraper.time.sleep", lambda _s: None):

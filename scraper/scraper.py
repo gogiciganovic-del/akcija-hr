@@ -253,7 +253,7 @@ def main():
         default=None,
         help=(
             f"Max stranica po lancu (override). Bez ovoga: "
-            f"{DEFAULT_PAGES} default, 12 za veće lance."
+            f"PAGES_BY_CHAIN ili {DEFAULT_PAGES} default."
         ),
     )
     parser.add_argument("--dry-run", action="store_true")
