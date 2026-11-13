@@ -1,5 +1,5 @@
 /**
- * Struktura blagdanskih popisa + loader.
+ * Božićna košarica: struktura + barkod loader + UI/copy hooks.
  * Pokreni: npm run test:holiday-carts
  */
 import assert from "node:assert/strict";
@@ -13,67 +13,46 @@ const raw = JSON.parse(
   readFileSync(resolve(__dir, "../src/data/holidayCarts.json"), "utf8")
 );
 
-assert.equal(raw.length, 2, "točno 2 popisa");
-assert.deepEqual(
-  raw.map((c) => c.id),
-  ["blagdansko-pecenje", "osnovno-kuhanje"]
-);
+assert.equal(raw.length, 1, "točno 1 popis");
+assert.equal(raw[0].id, "bozicna-kosarica");
+assert.equal(raw[0].title, "Božićna košarica");
+assert.ok(raw[0].items.length >= 5 && raw[0].items.length <= 10);
 
-const pecenje = raw.find((c) => c.id === "blagdansko-pecenje");
-assert.equal(pecenje.title, "Blagdansko pečenje");
-assert.deepEqual(
-  pecenje.items.map((i) => i.name),
-  [
-    "brašno 1 kg",
-    "šećer 1 kg",
-    "maslac 250 g",
-    "jaja 10 kom",
-    "mlijeko 1 l",
-    "ulje suncokretovo 1 l",
-    "čokolada 100 g",
-  ]
-);
-
-const kuhanje = raw.find((c) => c.id === "osnovno-kuhanje");
-assert.equal(kuhanje.title, "Osnovno za kuhanje");
-assert.deepEqual(
-  kuhanje.items.map((i) => i.name),
-  [
-    "tjestenina 500 g",
-    "krumpir 2 kg",
-    "mlijeko 1 l",
-    "jaja 10 kom",
-    "ulje suncokretovo 1 l",
-  ]
-);
-
-const forbidden = /pršut|prsut|\bsir\b|vino|pjenušac|pjenusac|kulen/i;
-for (const list of raw) {
-  for (const it of list.items) {
-    assert.equal(forbidden.test(it.name), false, `zabranjena stavka: ${it.name}`);
-  }
+for (const it of raw[0].items) {
+  assert.ok(String(it.barcode || "").trim().length >= 8, `barkod: ${it.displayName}`);
+  assert.ok(String(it.displayName || "").trim(), "displayName obavezan");
+  assert.equal(it.imageUrl, undefined, "URL slike ne ide u JSON");
 }
 
 const lists = getHolidayCarts();
-assert.equal(lists.length, 2);
-assert.equal(getHolidayCartById("blagdansko-pecenje")?.title, "Blagdansko pečenje");
-assert.equal(getHolidayCartById("nope"), null);
+assert.equal(lists.length, 1);
+assert.equal(getHolidayCartById("bozicna-kosarica")?.title, "Božićna košarica");
+assert.equal(getHolidayCartById("blagdansko-pecenje"), null);
+assert.equal(getHolidayCartById("osnovno-kuhanje"), null);
 
-const items = holidayListToCartItems(pecenje);
-assert.equal(items.length, 7);
-assert.ok(items.every((i) => i.name && i.id && i.barcode === null));
-assert.equal(new Set(items.map((i) => i.id)).size, 7, "jedinstveni id-evi");
+const items = holidayListToCartItems(raw[0]);
+assert.equal(items.length, raw[0].items.length);
+assert.ok(items.every((i) => i.name && i.id && i.barcode));
+assert.ok(items.every((i) => String(i.barcode).trim().length >= 8));
+assert.equal(new Set(items.map((i) => i.id)).size, items.length, "jedinstveni id-evi");
+assert.equal(items[0].name, raw[0].items[0].displayName);
 
 const cartSrc = readFileSync(resolve(__dir, "../src/pages/CartPage.jsx"), "utf8");
 assert.match(cartSrc, /getHolidayCarts/);
 assert.match(cartSrc, /trackBlagdanskaListaPrikazana/);
 assert.match(cartSrc, /trackBlagdanskaListaDodana/);
 assert.match(cartSrc, /holidayListToCartItems/);
-assert.match(cartSrc, /Usporedba po vrsti i veličini pakiranja/);
+assert.match(cartSrc, /Isti proizvodi \(isti barkod\)/);
+assert.match(cartSrc, /ne vodi ove artikle u našoj bazi/);
 assert.match(cartSrc, /fromHolidayList/);
 assert.match(cartSrc, /setFromHolidayList\(true\)/);
-assert.match(cartSrc, /setFromHolidayList\(false\)/);
 assert.match(cartSrc, /data-testid="holiday-compare-hint"/);
+assert.match(cartSrc, /data-testid=\{`holiday-cart-\$\{list\.id\}`\}/);
+assert.equal(raw[0].id, "bozicna-kosarica");
+
+const compareSrc = readFileSync(resolve(__dir, "../src/lib/cartCompare.js"), "utf8");
+assert.match(compareSrc, /unavailableReason: 'no_barcode'/);
+assert.match(compareSrc, /attachProductImagesByBarcode/);
 
 const eventsSrc = readFileSync(resolve(__dir, "../src/lib/usageEvents.js"), "utf8");
 assert.match(eventsSrc, /blagdanska_lista_prikazana/);

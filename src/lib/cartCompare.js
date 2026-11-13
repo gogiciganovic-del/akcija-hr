@@ -76,6 +76,58 @@ function saleHitFromDealRow(row) {
 }
 
 /**
+ * Slike iz products.image_url po barkodu (jedan .in upit, max ~10).
+ * Ne pregazi postojeći line.imageUrl (npr. draft). Samo dostupne retke.
+ */
+async function attachProductImagesByBarcode(primary, others) {
+  /** @type {object[]} */
+  const lines = []
+  if (primary?.lines) {
+    for (const line of primary.lines) {
+      if (line?.available) lines.push(line)
+    }
+  }
+  for (const row of others || []) {
+    for (const line of row.lines || []) {
+      if (line?.available) lines.push(line)
+    }
+  }
+  if (!lines.length) return
+
+  const barcodes = [
+    ...new Set(
+      lines
+        .map((l) => String(l.barcode || '').trim())
+        .filter((b) => b.length >= 8)
+    ),
+  ]
+  if (!barcodes.length) return
+
+  const byBarcode = new Map()
+  for (let i = 0; i < barcodes.length; i += DEAL_IMAGE_IN_CHUNK) {
+    const chunk = barcodes.slice(i, i + DEAL_IMAGE_IN_CHUNK)
+    const { data, error } = await supabase
+      .from('products')
+      .select('barcode, image_url')
+      .in('barcode', chunk)
+      .not('image_url', 'is', null)
+    if (error) throw error
+    for (const row of data || []) {
+      const bc = String(row.barcode || '').trim()
+      const url = normalizeImageUrl(row.image_url)
+      if (bc && url && !byBarcode.has(bc)) byBarcode.set(bc, url)
+    }
+  }
+
+  for (const line of lines) {
+    if (line.imageUrl) continue
+    const bc = String(line.barcode || '').trim()
+    const url = byBarcode.get(bc)
+    if (url) line.imageUrl = url
+  }
+}
+
+/**
  * Batch: slike iz active_deals za pronađene artikle (po barkodu ili točnom nazivu + lanac).
  * Ne dira matching — samo obogaćuje već resolved linije.
  */
@@ -156,6 +208,7 @@ async function attachDealImages(primary, others) {
 
   const enrichLine = (line, chain) => {
     if (!line?.available) return line
+    if (line.imageUrl) return line
     const bc = String(line.barcode || '').trim()
     const nm = normalizeDealNameKey(line.name)
     let imageUrl = null
@@ -507,6 +560,17 @@ async function resolveItemAtChain(item, chain) {
         matchedBy: 'barcode',
       }
     }
+    // Barkod zadan, a lanac nema taj EAN — bez name/type fallbacka.
+    return {
+      available: false,
+      price: null,
+      originalPrice: null,
+      priceSource: null,
+      name,
+      barcode,
+      matchedBy: null,
+      unavailableReason: 'no_barcode',
+    }
   }
 
   if (!name) {
@@ -787,6 +851,9 @@ export async function analyzeChainCart(selectedChain, items) {
     found: primaryFound,
   }
 
+  // Slike: products.image_url → draft imageUrl → active_deals.
+  await attachProductImagesByBarcode(primary, others)
+  attachDraftImages(primary, others, items)
   await attachDealImages(primary, others)
 
   return {
@@ -794,6 +861,29 @@ export async function analyzeChainCart(selectedChain, items) {
     primary,
     others,
     itemCount: items.length,
+  }
+}
+
+/** Draft imageUrl po barkodu — samo gdje products nije dao sliku. */
+function attachDraftImages(primary, others, items) {
+  const byBarcode = new Map()
+  for (const item of items || []) {
+    const bc = String(item?.barcode || '').trim()
+    const url = normalizeImageUrl(item?.imageUrl)
+    if (bc && url) byBarcode.set(bc, url)
+  }
+  if (!byBarcode.size) return
+
+  const apply = (line) => {
+    if (!line?.available || line.imageUrl) return
+    const bc = String(line.barcode || '').trim()
+    const url = byBarcode.get(bc)
+    if (url) line.imageUrl = url
+  }
+
+  for (const line of primary?.lines || []) apply(line)
+  for (const row of others || []) {
+    for (const line of row.lines || []) apply(line)
   }
 }
 

@@ -1,26 +1,32 @@
 [
   {
-    "id": "blagdansko-pecenje",
-    "title": "Blagdansko pečenje",
+    "id": "bozicna-kosarica",
+    "title": "Božićna košarica",
     "items": [
-      { "name": "brašno 1 kg" },
-      { "name": "šećer 1 kg" },
-      { "name": "maslac 250 g" },
-      { "name": "jaja 10 kom" },
-      { "name": "mlijeko 1 l" },
-      { "name": "ulje suncokretovo 1 l" },
-      { "name": "čokolada 100 g" }
-    ]
-  },
-  {
-    "id": "osnovno-kuhanje",
-    "title": "Osnovno za kuhanje",
-    "items": [
-      { "name": "tjestenina 500 g" },
-      { "name": "krumpir 2 kg" },
-      { "name": "mlijeko 1 l" },
-      { "name": "jaja 10 kom" },
-      { "name": "ulje suncokretovo 1 l" }
+      {
+        "barcode": "3850120700079",
+        "displayName": "Kraš Čajni kolutići 800 g"
+      },
+      {
+        "barcode": "3858881088177",
+        "displayName": "Franck Jubilarna kava 500 g"
+      },
+      {
+        "barcode": "3850108060102",
+        "displayName": "'Z bregov maslac 250 g"
+      },
+      {
+        "barcode": "80176800",
+        "displayName": "Nutella 750 g"
+      },
+      {
+        "barcode": "5449000131836",
+        "displayName": "Coca-Cola Zero 0,5 l"
+      },
+      {
+        "barcode": "3800020491461",
+        "displayName": "KitKat lješnjak 99 g"
+      }
     ]
   }
 ]

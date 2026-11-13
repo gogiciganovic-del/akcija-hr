@@ -25,7 +25,7 @@ import { SourceBadge } from "../components/SourceBadge";
 import { getHolidayCarts, holidayListToCartItems } from "../lib/holidayCarts";
 
 const HOLIDAY_COMPARE_HINT =
-  "Usporedba po vrsti i veličini pakiranja, najjeftiniji sličan proizvod. Nije isti artikl.";
+  "Isti proizvodi (isti barkod) u trgovinama koje ih vode. Cijene iz cjenika, provjeri na polici.";
 
 const fmtEur = (v) =>
   (v ?? 0).toLocaleString("hr-HR", { style: "currency", currency: "EUR" });
@@ -88,11 +88,20 @@ function allExactMatches(lines) {
   return available.every((l) => l.matchedBy === "barcode" || l.matchedBy === "name");
 }
 
-function foundLabel(found, total) {
+function foundLabel(found, total, { barcodeCart = false, chainLabel = "" } = {}) {
   if (!total) return null;
   if (found >= total) return `Pronađeno ${total} od ${total} · kompletna košarica`;
+  if (found === 0 && barcodeCart && chainLabel) {
+    return `${chainLabel} ne vodi ove artikle u našoj bazi`;
+  }
   if (found === 0) return `Pronađeno 0 od ${total} · nema pogodaka`;
   return `Pronađeno ${found} od ${total} · djelomična usporedba`;
+}
+
+/** Košarica gdje svaka stavka ima barkod (npr. Božićna košarica). */
+function isBarcodeCart(items) {
+  if (!Array.isArray(items) || !items.length) return false;
+  return items.every((it) => String(it?.barcode || "").trim().length >= 8);
 }
 
 /** Diskretna oznaka pouzdanosti uparivanja — samo UI. */
@@ -890,7 +899,7 @@ export function CartPage() {
                 className="font-bold px-0.5"
                 style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, letterSpacing: "0.04em" }}
               >
-                BLAGDANSKA KOŠARICA
+                BOŽIĆNA KOŠARICA
               </p>
               {holidayCarts.map((list) => {
                 const count = Array.isArray(list.items) ? list.items.length : 0;
@@ -1081,13 +1090,33 @@ export function CartPage() {
                   : unavailableReasonLabel(line.unavailableReason);
                 const isManual = line.matchedBy === "manual";
                 const chainId = displayResults.primary.chain;
+                const thumb = line.available
+                  ? normalizeImageUrl(line.imageUrl)
+                  : null;
                 return (
                 <li
                   key={`primary-${idx}-${line.cartName}`}
                   style={{ fontSize: 13 }}
                 >
                   {line.available ? (
-                    <>
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      {thumb ? (
+                        <img
+                          src={thumb}
+                          alt=""
+                          width={52}
+                          height={52}
+                          loading="lazy"
+                          decoding="async"
+                          className="rounded-lg flex-shrink-0 object-cover"
+                          style={{
+                            width: 52,
+                            height: 52,
+                            background: "rgba(255,255,255,0.04)",
+                          }}
+                        />
+                      ) : null}
+                      <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span
                           className="text-white/80 truncate min-w-0 font-medium"
@@ -1125,7 +1154,8 @@ export function CartPage() {
                           onClear={() => clearLineOverride(chainId, idx)}
                         />
                       )}
-                    </>
+                      </div>
+                    </div>
                   ) : (
                     <>
                       <span
@@ -1198,6 +1228,7 @@ export function CartPage() {
                   const x = countFound(row.lines);
                   const complete = x >= y && y > 0;
                   const none = x === 0;
+                  const barcodeCart = isBarcodeCart(items);
                   const exactComplete = complete && allExactMatches(row.lines);
                   const primaryY =
                     displayResults.itemCount || displayResults.primary?.lines?.length || 0;
@@ -1276,7 +1307,10 @@ export function CartPage() {
                         </div>
                       </div>
                       <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
-                        {foundLabel(x, y)}
+                        {foundLabel(x, y, {
+                          barcodeCart,
+                          chainLabel: row.label || row.chain,
+                        })}
                         {!complete && !none ? " · zbroj pronađenih" : ""}
                       </p>
                       <ul className="mt-2 space-y-2.5">

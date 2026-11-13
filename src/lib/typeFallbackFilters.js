@@ -1667,6 +1667,7 @@ export function shouldSkipTypeFallbackQuery(name) {
 export const UNAVAILABLE_REASON_LABELS = {
   cannot_compare: 'ne možemo usporediti ovaj artikl',
   not_in_catalog: 'nije u katalogu ovog lanca',
+  no_barcode: 'nema ovog barkoda u katalogu lanca',
   no_similar: 'nema dovoljno sličnog artikla',
 }
 

@@ -15,14 +15,18 @@ export function getHolidayCartById(id) {
 export function holidayListToCartItems(list) {
   if (!list?.items?.length) return [];
   return list.items
-    .map((it) => String(it?.name || "").trim())
-    .filter(Boolean)
-    .map((name) => ({
-      id: crypto.randomUUID(),
-      name,
-      barcode: null,
-      price: null,
-      originalPrice: null,
-      priceSource: "regular",
-    }));
+    .map((it) => {
+      const barcode = String(it?.barcode || "").trim() || null;
+      const name = String(it?.displayName || it?.name || "").trim();
+      if (!barcode || !name) return null;
+      return {
+        id: crypto.randomUUID(),
+        name,
+        barcode,
+        price: null,
+        originalPrice: null,
+        priceSource: "regular",
+      };
+    })
+    .filter(Boolean);
 }

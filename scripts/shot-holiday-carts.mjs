@@ -1,5 +1,5 @@
 /**
- * Blagdanska košarica shots (390×844, dpr 2).
+ * Božićna košarica shots (390×844, dpr 2).
  * Pretpostavlja Vite DEV na http://127.0.0.1:5173.
  */
 import { chromium } from "playwright";
@@ -37,28 +37,47 @@ await page.waitForTimeout(300);
 await page.getByRole("button", { name: /^Lidl$/i }).click();
 await page.waitForTimeout(600);
 
-await page.getByText("BLAGDANSKA KOŠARICA").waitFor({ timeout: 10000 });
-await page.locator('[data-testid="holiday-cart-blagdansko-pecenje"]').waitFor({
+await page.locator('[data-testid="holiday-cart-bozicna-kosarica"]').waitFor({
   state: "visible",
-  timeout: 5000,
+  timeout: 10000,
 });
 
-const emptyOut = path.join(outDir, "holiday-cart-empty-390x844.png");
+const emptyOut = path.join(outDir, "christmas-cart-empty-390x844.png");
 await page.screenshot({ path: emptyOut, fullPage: false });
 console.log("wrote", path.basename(emptyOut));
 
-await page.locator('[data-testid="holiday-cart-blagdansko-pecenje"]').click();
-await page.getByText("brašno 1 kg").first().waitFor({ timeout: 20000 });
-await page.getByText(/Košarica u/i).waitFor({ timeout: 90000 });
-const hint = page.locator('[data-testid="holiday-compare-hint"]');
-await hint.waitFor({ state: "visible", timeout: 10000 });
-await hint.scrollIntoViewIfNeeded();
-await page.waitForTimeout(400);
-const afterOut = path.join(outDir, "holiday-cart-after-add-390x844.png");
+await page.locator('[data-testid="holiday-cart-bozicna-kosarica"]').click();
+const primaryBanner = page.getByText(/Košarica u Lidl/i);
+await primaryBanner.waitFor({ timeout: 90000 });
+await primaryBanner.scrollIntoViewIfNeeded();
+await page.getByText("isti barkod").first().waitFor({ timeout: 20000 });
+await page.locator("img[src*='cdn.najcijena.hr']").first().waitFor({
+  state: "visible",
+  timeout: 15000,
+});
+await page.waitForTimeout(800);
+
+const afterOut = path.join(outDir, "christmas-cart-after-add-390x844.png");
 await page.screenshot({ path: afterOut, fullPage: false });
 console.log("wrote", path.basename(afterOut));
-const hintText = await hint.innerText();
-console.log("hint:", hintText);
+
+// Lidl chain card area (primary already visible) — scroll to others Eurospin
+const euro = page.getByText("Eurospin", { exact: true }).first();
+await euro.scrollIntoViewIfNeeded();
+await page.waitForTimeout(400);
+const euroMsg = page.getByText(/Eurospin ne vodi ove artikle u našoj bazi/i);
+await euroMsg.waitFor({ state: "visible", timeout: 10000 });
+const euroOut = path.join(outDir, "christmas-cart-eurospin-390x844.png");
+await page.screenshot({ path: euroOut, fullPage: false });
+console.log("wrote", path.basename(euroOut));
+
+// One complete chain card (Konzum/Kaufland/Spar…)
+const konzum = page.getByText("Konzum", { exact: true }).first();
+await konzum.scrollIntoViewIfNeeded();
+await page.waitForTimeout(400);
+const chainOut = path.join(outDir, "christmas-cart-chain-390x844.png");
+await page.screenshot({ path: chainOut, fullPage: false });
+console.log("wrote", path.basename(chainOut));
 
 await browser.close();
 console.log("OK shot-holiday-carts");
