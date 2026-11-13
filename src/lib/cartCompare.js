@@ -560,16 +560,19 @@ async function resolveItemAtChain(item, chain) {
         matchedBy: 'barcode',
       }
     }
-    // Barkod zadan, a lanac nema taj EAN — bez name/type fallbacka.
-    return {
-      available: false,
-      price: null,
-      originalPrice: null,
-      priceSource: null,
-      name,
-      barcode,
-      matchedBy: null,
-      unavailableReason: 'no_barcode',
+    // Samo Božićna košarica (strictBarcode): bez name/type fallbacka.
+    // Obične stavke s barkodom nastavljaju na naziv → type_unit.
+    if (item.strictBarcode === true) {
+      return {
+        available: false,
+        price: null,
+        originalPrice: null,
+        priceSource: null,
+        name,
+        barcode,
+        matchedBy: null,
+        unavailableReason: 'no_barcode',
+      }
     }
   }
 

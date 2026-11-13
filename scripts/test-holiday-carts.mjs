@@ -34,6 +34,7 @@ const items = holidayListToCartItems(raw[0]);
 assert.equal(items.length, raw[0].items.length);
 assert.ok(items.every((i) => i.name && i.id && i.barcode));
 assert.ok(items.every((i) => String(i.barcode).trim().length >= 8));
+assert.ok(items.every((i) => i.strictBarcode === true), "strictBarcode na svakoj stavci");
 assert.equal(new Set(items.map((i) => i.id)).size, items.length, "jedinstveni id-evi");
 assert.equal(items[0].name, raw[0].items[0].displayName);
 
@@ -52,7 +53,9 @@ assert.equal(raw[0].id, "bozicna-kosarica");
 
 const compareSrc = readFileSync(resolve(__dir, "../src/lib/cartCompare.js"), "utf8");
 assert.match(compareSrc, /unavailableReason: 'no_barcode'/);
+assert.match(compareSrc, /item\.strictBarcode === true/);
 assert.match(compareSrc, /attachProductImagesByBarcode/);
+assert.match(cartSrc, /it\?\.strictBarcode === true/);
 
 const eventsSrc = readFileSync(resolve(__dir, "../src/lib/usageEvents.js"), "utf8");
 assert.match(eventsSrc, /blagdanska_lista_prikazana/);

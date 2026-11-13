@@ -23,6 +23,7 @@ export function holidayListToCartItems(list) {
         id: crypto.randomUUID(),
         name,
         barcode,
+        strictBarcode: true,
         price: null,
         originalPrice: null,
         priceSource: "regular",

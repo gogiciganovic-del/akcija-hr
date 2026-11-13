@@ -98,10 +98,10 @@ function foundLabel(found, total, { barcodeCart = false, chainLabel = "" } = {})
   return `Pronađeno ${found} od ${total} · djelomična usporedba`;
 }
 
-/** Košarica gdje svaka stavka ima barkod (npr. Božićna košarica). */
+/** Samo potpuno stroga božićna košarica (svaka stavka strictBarcode). */
 function isBarcodeCart(items) {
   if (!Array.isArray(items) || !items.length) return false;
-  return items.every((it) => String(it?.barcode || "").trim().length >= 8);
+  return items.every((it) => it?.strictBarcode === true);
 }
 
 /** Diskretna oznaka pouzdanosti uparivanja — samo UI. */

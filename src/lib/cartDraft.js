@@ -38,6 +38,29 @@ export function reindexLineOverrides(overrides, removedIndex) {
   return next;
 }
 
+/** Zadrži poznata polja; strictBarcode samo kad je eksplicitno true. */
+function normalizeDraftItem(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const name = String(raw.name || "").trim();
+  if (!name) return null;
+  const item = {
+    id: raw.id || crypto.randomUUID(),
+    name,
+    barcode: raw.barcode ?? null,
+    price: raw.price ?? null,
+    originalPrice: raw.originalPrice ?? null,
+    priceSource: raw.priceSource === "sale" ? "sale" : "regular",
+  };
+  if (raw.strictBarcode === true) item.strictBarcode = true;
+  if (raw.imageUrl) item.imageUrl = raw.imageUrl;
+  return item;
+}
+
+function normalizeDraftItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map(normalizeDraftItem).filter(Boolean);
+}
+
 /** Spremljena košarica (lanac + stavke + ručne zamjene) — preživljava tab. Ne dira izračun. */
 export function loadCartDraft() {
   const data = safeParse(localStorage.getItem(DRAFT_KEY), null);
@@ -46,7 +69,7 @@ export function loadCartDraft() {
   }
   return {
     selectedChain: data.selectedChain || null,
-    items: Array.isArray(data.items) ? data.items : [],
+    items: normalizeDraftItems(data.items),
     lineOverrides: normalizeLineOverrides(data.lineOverrides),
   };
 }
@@ -57,7 +80,7 @@ export function saveCartDraft({ selectedChain, items, lineOverrides }) {
       DRAFT_KEY,
       JSON.stringify({
         selectedChain: selectedChain || null,
-        items: Array.isArray(items) ? items : [],
+        items: normalizeDraftItems(items),
         lineOverrides: normalizeLineOverrides(lineOverrides),
       })
     );

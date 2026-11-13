@@ -40,7 +40,7 @@ export async function resolveUniqueBarcode(name, chain) {
 
 /**
  * Dopuni barkod na stavkama kojima nedostaje.
- * Ne mijenja cijene ni imena — samo barcode polje.
+ * Ne mijenja cijene, imena, ni strictBarcode — samo barcode polje.
  */
 export async function enrichItemsWithBarcodes(items, chain) {
   if (!chain || !items?.length) return items || [];
@@ -50,6 +50,7 @@ export async function enrichItemsWithBarcodes(items, chain) {
       if (item?.barcode) return item;
       if (!item?.name) return item;
       const barcode = await resolveUniqueBarcode(item.name, chain);
+      // Spread zadržava strictBarcode i ostala polja.
       return barcode ? { ...item, barcode } : item;
     })
   );
