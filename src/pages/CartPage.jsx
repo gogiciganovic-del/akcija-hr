@@ -18,11 +18,18 @@ import { applyDisplayOverrides, overrideKey } from "../lib/cartDisplayOverrides"
 import {
   notifyCartAdded,
   trackKosaricaIzracunaj,
+  trackKosaricaPodijeljeno,
   trackBlagdanskaListaPrikazana,
   trackBlagdanskaListaDodana,
 } from "../lib/usageEvents";
 import { SourceBadge } from "../components/SourceBadge";
 import { getHolidayCarts, holidayListToCartItems } from "../lib/holidayCarts";
+import {
+  buildShareCartText,
+  hasCompleteShareChain,
+  joinHrLabels,
+  SHARE_CART_URL,
+} from "../lib/shareCartText";
 
 const HOLIDAY_COMPARE_HINT =
   "Isti proizvodi (isti barkod) u trgovinama koje ih vode. Cijene iz cjenika, provjeri na polici.";
@@ -562,21 +569,20 @@ export function CartPage() {
     [selectedChain, runAnalyze]
   );
 
-  const handleShareSavings = useCallback(async () => {
-    const primary = displayResults?.primary;
-    if (!primary || !((primary.savings ?? 0) >= MIN_SAVINGS_HIGHLIGHT)) return;
+  const canShareCart = hasCompleteShareChain(displayResults);
 
-    const text =
-      `Uštedio sam ${fmtEur(primary.savings)} kupujući u ${primary.label} uz Cjenko Akcije! 🛒\n` +
-      `https://cjenko.app`;
+  const handleShareCart = useCallback(async () => {
+    const text = buildShareCartText(displayResults, { isHoliday: fromHolidayList });
+    if (!text) return;
 
     try {
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
         await navigator.share({
           title: "Cjenko Akcije",
           text,
-          url: "https://cjenko.app",
+          url: SHARE_CART_URL,
         });
+        trackKosaricaPodijeljeno();
         return;
       }
 
@@ -593,6 +599,7 @@ export function CartPage() {
         document.execCommand("copy");
         document.body.removeChild(ta);
       }
+      trackKosaricaPodijeljeno();
       setShareFeedback("Kopirano!");
       window.setTimeout(() => setShareFeedback(null), 2000);
     } catch (e) {
@@ -601,7 +608,7 @@ export function CartPage() {
       setShareFeedback("Kopiranje nije uspjelo");
       window.setTimeout(() => setShareFeedback(null), 2000);
     }
-  }, [displayResults]);
+  }, [displayResults, fromHolidayList]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") {
@@ -1053,22 +1060,6 @@ export function CartPage() {
                 >
                   Ukupno {fmtEur(displayResults.primary.total)}
                 </p>
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    onClick={handleShareSavings}
-                    className="w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2"
-                    style={{
-                      background: "rgba(0,255,136,0.1)",
-                      border: "1px solid rgba(0,255,136,0.28)",
-                      color: "#00ff88",
-                      fontSize: 13,
-                    }}
-                  >
-                    <Share2 size={15} />
-                    {shareFeedback || "Podijeli uštedu"}
-                  </button>
-                </div>
               </>
             ) : (
               <>
@@ -1079,6 +1070,25 @@ export function CartPage() {
                   Nema dodatne uštede na akcijama u ovoj košarici
                 </p>
               </>
+            )}
+            {canShareCart && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  data-testid="share-cart"
+                  onClick={handleShareCart}
+                  className="w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2"
+                  style={{
+                    background: "rgba(0,255,136,0.1)",
+                    border: "1px solid rgba(0,255,136,0.28)",
+                    color: "#00ff88",
+                    fontSize: 13,
+                  }}
+                >
+                  <Share2 size={15} />
+                  {shareFeedback || "Podijeli košaricu"}
+                </button>
+              </div>
             )}
             <ul className="mt-3 space-y-2">
               {displayResults.primary.lines.map((line, idx) => {
@@ -1211,8 +1221,9 @@ export function CartPage() {
                 className="rounded-2xl overflow-hidden"
                 style={{ border: "1px solid rgba(255,255,255,0.08)" }}
               >
-                {[...displayResults.others]
-                  .sort((a, b) => {
+                {(() => {
+                  const barcodeCart = isBarcodeCart(items);
+                  const sortedOthers = [...displayResults.others].sort((a, b) => {
                     const ya = displayResults.itemCount || a.lines?.length || 0;
                     const yb = displayResults.itemCount || b.lines?.length || 0;
                     const xa = countFound(a.lines);
@@ -1222,13 +1233,23 @@ export function CartPage() {
                     if (ca !== cb) return ca ? -1 : 1;
                     if (xa !== xb) return xb - xa;
                     return (a.total ?? 0) - (b.total ?? 0);
-                  })
-                  .map((row, i) => {
+                  });
+                  const zeroOthers = barcodeCart
+                    ? sortedOthers.filter((row) => countFound(row.lines) === 0)
+                    : [];
+                  const visibleOthers = barcodeCart
+                    ? sortedOthers.filter((row) => countFound(row.lines) > 0)
+                    : sortedOthers;
+                  const zeroLineLabel = joinHrLabels(
+                    zeroOthers.map((row) => row.label || row.chain)
+                  );
+                  return (
+                    <>
+                {visibleOthers.map((row, i) => {
                   const y = displayResults.itemCount || row.lines?.length || 0;
                   const x = countFound(row.lines);
                   const complete = x >= y && y > 0;
                   const none = x === 0;
-                  const barcodeCart = isBarcodeCart(items);
                   const exactComplete = complete && allExactMatches(row.lines);
                   const primaryY =
                     displayResults.itemCount || displayResults.primary?.lines?.length || 0;
@@ -1440,6 +1461,27 @@ export function CartPage() {
                     </div>
                   );
                 })}
+                {zeroLineLabel ? (
+                  <p
+                    data-testid="barcode-cart-missing-chains"
+                    className="px-4 py-3"
+                    style={{
+                      fontSize: 12,
+                      color: "rgba(255,255,255,0.38)",
+                      lineHeight: 1.4,
+                      borderTop:
+                        visibleOthers.length > 0
+                          ? "1px solid rgba(255,255,255,0.06)"
+                          : "none",
+                      background: "rgba(255,255,255,0.02)",
+                    }}
+                  >
+                    {zeroLineLabel} ne vode ove artikle u našoj bazi.
+                  </p>
+                ) : null}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           )}

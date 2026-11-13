@@ -134,6 +134,11 @@ export function trackKosaricaIzracunaj() {
   track("kosarica_izracunaj");
 }
 
+/** Dijeljenje košarice — samo ime događaja, bez sadržaja teksta. */
+export function trackKosaricaPodijeljeno() {
+  track("kosarica_podijeljeno");
+}
+
 /** Blagdanska košarica — samo ime događaja, bez stavki u payloadu. */
 export function trackBlagdanskaListaPrikazana() {
   track("blagdanska_lista_prikazana");
