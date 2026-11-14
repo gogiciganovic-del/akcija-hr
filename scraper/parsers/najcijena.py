@@ -117,7 +117,13 @@ def parse_listing_page(
     *,
     stats: ListingDateStats | None = None,
     now: datetime | None = None,
+    skipped_ids: set[str] | None = None,
 ) -> list[ScrapedDeal]:
+    """
+    Vrati samo prihvaćene akcije.
+    Ako je zadan skipped_ids, popuni ga external_id kartica preskočenih
+    zbog expired/future (za paginaciju u fetch_store).
+    """
     soup = BeautifulSoup(html, "html.parser")
     deals: list[ScrapedDeal] = []
     seen: set[str] = set()
@@ -172,6 +178,8 @@ def parse_listing_page(
         if resolved.skip:
             # expired/future — ne ubacuj (sync_deal uvijek stavlja is_active=true;
             # active_deals filtrira samo valid_until > now, ne valid_from).
+            if skipped_ids is not None:
+                skipped_ids.add(ext_id)
             continue
 
         deals.append(

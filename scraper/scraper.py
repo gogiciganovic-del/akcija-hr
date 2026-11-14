@@ -112,9 +112,11 @@ def _handle_listing_404(*, pages_fetched: int, context: str) -> tuple[bool, bool
 
 def fetch_store(client, store_slug, max_pages) -> StoreFetchResult:
     """
-    Originalno pravilo zaustavljanja: staje kad stranica ne donese nijednu
-    NOVU ponudu (len(new)==0) ili kad dohvat padne. complete se računa
-    odvojeno (prirodni kraj vs odrezan max_pages) i ne utječe na petlju.
+    Zaustavljanje: staje kad stranica ne donese nijednu NOVU karticu
+    (prihvaćenu ili date-preskočenu) ili kad dohvat padne.
+    all_deals sadrži samo prihvaćene akcije; expired/future se broje kao
+    kartice za paginaciju (inače bi page s samim budućim akcijama
+    lažno izgledao prazan i prekinuo scrape).
 
     HTTP 404 nakon barem jedne uspješno skinute stranice = prirodni kraj
     (NajCijena tako označava kraj paginacije). 404 na page=1 ostaje greška.
@@ -144,9 +146,11 @@ def fetch_store(client, store_slug, max_pages) -> StoreFetchResult:
             )
             break
 
-        batch = parse_listing_page(resp.text, chain)
+        skipped: set[str] = set()
+        batch = parse_listing_page(resp.text, chain, skipped_ids=skipped)
+        page_card_ids = {d.external_id for d in batch} | skipped
 
-        if page == 1 and len(batch) == 0 and not use_vendor:
+        if page == 1 and len(page_card_ids) == 0 and not use_vendor:
             use_vendor = True
             url = _listing_url(store_slug, page, use_vendor)
             print(f"  -> Nema akcija na /trgovina/, pokusavam {url}")
@@ -161,18 +165,25 @@ def fetch_store(client, store_slug, max_pages) -> StoreFetchResult:
                     pages_fetched=pages_fetched, context=" (vendor)"
                 )
                 break
-            batch = parse_listing_page(resp.text, chain)
+            skipped = set()
+            batch = parse_listing_page(resp.text, chain, skipped_ids=skipped)
+            page_card_ids = {d.external_id for d in batch} | skipped
 
         pages_fetched = page
-        last_page_cards = len(batch)
+        last_page_cards = len(page_card_ids)
 
-        new = [d for d in batch if d.external_id not in seen]
-        for d in new:
-            seen.add(d.external_id)
-        all_deals.extend(new)
-        print(f"    Pronadeno {len(new)} novih akcija (ukupno {len(all_deals)})")
+        new_card_ids = page_card_ids - seen
+        for cid in page_card_ids:
+            seen.add(cid)
 
-        if len(new) == 0:
+        new_deals = [d for d in batch if d.external_id in new_card_ids]
+        all_deals.extend(new_deals)
+        print(
+            f"    Pronadeno {len(new_deals)} novih akcija "
+            f"(kartice nove={len(new_card_ids)}, ukupno akcija={len(all_deals)})"
+        )
+
+        if len(new_card_ids) == 0:
             stopped_naturally = True
             break
         time.sleep(0.8)
