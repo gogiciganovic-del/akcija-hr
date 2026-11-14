@@ -21,13 +21,24 @@ class ListingDateStats:
     real: int = 0
     fallback: int = 0
     expired_skipped: int = 0
+    future_skipped: int = 0
     duration_1_3: int = 0
     duration_4_7: int = 0
     duration_8_plus: int = 0
 
-    def note(self, source: str, *, skip: bool = False, span_days: int | None = None) -> None:
+    def note(
+        self,
+        source: str,
+        *,
+        skip: bool = False,
+        skip_reason: str | None = None,
+        span_days: int | None = None,
+    ) -> None:
         if skip:
-            self.expired_skipped += 1
+            if skip_reason == "future":
+                self.future_skipped += 1
+            else:
+                self.expired_skipped += 1
             return
         if source == "rsc":
             self.real += 1
@@ -155,10 +166,12 @@ def parse_listing_page(
             stats.note(
                 resolved.source,
                 skip=resolved.skip,
+                skip_reason=resolved.skip_reason,
                 span_days=resolved.span_days,
             )
         if resolved.skip:
-            # Istekla po RSC validTo — ne ubacuj kao aktivnu (sync_deal uvijek stavlja is_active=true).
+            # expired/future — ne ubacuj (sync_deal uvijek stavlja is_active=true;
+            # active_deals filtrira samo valid_until > now, ne valid_from).
             continue
 
         deals.append(

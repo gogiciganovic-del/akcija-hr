@@ -114,6 +114,31 @@ def test_rsc_ok_last_day_still_valid():
     assert_eq(r.valid_until, zagreb_day_end(date(2026, 11, 14)))
 
 
+def test_future_valid_from_skipped():
+    # validFrom sutra → skip (active_deals bi inače pokazao prije početka)
+    now = datetime(2026, 11, 14, 12, 0, tzinfo=timezone.utc)
+    r = resolve_validity(date(2026, 11, 15), date(2026, 11, 20), now=now)
+    assert_eq(r.source, "rsc")
+    assert_eq(r.skip, True)
+    assert_eq(r.skip_reason, "future")
+
+
+def test_valid_from_today_passes():
+    now = datetime(2026, 11, 14, 12, 0, tzinfo=timezone.utc)  # 13:00 Zagreb
+    r = resolve_validity(date(2026, 11, 14), date(2026, 11, 20), now=now)
+    assert_eq(r.skip, False)
+    assert_eq(r.source, "rsc")
+    assert_eq(r.valid_from, zagreb_day_start(date(2026, 11, 14)))
+
+
+def test_valid_from_yesterday_passes():
+    now = datetime(2026, 11, 14, 12, 0, tzinfo=timezone.utc)
+    r = resolve_validity(date(2026, 11, 13), date(2026, 11, 20), now=now)
+    assert_eq(r.skip, False)
+    assert_eq(r.source, "rsc")
+    assert_eq(r.valid_from, zagreb_day_start(date(2026, 11, 13)))
+
+
 def main() -> int:
     test_parse_ymd()
     test_month_end()
@@ -124,6 +149,9 @@ def main() -> int:
     test_too_long_span_fallback()
     test_expired_skipped()
     test_rsc_ok_last_day_still_valid()
+    test_future_valid_from_skipped()
+    test_valid_from_today_passes()
+    test_valid_from_yesterday_passes()
     print("OK test_rsc_deal_dates")
     return 0
 

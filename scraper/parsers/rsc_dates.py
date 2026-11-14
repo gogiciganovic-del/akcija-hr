@@ -115,7 +115,9 @@ def resolve_validity(
     """
     RSC datumi → aware datetimes u Zagreb zoni.
     Nevaljani / predugi span → fallback now/now+7.
-    Ako je kraj validTo dana već prošao → skip (ne aktivna).
+    Ako je kraj validTo dana već prošao → skip (expired).
+    Ako je početak validFrom dana strogo u budućnosti → skip (future)
+    jer active_deals filtrira samo valid_until > now().
     """
     n = now or datetime.now(timezone.utc)
     if n.tzinfo is None:
@@ -136,6 +138,16 @@ def resolve_validity(
 
     start = zagreb_day_start(valid_from_d)
     end = zagreb_day_end(valid_to_d)
+    if start > n:
+        # Još ne vrijedi — view bi je inače pokazao jer gleda samo valid_until.
+        return ValidityResolution(
+            start,
+            end,
+            "rsc",
+            skip=True,
+            skip_reason="future",
+            span_days=span,
+        )
     if end < n:
         # Ne ubacuj kao aktivnu — listing bi inače držao mrtve akcije do +7.
         return ValidityResolution(
