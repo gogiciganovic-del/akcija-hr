@@ -186,8 +186,6 @@ function EmptySavingsCard() {
 function SavingsCard({ items, onShare, shareFeedback }) {
   const { original, sale, saved } = favoriteTotals(items);
   const showHero = saved >= MIN_SAVINGS_HIGHLIGHT;
-  const countLabel =
-    items.length === 1 ? "1 spremljena akcija" : `${items.length} spremljenih akcija`;
 
   return (
     <div className="mx-4 mb-4">
@@ -200,8 +198,8 @@ function SavingsCard({ items, onShare, shareFeedback }) {
           <p className="font-black" style={{ color: "#633806", fontSize: 14, lineHeight: 1.35 }}>
             Tvoji favoriti
           </p>
-          <p style={{ color: "rgba(99,56,6,0.75)", fontSize: 12, marginTop: 2 }}>
-            {countLabel}
+          <p style={{ color: "rgba(99,56,6,0.75)", fontSize: 11, marginTop: 2, lineHeight: 1.4 }}>
+            Srce = spremljeno. Obavijest o padu cijene samo s barkodom („Prati cijenu“ u detaljima).
           </p>
         </div>
       </div>
@@ -214,7 +212,7 @@ function SavingsCard({ items, onShare, shareFeedback }) {
         }}
       >
         <p className="font-bold mb-3" style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
-          TVOJA UŠTEDA
+          RAZLIKA NA SPREMLJENIM AKCIJAMA
         </p>
         {showHero ? (
           <>
@@ -233,14 +231,14 @@ function SavingsCard({ items, onShare, shareFeedback }) {
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 13 }}>Platiš</span>
+                <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 13 }}>Na akciji</span>
                 <span className="font-bold text-white tabular-nums" style={{ fontSize: 16 }}>
                   {fmtEur(sale)}
                 </span>
               </div>
             </div>
-            <p style={{ color: "rgba(0,255,136,0.75)", fontSize: 13, marginBottom: 4 }}>
-              Uštedio si!
+            <p style={{ color: "rgba(0,255,136,0.75)", fontSize: 13, marginBottom: 4, lineHeight: 1.35 }}>
+              Spremljene akcije: do {fmtEur(saved)} jeftinije nego inače
             </p>
             <p
               className="font-black tabular-nums"
@@ -282,7 +280,7 @@ function SavingsCard({ items, onShare, shareFeedback }) {
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 13 }}>Platiš</span>
+                <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 13 }}>Na akciji</span>
                 <span className="font-bold text-white tabular-nums" style={{ fontSize: 15 }}>
                   {fmtEur(sale)}
                 </span>
@@ -292,7 +290,7 @@ function SavingsCard({ items, onShare, shareFeedback }) {
               {fmtEur(saved)}
             </p>
             <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, marginTop: 4 }}>
-              Nema veće uštede na trenutnim favoritima
+              Mala ili nikakva razlika na trenutnim favoritima
             </p>
           </>
         )}
@@ -446,8 +444,8 @@ export function FavoritesPage({
         <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 13 }}>
           {hasItems
             ? items.length === 1
-              ? "1 spremljena akcija"
-              : `${items.length} spremljenih akcija`
+              ? "1 spremljena akcija (favorit)"
+              : `${items.length} spremljenih akcija (favoriti)`
             : "Nema spremljenih akcija"}
         </p>
         {expiringHint && (
