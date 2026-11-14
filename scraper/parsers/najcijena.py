@@ -1,16 +1,46 @@
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from urllib.parse import unquote, urlparse, parse_qs
 
 from bs4 import BeautifulSoup
 
 from category_map import map_category
+from parsers.rsc_dates import parse_rsc_dates, resolve_validity
 
 DEAL_PATH_RE = re.compile(r"/akcija/([a-z0-9\-]+)-(\d+)$")
 PRICE_RE = re.compile(r"(\d+[.,]\d{2})")
 YEAR = datetime.now().year
+
+
+@dataclass
+class ListingDateStats:
+    """Brojači po listingu / lancu (RSC vs fallback vs skipped)."""
+
+    real: int = 0
+    fallback: int = 0
+    expired_skipped: int = 0
+    duration_1_3: int = 0
+    duration_4_7: int = 0
+    duration_8_plus: int = 0
+
+    def note(self, source: str, *, skip: bool = False, span_days: int | None = None) -> None:
+        if skip:
+            self.expired_skipped += 1
+            return
+        if source == "rsc":
+            self.real += 1
+            if span_days is None:
+                return
+            if span_days <= 3:
+                self.duration_1_3 += 1
+            elif span_days <= 7:
+                self.duration_4_7 += 1
+            else:
+                self.duration_8_plus += 1
+        else:
+            self.fallback += 1
 
 
 @dataclass
@@ -28,6 +58,7 @@ class ScrapedDeal:
     valid_until: datetime
     store_chain: str
     source_url: str
+    date_source: str = "fallback"  # "rsc" | "fallback"
 
 
 def _parse_price(text: str | None) -> float | None:
@@ -69,10 +100,18 @@ def _discount_from_prices(sale: float, original: float) -> int:
     return max(0, min(100, pct))
 
 
-def parse_listing_page(html: str, store_chain: str) -> list[ScrapedDeal]:
+def parse_listing_page(
+    html: str,
+    store_chain: str,
+    *,
+    stats: ListingDateStats | None = None,
+    now: datetime | None = None,
+) -> list[ScrapedDeal]:
     soup = BeautifulSoup(html, "html.parser")
     deals: list[ScrapedDeal] = []
     seen: set[str] = set()
+    rsc_by_id = parse_rsc_dates(html)
+    n = now or datetime.now(timezone.utc)
 
     for card in soup.select('a.product-card[href^="/akcija/"]'):
         href = card.get("href", "")
@@ -108,6 +147,20 @@ def parse_listing_page(html: str, store_chain: str) -> list[ScrapedDeal]:
         if discount is None:
             discount = _discount_from_prices(sale, original)
 
+        pair = rsc_by_id.get(ext_id)
+        vf_d = pair[0] if pair else None
+        vt_d = pair[1] if pair else None
+        resolved = resolve_validity(vf_d, vt_d, now=n)
+        if stats is not None:
+            stats.note(
+                resolved.source,
+                skip=resolved.skip,
+                span_days=resolved.span_days,
+            )
+        if resolved.skip:
+            # Istekla po RSC validTo — ne ubacuj kao aktivnu (sync_deal uvijek stavlja is_active=true).
+            continue
+
         deals.append(
             ScrapedDeal(
                 external_id=ext_id,
@@ -119,10 +172,11 @@ def parse_listing_page(html: str, store_chain: str) -> list[ScrapedDeal]:
                 price=sale,
                 original_price=original,
                 discount_pct=discount,
-                valid_from=datetime.now(timezone.utc),
-                valid_until=datetime.now(timezone.utc) + timedelta(days=7),
+                valid_from=resolved.valid_from,
+                valid_until=resolved.valid_until,
                 store_chain=store_chain,
                 source_url=f"https://www.najcijena.hr{href}",
+                date_source=resolved.source,
             )
         )
 
