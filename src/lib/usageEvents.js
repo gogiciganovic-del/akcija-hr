@@ -7,10 +7,15 @@
  * push_klik, push_ukljucen, push_odbijen, push_greska, push_otvoren, push_iskljucen,
  * push_soft_prikazan, push_soft_klik, push_soft_zatvoren,
  * letak_pratim, letak_prestani, otvoreno_iz_appa,
+ * povratak_dan_0, povratak_dan_1, povratak_dan_2_3, povratak_dan_4_7, povratak_dan_8_plus,
  * onboarding_prikazan, onboarding_korak_1..3, onboarding_zavrsen, onboarding_preskocen,
  * keyword_dodana, keyword_uklonjena, keyword_zatrazen_prikaz, keyword_ponuda_klik,
  * akcije_prikazi_jos.
  */
+import {
+  consumePovratakBucket,
+  resolvePovratakEventName,
+} from "./returnBuckets.js";
 
 const TAB_EVENTS = {
   home: "tab_home",
@@ -26,6 +31,8 @@ let pushOpenHandled = false;
 let scriptInjected = false;
 let flushTimer = null;
 const otvorenoIzAppaState = { seen: false };
+/** Jednom po sesiji — povratak_* bucketing (sve platforme). */
+const povratakState = { seen: false };
 
 /** Chrome TWA / Custom Tab iz APK-a postavlja ovaj referrer (paket, ne display-mode). */
 export const ANDROID_APP_REFERRER_PREFIX = "android-app://app.cjenko.akcije";
@@ -195,6 +202,33 @@ export function trackOtvorenoIzAppa() {
   track("otvoreno_iz_appa");
 }
 
+/**
+ * Retention bucket jednom po sesiji (web / PWA / TWA).
+ * first_open se upisuje i kad je tracking isključen; event ide samo preko track().
+ * @param {{ now?: Date, storage?: Storage|null, state?: { seen: boolean } }} [opts]
+ * @returns {boolean} true ako je event poslan u track()
+ */
+export function maybeTrackPovratak(opts = {}) {
+  let storage = opts.storage;
+  if (storage === undefined) {
+    try {
+      storage = typeof localStorage !== "undefined" ? localStorage : null;
+    } catch {
+      storage = null;
+    }
+  }
+  const state = opts.state || povratakState;
+  const eventName = resolvePovratakEventName({
+    now: opts.now,
+    storage,
+  });
+  if (!eventName || !eventName.startsWith("povratak_")) return false;
+  const bucket = eventName.slice("povratak_".length);
+  if (!consumePovratakBucket(bucket, state)) return false;
+  track(eventName);
+  return true;
+}
+
 export function trackPushKlik() {
   track("push_klik");
 }
@@ -349,6 +383,8 @@ export function initUsageTracking() {
   if (consumeOtvorenoIzAppa(document.referrer)) {
     trackOtvorenoIzAppa();
   }
+  // Sve platforme; jednom po sesiji. first_open se upisuje i bez Umamija.
+  maybeTrackPovratak();
   if (navigator.serviceWorker) {
     navigator.serviceWorker.addEventListener("message", onSwMessage);
   }

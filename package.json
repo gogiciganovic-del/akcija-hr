@@ -33,6 +33,7 @@
     "test:soft-push-prompt": "node scripts/test-soft-push-prompt.mjs",
     "test:holiday-carts": "node scripts/test-holiday-carts.mjs",
     "test:share-cart-text": "node scripts/test-share-cart-text.mjs",
+    "test:return-buckets": "node scripts/test-return-buckets.mjs",
     "test:top-discounts": "node scripts/test-top-discounts.mjs",
     "test:deactivate-stale": "py -3 scripts/test-deactivate-stale.py"
   },
