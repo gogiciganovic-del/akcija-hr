@@ -67,27 +67,14 @@ import {
 } from "../lib/pushNotifications";
 
 /** Isti broj lanaca kao STORES — value line na Homeu. */
-const HOME_VALUE_LINE = `Akcije i cijene iz ${STORES.length} trgovina na jednom mjestu`;
-
 function StoreFilterRow({ selectedStore, onSelect, preferredStores = [] }) {
   const ordered = orderStoresPreferredFirst(STORES, preferredStores);
   return (
     <div
-      className="mx-4 mb-2 rounded-2xl px-2.5 py-2"
+      className="mx-4 mb-2 rounded-2xl px-2 py-1.5"
       style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+      aria-label="Trgovine"
     >
-      <p
-        style={{
-          color: "rgba(255,255,255,0.35)",
-          fontSize: 8,
-          fontWeight: 700,
-          letterSpacing: "0.16em",
-          marginBottom: 6,
-          paddingLeft: 2,
-        }}
-      >
-        TRGOVINE
-      </p>
       <div className="relative" data-testid="home-stores-scroll-wrap">
         <div
           className="flex gap-2 overflow-x-auto"
@@ -101,14 +88,17 @@ function StoreFilterRow({ selectedStore, onSelect, preferredStores = [] }) {
                 key={store.id}
                 type="button"
                 onClick={() => onSelect(store.id)}
-                className="flex flex-col items-center gap-1 flex-shrink-0 transition-all duration-200"
-                style={{ width: 52 }}
+                aria-pressed={active}
+                aria-label={store.label}
+                title={store.label}
+                className="flex flex-col items-center gap-0.5 flex-shrink-0 transition-all duration-200"
+                style={{ width: 48 }}
               >
                 <div
                   className="flex items-center justify-center rounded-xl overflow-hidden w-full transition-all duration-200"
                   style={{
                     aspectRatio: "1",
-                    maxHeight: 40,
+                    maxHeight: 36,
                     background: "#fff",
                     border: active ? `2px solid ${store.color}` : "1px solid rgba(255,255,255,0.12)",
                     boxShadow: active ? `0 0 10px ${store.color}44` : "none",
@@ -116,17 +106,17 @@ function StoreFilterRow({ selectedStore, onSelect, preferredStores = [] }) {
                 >
                   <img
                     src={store.logo}
-                    alt={store.label}
+                    alt=""
                     className="object-contain"
                     style={{ width: "78%", height: "78%" }}
                     loading="lazy"
                   />
                 </div>
                 <span
-                  className="font-semibold rounded-full px-1 py-0.5 w-full text-center truncate"
+                  className="font-semibold rounded-full px-1 w-full text-center truncate"
                   style={{
                     fontSize: 8,
-                    lineHeight: 1.2,
+                    lineHeight: 1.15,
                     color: active ? "#fff" : "rgba(255,255,255,0.45)",
                     background: active ? store.color : "rgba(255,255,255,0.06)",
                   }}
@@ -651,17 +641,6 @@ export function HomePage({
             }}
           />
         </div>
-        <p
-          className="mx-4 mb-1.5"
-          data-testid="home-value-line"
-          style={{
-            color: "rgba(255,255,255,0.62)",
-            fontSize: 12,
-            lineHeight: 1.35,
-          }}
-        >
-          {HOME_VALUE_LINE}
-        </p>
         {!selectedStore && (
           <div className="mx-4 mb-2">
             <button
