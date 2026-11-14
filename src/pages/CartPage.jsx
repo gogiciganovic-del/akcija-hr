@@ -769,6 +769,8 @@ export function CartPage() {
             </div>
             <input
               ref={inputRef}
+              type="search"
+              name="cjenko-cart-q"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -792,6 +794,8 @@ export function CartPage() {
                 fontFamily: "'DM Sans', sans-serif",
               }}
               autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
             />
             {suggestionsOpen && (
               <ul
