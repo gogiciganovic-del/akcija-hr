@@ -383,7 +383,7 @@ export function FavoritesPage({
     if (!(saved >= MIN_SAVINGS_HIGHLIGHT)) return;
 
     const text =
-      `Uštedio sam ${fmtEur(saved)} na favoritima uz Cjenko Akcije! 💚\n` +
+      `Moje spremljene akcije u Cjenko Akcije su do ${fmtEur(saved)} jeftinije nego inače 💚\n` +
       `Bez popusta ${fmtEur(original)} → platiš ${fmtEur(sale)}\n` +
       `https://cjenko.app`;
 

@@ -66,7 +66,6 @@ import {
   unfollowChain,
 } from "../lib/pushNotifications";
 
-/** Isti broj lanaca kao STORES — value line na Homeu. */
 function StoreFilterRow({ selectedStore, onSelect, preferredStores = [] }) {
   const ordered = orderStoresPreferredFirst(STORES, preferredStores);
   return (
