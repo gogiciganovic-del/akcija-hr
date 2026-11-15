@@ -2,15 +2,20 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { X } from "lucide-react";
 import { STORES } from "../lib/constants";
 import { FLYER_FOLLOW_CHAINS } from "../lib/pushFlyerFollow";
+import {
+  applyFlyerFollowDelta,
+} from "../lib/onboardingFlyerSync";
 import { writePreferredStores, markOnboardingDone } from "../lib/onboardingGate";
 import {
   barcodesFromFavorites,
   enablePushNotifications,
   followChain,
+  unfollowChain,
 } from "../lib/pushNotifications";
 import { classifyPushEnableFailure } from "../lib/pushEnableFailure";
 import {
   trackLetakPratim,
+  trackLetakPrestani,
   trackOnboardingKorak,
   trackOnboardingPrikazan,
   trackOnboardingPreskocen,
@@ -47,6 +52,7 @@ function formatFlyerChainsLabel(chains) {
 /**
  * Jedan sheet: trgovine + opcionalni prekidač za letak.
  * Donji sheet (fixed) — ne gura layout. Zatvaranje uvijek označi done.
+ * Prekidač ↔ stvarno praćenje (follow/unfollow); zatvaranje dok je uključen NE odjavljuje.
  */
 export function OnboardingSheet({
   open,
@@ -57,23 +63,36 @@ export function OnboardingSheet({
   const titleId = useId();
   const panelRef = useRef(null);
   const finishedRef = useRef(false);
+  /** Lanci koje je ova sesija stvarno zapratila (followChain ok). */
+  const followedRef = useRef(/** @type {Set<string>} */ (new Set()));
   const [selectedStores, setSelectedStores] = useState([]);
   const [notifyOn, setNotifyOn] = useState(false);
+  const [followedChains, setFollowedChains] = useState(/** @type {string[]} */ ([]));
   const [busy, setBusy] = useState(false);
 
   const flyerEligible = useMemo(
-    () =>
-      FLYER_FOLLOW_CHAINS.filter((id) => selectedStores.includes(id)),
+    () => FLYER_FOLLOW_CHAINS.filter((id) => selectedStores.includes(id)),
     [selectedStores]
   );
-  const showNotifyToggle = flyerEligible.length > 0;
-  const flyerLabel = formatFlyerChainsLabel(flyerEligible);
+  const showNotifyToggle = flyerEligible.length > 0 || followedChains.length > 0;
+  // Dok je uključeno — samo stvarno praćeni; inače preview eligible.
+  const flyerLabel = formatFlyerChainsLabel(
+    notifyOn && followedChains.length > 0 ? followedChains : flyerEligible
+  );
+
+  const writeFollowedState = useCallback((chains) => {
+    const ordered = FLYER_FOLLOW_CHAINS.filter((c) => chains.includes(c));
+    followedRef.current = new Set(ordered);
+    setFollowedChains(ordered);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     finishedRef.current = false;
+    followedRef.current = new Set();
     setSelectedStores([]);
     setNotifyOn(false);
+    setFollowedChains([]);
     setBusy(false);
     trackOnboardingPrikazan();
     trackOnboardingKorak(1);
@@ -82,11 +101,6 @@ export function OnboardingSheet({
     }, 50);
     return () => window.clearTimeout(t);
   }, [open]);
-
-  // Nestane eligible lanaca → ugasi prekidač (bez auto-push).
-  useEffect(() => {
-    if (!showNotifyToggle && notifyOn) setNotifyOn(false);
-  }, [showNotifyToggle, notifyOn]);
 
   const restoreFocus = useCallback(() => {
     try {
@@ -159,41 +173,114 @@ export function OnboardingSheet({
     }
   }, [finishComplete]);
 
-  const toggleStore = (id) => {
-    setSelectedStores((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
+  const syncFollowsToEligible = useCallback(
+    async (eligible) => {
+      const previous = [...followedRef.current];
+      const result = await applyFlyerFollowDelta({
+        previousFollowed: previous,
+        nextEligible: eligible,
+        followChain,
+        unfollowChain,
+        trackedBarcodes: barcodesFromFavorites(favorites),
+        onFollowed: () => trackLetakPratim(),
+        onUnfollowed: () => trackLetakPrestani(),
+      });
+      writeFollowedState(result.followed);
+      return result;
+    },
+    [favorites, writeFollowedState]
+  );
 
-  const onEnablePush = async (chains) => {
-    const barcodes = barcodesFromFavorites(favorites);
-    const follow = chains.filter((c) => FLYER_FOLLOW_CHAINS.includes(c));
-    trackPushKlik();
-    await enablePushNotifications(barcodes);
-    trackPushUkljucen();
-    for (const chain of follow) {
-      try {
-        const res = await followChain(chain, { trackedBarcodes: barcodes });
-        if (res?.ok) trackLetakPratim();
-      } catch {
-        // tiho
+  const toggleStore = async (id) => {
+    if (busy) return;
+    const nextSelected = selectedStores.includes(id)
+      ? selectedStores.filter((x) => x !== id)
+      : [...selectedStores, id];
+    const nextEligible = FLYER_FOLLOW_CHAINS.filter((c) =>
+      nextSelected.includes(c)
+    );
+
+    if (!notifyOn) {
+      setSelectedStores(nextSelected);
+      return;
+    }
+
+    // Prekidač uključen — sinkroniziraj praćenje s novim eligible.
+    const prevSelected = selectedStores;
+    const prevFollowed = [...followedRef.current];
+    const prevNotify = notifyOn;
+    setSelectedStores(nextSelected);
+    setBusy(true);
+    try {
+      if (nextEligible.length === 0) {
+        await syncFollowsToEligible([]);
+        setNotifyOn(false);
+      } else {
+        await syncFollowsToEligible(nextEligible);
       }
+    } catch {
+      setSelectedStores(prevSelected);
+      writeFollowedState(prevFollowed);
+      setNotifyOn(prevNotify && prevFollowed.length > 0);
+    } finally {
+      setBusy(false);
     }
   };
 
   const onToggleNotify = async () => {
-    if (busy || !showNotifyToggle) return;
+    if (busy) return;
+    if (!showNotifyToggle && !notifyOn) return;
+
     if (notifyOn) {
-      setNotifyOn(false);
+      // Isključi → odjavi sve što je ova sesija zapratila.
+      const prevFollowed = [...followedRef.current];
+      setBusy(true);
+      try {
+        await applyFlyerFollowDelta({
+          previousFollowed: prevFollowed,
+          nextEligible: [],
+          followChain,
+          unfollowChain,
+          trackedBarcodes: barcodesFromFavorites(favorites),
+          onUnfollowed: () => trackLetakPrestani(),
+        });
+        writeFollowedState([]);
+        setNotifyOn(false);
+      } catch {
+        writeFollowedState(prevFollowed);
+        setNotifyOn(true);
+      } finally {
+        setBusy(false);
+      }
       return;
     }
+
     // Uključivanje samo na eksplicitni dodir — nikad automatski.
+    if (flyerEligible.length === 0) return;
+    const prevFollowed = [...followedRef.current];
     setBusy(true);
     try {
-      await onEnablePush(flyerEligible);
-      setNotifyOn(true);
+      const barcodes = barcodesFromFavorites(favorites);
+      trackPushKlik();
+      await enablePushNotifications(barcodes);
+      trackPushUkljucen();
+      const result = await applyFlyerFollowDelta({
+        previousFollowed: prevFollowed,
+        nextEligible: flyerEligible,
+        followChain,
+        unfollowChain,
+        trackedBarcodes: barcodes,
+        onFollowed: () => trackLetakPratim(),
+        onUnfollowed: () => trackLetakPrestani(),
+      });
+      writeFollowedState(result.followed);
+      setNotifyOn(result.followed.length > 0);
+      if (result.followed.length === 0) {
+        throw new Error("follow_none");
+      }
     } catch (e) {
-      setNotifyOn(false);
+      writeFollowedState(prevFollowed);
+      setNotifyOn(prevFollowed.length > 0);
       const code =
         e?.code ||
         (typeof Notification !== "undefined" ? Notification.permission : "");
@@ -202,7 +289,7 @@ export function OnboardingSheet({
         typeof Notification !== "undefined" ? Notification.permission : ""
       );
       if (event === "push_odbijen") trackPushOdbijen();
-      else trackPushGreska();
+      else if (e?.message !== "follow_none") trackPushGreska();
     } finally {
       setBusy(false);
     }
