@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Check, X } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { STORES } from "../lib/constants";
 import { FLYER_FOLLOW_CHAINS } from "../lib/pushFlyerFollow";
-import {
-  writeInterest,
-  writePreferredStores,
-} from "../lib/onboardingGate";
+import { writePreferredStores, markOnboardingDone } from "../lib/onboardingGate";
 import {
   barcodesFromFavorites,
   enablePushNotifications,
@@ -23,13 +20,6 @@ import {
   trackPushOdbijen,
   trackPushUkljucen,
 } from "../lib/usageEvents";
-import { markOnboardingDone } from "../lib/onboardingGate";
-
-const INTEREST_OPTIONS = [
-  { id: "hrana", label: "Hrana i piće" },
-  { id: "higijena", label: "Higijena i kućanstvo" },
-  { id: "sve", label: "Sve" },
-];
 
 const BTN_MIN = 44;
 
@@ -45,7 +35,17 @@ function chipForeground(bgHex) {
   return lum > 0.62 ? "#020617" : "#fff";
 }
 
+/** @param {string[]} chains */
+function formatFlyerChainsLabel(chains) {
+  const list = Array.isArray(chains) ? chains.filter(Boolean) : [];
+  if (list.length === 0) return "";
+  if (list.length === 1) return `Za ${list[0]}`;
+  if (list.length === 2) return `Za ${list[0]} i ${list[1]}`;
+  return `Za ${list.slice(0, -1).join(", ")} i ${list[list.length - 1]}`;
+}
+
 /**
+ * Jedan sheet: trgovine + opcionalni prekidač za letak.
  * Donji sheet (fixed) — ne gura layout. Zatvaranje uvijek označi done.
  */
 export function OnboardingSheet({
@@ -57,19 +57,23 @@ export function OnboardingSheet({
   const titleId = useId();
   const panelRef = useRef(null);
   const finishedRef = useRef(false);
-  const [step, setStep] = useState(1);
   const [selectedStores, setSelectedStores] = useState([]);
-  const [interest, setInterest] = useState("sve");
-  const [flyerChains, setFlyerChains] = useState(() => [...FLYER_FOLLOW_CHAINS]);
+  const [notifyOn, setNotifyOn] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  const flyerEligible = useMemo(
+    () =>
+      FLYER_FOLLOW_CHAINS.filter((id) => selectedStores.includes(id)),
+    [selectedStores]
+  );
+  const showNotifyToggle = flyerEligible.length > 0;
+  const flyerLabel = formatFlyerChainsLabel(flyerEligible);
 
   useEffect(() => {
     if (!open) return;
     finishedRef.current = false;
-    setStep(1);
     setSelectedStores([]);
-    setInterest("sve");
-    setFlyerChains([]);
+    setNotifyOn(false);
     setBusy(false);
     trackOnboardingPrikazan();
     trackOnboardingKorak(1);
@@ -79,16 +83,10 @@ export function OnboardingSheet({
     return () => window.clearTimeout(t);
   }, [open]);
 
+  // Nestane eligible lanaca → ugasi prekidač (bez auto-push).
   useEffect(() => {
-    if (!open) return;
-    // Predodabir: samo korak 1 ∩ Eurospin/Kaufland/Plodine; inače sva tri isključena.
-    if (step === 3) {
-      const fromStep1 = selectedStores.filter((id) =>
-        FLYER_FOLLOW_CHAINS.includes(id)
-      );
-      setFlyerChains(fromStep1);
-    }
-  }, [step, selectedStores, open]);
+    if (!showNotifyToggle && notifyOn) setNotifyOn(false);
+  }, [showNotifyToggle, notifyOn]);
 
   const restoreFocus = useCallback(() => {
     try {
@@ -121,7 +119,6 @@ export function OnboardingSheet({
     restoreFocus();
   }, [onClosed, restoreFocus]);
 
-  // History entry + Android / browser Natrag → isti skip put.
   useEffect(() => {
     if (!open) return;
     const prev = window.history.state;
@@ -168,43 +165,38 @@ export function OnboardingSheet({
     );
   };
 
-  const toggleFlyer = (id) => {
-    setFlyerChains((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
-  const goNextFrom1 = () => {
-    writePreferredStores(selectedStores);
-    setStep(2);
-    trackOnboardingKorak(2);
-  };
-
-  const goNextFrom2 = () => {
-    writeInterest(interest);
-    setStep(3);
-    trackOnboardingKorak(3);
-  };
-
-  const onEnablePush = async () => {
-    if (busy) return;
-    setBusy(true);
+  const onEnablePush = async (chains) => {
     const barcodes = barcodesFromFavorites(favorites);
-    const chains = flyerChains.filter((c) => FLYER_FOLLOW_CHAINS.includes(c));
-    try {
-      trackPushKlik();
-      await enablePushNotifications(barcodes);
-      trackPushUkljucen();
-      for (const chain of chains) {
-        try {
-          const res = await followChain(chain, { trackedBarcodes: barcodes });
-          if (res?.ok) trackLetakPratim();
-        } catch {
-          // tiho — završi onboarding
-        }
+    const follow = chains.filter((c) => FLYER_FOLLOW_CHAINS.includes(c));
+    trackPushKlik();
+    await enablePushNotifications(barcodes);
+    trackPushUkljucen();
+    for (const chain of follow) {
+      try {
+        const res = await followChain(chain, { trackedBarcodes: barcodes });
+        if (res?.ok) trackLetakPratim();
+      } catch {
+        // tiho
       }
+    }
+  };
+
+  const onToggleNotify = async () => {
+    if (busy || !showNotifyToggle) return;
+    if (notifyOn) {
+      setNotifyOn(false);
+      return;
+    }
+    // Uključivanje samo na eksplicitni dodir — nikad automatski.
+    setBusy(true);
+    try {
+      await onEnablePush(flyerEligible);
+      setNotifyOn(true);
     } catch (e) {
-      const code = e?.code || (typeof Notification !== "undefined" ? Notification.permission : "");
+      setNotifyOn(false);
+      const code =
+        e?.code ||
+        (typeof Notification !== "undefined" ? Notification.permission : "");
       const { event } = classifyPushEnableFailure(
         code,
         typeof Notification !== "undefined" ? Notification.permission : ""
@@ -213,8 +205,13 @@ export function OnboardingSheet({
       else trackPushGreska();
     } finally {
       setBusy(false);
-      finishCompleteAndBack();
     }
+  };
+
+  const onDone = () => {
+    if (busy) return;
+    writePreferredStores(selectedStores);
+    finishCompleteAndBack();
   };
 
   if (!open) return null;
@@ -254,9 +251,7 @@ export function OnboardingSheet({
             className="font-bold"
             style={{ color: "#fff", fontSize: 16 }}
           >
-            {step === 1 && "Koje trgovine često koristiš?"}
-            {step === 2 && "Što te zanima?"}
-            {step === 3 && "Obavijesti o akcijama"}
+            Gdje kupuješ?
           </p>
           <button
             type="button"
@@ -275,199 +270,126 @@ export function OnboardingSheet({
           </button>
         </div>
 
-        {step === 1 && (
-          <>
-            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, marginBottom: 10 }}>
-              Odaberi jednu ili više — možeš kasnije promijeniti.
-            </p>
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              {STORES.map((store) => {
-                const on = selectedStores.includes(store.id);
-                return (
-                  <button
-                    key={store.id}
-                    type="button"
-                    onClick={() => toggleStore(store.id)}
-                    className="rounded-xl font-semibold"
-                    style={{
-                      minHeight: BTN_MIN,
-                      fontSize: 12,
-                      color: on
-                        ? chipForeground(store.color)
-                        : "rgba(255,255,255,0.65)",
-                      background: on ? store.color : "rgba(255,255,255,0.06)",
-                      border: on
-                        ? `1px solid ${store.color}`
-                        : "1px solid rgba(255,255,255,0.1)",
-                    }}
-                  >
-                    {store.label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                data-testid="onboarding-skip"
-                onClick={finishSkipAndBack}
-                className="flex-1 rounded-xl font-semibold"
-                style={{
-                  minHeight: BTN_MIN,
-                  color: "rgba(255,255,255,0.55)",
-                  background: "rgba(255,255,255,0.06)",
-                }}
-              >
-                Preskoči
-              </button>
-              <button
-                type="button"
-                data-testid="onboarding-next"
-                onClick={goNextFrom1}
-                className="flex-1 rounded-xl font-bold"
-                style={{
-                  minHeight: BTN_MIN,
-                  color: "#020617",
-                  background: "#00ff88",
-                }}
-              >
-                Dalje
-              </button>
-            </div>
-          </>
-        )}
+        <p
+          style={{
+            color: "rgba(255,255,255,0.45)",
+            fontSize: 12,
+            marginBottom: 10,
+          }}
+        >
+          Odaberi jednu ili više — možeš kasnije promijeniti.
+        </p>
 
-        {step === 2 && (
-          <>
-            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, marginBottom: 10 }}>
-              Odaberi što ti je bitnije u trgovini.
-            </p>
-            <div className="flex flex-col gap-2 mb-3">
-              {INTEREST_OPTIONS.map((opt) => {
-                const on = interest === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setInterest(opt.id)}
-                    className="rounded-xl font-semibold text-left px-3 flex items-center justify-between gap-2"
-                    style={{
-                      minHeight: BTN_MIN,
-                      fontSize: 14,
-                      color: on ? "#fff" : "rgba(255,255,255,0.75)",
-                      background: "rgba(255,255,255,0.06)",
-                      border: on
-                        ? "2px solid rgba(255,255,255,0.55)"
-                        : "1px solid rgba(255,255,255,0.1)",
-                    }}
-                  >
-                    <span>{opt.label}</span>
-                    {on ? (
-                      <Check size={18} strokeWidth={2.5} aria-hidden />
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex gap-2">
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {STORES.map((store) => {
+            const on = selectedStores.includes(store.id);
+            return (
               <button
+                key={store.id}
                 type="button"
-                onClick={finishSkipAndBack}
-                className="flex-1 rounded-xl font-semibold"
+                onClick={() => toggleStore(store.id)}
+                className="rounded-xl font-semibold"
                 style={{
                   minHeight: BTN_MIN,
-                  color: "rgba(255,255,255,0.55)",
-                  background: "rgba(255,255,255,0.06)",
+                  fontSize: 12,
+                  color: on
+                    ? chipForeground(store.color)
+                    : "rgba(255,255,255,0.65)",
+                  background: on ? store.color : "rgba(255,255,255,0.06)",
+                  border: on
+                    ? `1px solid ${store.color}`
+                    : "1px solid rgba(255,255,255,0.1)",
                 }}
               >
-                Preskoči
+                {store.label}
               </button>
-              <button
-                type="button"
-                data-testid="onboarding-next"
-                onClick={goNextFrom2}
-                className="flex-1 rounded-xl font-bold"
-                style={{
-                  minHeight: BTN_MIN,
-                  color: "#020617",
-                  background: "#00ff88",
-                }}
-              >
-                Dalje
-              </button>
-            </div>
-          </>
-        )}
+            );
+          })}
+        </div>
 
-        {step === 3 && (
-          <>
-            <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, marginBottom: 10 }}>
-              Javimo ti kad se pojave nove akcije: Eurospin, Kaufland, Plodine.
-            </p>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {FLYER_FOLLOW_CHAINS.map((id) => {
-                const meta = STORES.find((s) => s.id === id);
-                const on = flyerChains.includes(id);
-                const bg = meta?.color || "#334155";
-                const fg = on ? chipForeground(bg) : "rgba(255,255,255,0.45)";
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => toggleFlyer(id)}
-                    className="rounded-xl font-semibold px-3 flex items-center gap-1.5"
-                    style={{
-                      minHeight: BTN_MIN,
-                      fontSize: 13,
-                      color: fg,
-                      background: on ? bg : "rgba(255,255,255,0.06)",
-                      border: on
-                        ? `1px solid ${bg}`
-                        : "1px solid rgba(255,255,255,0.12)",
-                    }}
-                  >
-                    {on ? (
-                      <Check size={16} strokeWidth={2.5} aria-hidden color={fg} />
-                    ) : null}
-                    {id}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                data-testid="onboarding-push-later"
-                disabled={busy}
-                onClick={finishCompleteAndBack}
-                className="flex-1 rounded-xl font-semibold"
-                style={{
-                  minHeight: BTN_MIN,
-                  color: "rgba(255,255,255,0.55)",
-                  background: "rgba(255,255,255,0.06)",
-                  opacity: busy ? 0.7 : 1,
-                }}
+        {showNotifyToggle ? (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={notifyOn}
+            data-testid="onboarding-flyer-toggle"
+            disabled={busy}
+            onClick={onToggleNotify}
+            className="w-full rounded-xl px-3 mb-3 flex items-center justify-between gap-3 text-left"
+            style={{
+              minHeight: BTN_MIN + 8,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              opacity: busy ? 0.75 : 1,
+            }}
+          >
+            <span className="flex flex-col gap-0.5 min-w-0">
+              <span
+                className="font-semibold"
+                style={{ color: "#fff", fontSize: 13 }}
               >
-                Ne sada
-              </button>
-              <button
-                type="button"
-                data-testid="onboarding-push-enable"
-                disabled={busy || flyerChains.length === 0}
-                onClick={onEnablePush}
-                className="flex-1 rounded-xl font-bold"
+                Javi mi kad izađe novi letak
+              </span>
+              <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>
+                {flyerLabel}
+              </span>
+            </span>
+            <span
+              aria-hidden
+              className="shrink-0 rounded-full relative"
+              style={{
+                width: 44,
+                height: 26,
+                background: notifyOn ? "#00ff88" : "rgba(255,255,255,0.18)",
+                transition: "background 0.15s ease",
+              }}
+            >
+              <span
+                className="absolute top-0.5 rounded-full"
                 style={{
-                  minHeight: BTN_MIN,
-                  color: "#020617",
-                  background: "#00ff88",
-                  opacity: busy || flyerChains.length === 0 ? 0.7 : 1,
+                  width: 22,
+                  height: 22,
+                  background: notifyOn ? "#020617" : "#fff",
+                  left: notifyOn ? 20 : 2,
+                  transition: "left 0.15s ease",
                 }}
-              >
-                {busy ? "…" : "Uključi"}
-              </button>
-            </div>
-          </>
-        )}
+              />
+            </span>
+          </button>
+        ) : null}
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            data-testid="onboarding-skip"
+            disabled={busy}
+            onClick={finishSkipAndBack}
+            className="flex-1 rounded-xl font-semibold"
+            style={{
+              minHeight: BTN_MIN,
+              color: "rgba(255,255,255,0.55)",
+              background: "rgba(255,255,255,0.06)",
+              opacity: busy ? 0.7 : 1,
+            }}
+          >
+            Preskoči
+          </button>
+          <button
+            type="button"
+            data-testid="onboarding-done"
+            disabled={busy}
+            onClick={onDone}
+            className="flex-1 rounded-xl font-bold"
+            style={{
+              minHeight: BTN_MIN,
+              color: "#020617",
+              background: "#00ff88",
+              opacity: busy ? 0.7 : 1,
+            }}
+          >
+            Gotovo
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -8,7 +8,8 @@
  * push_soft_prikazan, push_soft_klik, push_soft_zatvoren,
  * letak_pratim, letak_prestani, otvoreno_iz_appa,
  * povratak_dan_0, povratak_dan_1, povratak_dan_2_3, povratak_dan_4_7, povratak_dan_8_plus,
- * onboarding_prikazan, onboarding_korak_1..3, onboarding_zavrsen, onboarding_preskocen,
+ * onboarding_prikazan, onboarding_korak_1 (korak_2/3 više se ne šalju — jedan ekran),
+ * onboarding_zavrsen, onboarding_preskocen,
  * keyword_dodana, keyword_uklonjena, keyword_zatrazen_prikaz, keyword_ponuda_klik,
  * akcije_prikazi_jos.
  */
