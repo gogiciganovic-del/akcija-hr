@@ -54,10 +54,10 @@ DEFAULT_PAGES = 3
 PAGES_BY_CHAIN: dict[str, int] = {
     "lidl": 24,
     "kaufland": 20,
-    "plodine": 19,
-    "konzum": 17,
+    "plodine": 23,
+    "konzum": 21,
     "interspar": 17,
-    "spar": 12,
+    "spar": 16,
 }
 
 
