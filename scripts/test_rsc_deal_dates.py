@@ -86,13 +86,24 @@ def test_invalid_order_fallback():
     assert_eq(r.source, "fallback")
 
 
-def test_too_long_span_fallback():
+def test_span_at_max_ok():
+    # span == MAX_SPAN_DAYS (400) → još RSC, ne fallback
     now = datetime(2026, 11, 14, 12, 0, tzinfo=timezone.utc)
-    r = resolve_validity(
-        date(2026, 9, 1),
-        date(2026, 9, 1) + __import__("datetime").timedelta(days=MAX_SPAN_DAYS + 1),
-        now=now,
-    )
+    start = date(2026, 1, 1)
+    end = start + __import__("datetime").timedelta(days=MAX_SPAN_DAYS)
+    assert_eq(MAX_SPAN_DAYS, 400)
+    r = resolve_validity(start, end, now=now)
+    assert_eq(r.source, "rsc")
+    assert_eq(r.skip, False)
+    assert_eq(r.span_days, 400)
+
+
+def test_too_long_span_fallback():
+    # span == 401 → fallback
+    now = datetime(2026, 11, 14, 12, 0, tzinfo=timezone.utc)
+    start = date(2026, 1, 1)
+    end = start + __import__("datetime").timedelta(days=MAX_SPAN_DAYS + 1)
+    r = resolve_validity(start, end, now=now)
     assert_eq(r.source, "fallback")
 
 
@@ -146,6 +157,7 @@ def main() -> int:
     test_dst_fall_2026_10_25()
     test_missing_dates_fallback()
     test_invalid_order_fallback()
+    test_span_at_max_ok()
     test_too_long_span_fallback()
     test_expired_skipped()
     test_rsc_ok_last_day_still_valid()

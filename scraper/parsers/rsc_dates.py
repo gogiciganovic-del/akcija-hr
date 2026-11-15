@@ -45,8 +45,9 @@ _ITEM_RAW = re.compile(
 
 _YMD_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 
-# Trajanje duže od ovoga → fallback na now / now+7.
-MAX_SPAN_DAYS = 60
+# Sigurnosni strop za absurdno duge raspone → fallback now/now+7.
+# Praznične akcije (Interspar/Müller ~60–70d) moraju proći; 400 ≈ godina+.
+MAX_SPAN_DAYS = 400
 
 
 def parse_ymd(raw: str | None) -> date | None:
@@ -114,7 +115,8 @@ def resolve_validity(
 ) -> ValidityResolution:
     """
     RSC datumi → aware datetimes u Zagreb zoni.
-    Nevaljani / predugi span → fallback now/now+7.
+    Fallback now/now+7 samo ako datumi nedostaju, validTo < validFrom,
+    ili span > MAX_SPAN_DAYS (sigurnosni strop).
     Ako je kraj validTo dana već prošao → skip (expired).
     Ako je početak validFrom dana strogo u budućnosti → skip (future)
     jer active_deals filtrira samo valid_until > now().
