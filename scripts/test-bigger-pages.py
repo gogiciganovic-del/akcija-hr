@@ -71,10 +71,15 @@ def main() -> int:
     expected = {
         "lidl": 24,
         "kaufland": 20,
-        "plodine": 19,
-        "konzum": 17,
+        "plodine": 23,
+        "konzum": 21,
         "interspar": 17,
-        "spar": 12,
+        "spar": 16,
+        "tommy": 10,
+        "dm": 8,
+        "studenac": 5,
+        "bipa": 8,
+        "eurospin": 5,
     }
     assert_true(DEFAULT_PAGES == 3, f"DEFAULT_PAGES={DEFAULT_PAGES}")
     assert_true(PAGES_BY_CHAIN == expected, f"PAGES_BY_CHAIN={PAGES_BY_CHAIN}")
@@ -114,9 +119,10 @@ def main() -> int:
     with patch("scraper.time.sleep", lambda _s: None):
         with patch("scraper.BASE_URL", "https://najcijena.hr"):
             rs = fetch_store(client_s, "eurospin", pages_for_store("eurospin"))
-    assert_true(client_s.requests == 3, f"eurospin requests={client_s.requests}")
-    assert_true(len(rs.deals) == 150, f"eurospin deals={len(rs.deals)}")
-    print("eurospin fetch uses 3 pages: OK")
+    assert_true(client_s.requests == 5, f"eurospin requests={client_s.requests}")
+    assert_true(rs.pages_fetched == 5, f"eurospin pages_fetched={rs.pages_fetched}")
+    assert_true(len(rs.deals) == 250, f"eurospin deals={len(rs.deals)}")
+    print("eurospin fetch uses 5 pages: OK")
 
     print("OK test-bigger-pages")
     return 0

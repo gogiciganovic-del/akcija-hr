@@ -58,6 +58,13 @@ PAGES_BY_CHAIN: dict[str, int] = {
     "konzum": 21,
     "interspar": 17,
     "spar": 16,
+    "tommy": 10,
+    "dm": 8,
+    "studenac": 5,
+    "bipa": 8,
+    "eurospin": 5,
+    # mueller: dry-run do 30 stranica nije našao prirodni kraj (i dalje 50 kartica) —
+    # ne postavljaj cap dok se ne potvrdi kraj.
 }
 
 
