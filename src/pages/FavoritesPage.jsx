@@ -199,7 +199,7 @@ function SavingsCard({ items, onShare, shareFeedback }) {
             Tvoji favoriti
           </p>
           <p style={{ color: "rgba(99,56,6,0.75)", fontSize: 11, marginTop: 2, lineHeight: 1.4 }}>
-            Srce = spremljeno. Obavijest o padu cijene samo s barkodom („Prati cijenu“ u detaljima).
+            Spremljene akcije za tvoju kupnju
           </p>
         </div>
       </div>
@@ -478,7 +478,9 @@ export function FavoritesPage({
         )}
       </div>
 
-      {hasItems ? (
+      {hasItems &&
+      pushStatus === "subscribed" &&
+      items.some((p) => favoriteHasTrackableBarcode(p)) ? (
         <PushNotifyBanner
           status={pushStatus}
           busy={pushBusy}
@@ -503,7 +505,6 @@ export function FavoritesPage({
           {items.map((p) => {
             const expiring = isExpiringTodayProduct(p);
             const barcodeKey = String(p.barcode || "").trim();
-            const trackable = favoriteHasTrackableBarcode(p);
             const isGlowing = glowBarcode && barcodeKey === glowBarcode;
             return (
               <div
@@ -535,29 +536,6 @@ export function FavoritesPage({
                   >
                     Danas
                   </span>
-                )}
-                {!trackable && (
-                  <button
-                    type="button"
-                    className="absolute z-10 px-1.5 py-0.5 rounded font-semibold"
-                    style={{
-                      top: expiring ? 28 : 8,
-                      left: 8,
-                      fontSize: 8,
-                      letterSpacing: "0.03em",
-                      color: "rgba(255,255,255,0.85)",
-                      background: "rgba(2,6,23,0.72)",
-                      border: "1px solid rgba(0,255,136,0.35)",
-                    }}
-                    title="Nema barkoda — skeniraj da pratiš pad cijene"
-                    aria-label="Skeniraj barkod da pratiš pad cijene"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onGoScan?.();
-                    }}
-                  >
-                    Ne prati se · Skeniraj
-                  </button>
                 )}
                 <ProductCard
                   product={p}
