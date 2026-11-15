@@ -479,8 +479,8 @@ export function FavoritesPage({
       </div>
 
       {hasItems &&
-      pushStatus === "subscribed" &&
-      items.some((p) => favoriteHasTrackableBarcode(p)) ? (
+      (pushStatus !== "prompt" ||
+        items.some((p) => favoriteHasTrackableBarcode(p))) ? (
         <PushNotifyBanner
           status={pushStatus}
           busy={pushBusy}
