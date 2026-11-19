@@ -52,19 +52,19 @@ STORES = list(STORE_SLUGS.keys())
 DEFAULT_PAGES = 3
 # Per-chain max listing pages (slug → pages). Ostali lanci → DEFAULT_PAGES.
 PAGES_BY_CHAIN: dict[str, int] = {
-    "lidl": 24,
-    "kaufland": 20,
-    "plodine": 23,
-    "konzum": 21,
-    "interspar": 17,
-    "spar": 16,
-    "tommy": 10,
-    "dm": 8,
-    "studenac": 5,
-    "bipa": 8,
-    "eurospin": 5,
-    # mueller: dry-run do 30 stranica nije našao prirodni kraj (i dalje 50 kartica) —
-    # ne postavljaj cap dok se ne potvrdi kraj.
+    # Izdašan strop ≈ 1.5× poznati prirodni kraj (petlja staje ranije na 404/prazno).
+    # mueller: bez prirodnog kraja ni na 30 — ostaje DEFAULT_PAGES (3).
+    "lidl": 33,  # kraj ~22
+    "kaufland": 30,  # dry-run kraj 19; ranije trunc na 20
+    "plodine": 35,  # dry-run kraj 18; ranije trunc na 23
+    "konzum": 30,  # kraj ~20
+    "interspar": 24,  # kraj ~16
+    "spar": 18,  # kraj ~12
+    "tommy": 12,  # kraj ~8
+    "dm": 9,  # kraj ~6
+    "studenac": 5,  # kraj ~3
+    "bipa": 9,  # kraj ~6
+    "eurospin": 8,  # dry-run kraj 3; 5 već bio nedovoljan 16.11.
 }
 
 

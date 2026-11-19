@@ -69,17 +69,17 @@ class CountingClient:
 
 def main() -> int:
     expected = {
-        "lidl": 24,
-        "kaufland": 20,
-        "plodine": 23,
-        "konzum": 21,
-        "interspar": 17,
-        "spar": 16,
-        "tommy": 10,
-        "dm": 8,
+        "lidl": 33,
+        "kaufland": 30,
+        "plodine": 35,
+        "konzum": 30,
+        "interspar": 24,
+        "spar": 18,
+        "tommy": 12,
+        "dm": 9,
         "studenac": 5,
-        "bipa": 8,
-        "eurospin": 5,
+        "bipa": 9,
+        "eurospin": 8,
     }
     assert_true(DEFAULT_PAGES == 3, f"DEFAULT_PAGES={DEFAULT_PAGES}")
     assert_true(PAGES_BY_CHAIN == expected, f"PAGES_BY_CHAIN={PAGES_BY_CHAIN}")
@@ -92,37 +92,37 @@ def main() -> int:
     assert_true(pages_for_store("lidl", 5) == 5, "CLI override lidl")
     assert_true(pages_for_store("eurospin", 5) == 5, "CLI override eurospin")
     assert_true(pages_for_store("lidl", 3) == 3, "CLI --pages 3 forces 3")
-    assert_true(pages_for_store("kaufland", 20) == 20, "CLI override equals default")
+    assert_true(pages_for_store("kaufland", 30) == 30, "CLI override equals default")
     print("pages_for_store mapping: OK")
 
-    # fetch_store respects per-chain max_pages (lidl=24; no early empty/404)
+    # fetch_store respects per-chain max_pages (lidl=33; no early empty/404)
     client = CountingClient()
     with patch("scraper.time.sleep", lambda _s: None):
         with patch("scraper.BASE_URL", "https://najcijena.hr"):
             result = fetch_store(client, "lidl", pages_for_store("lidl"))
-    assert_true(client.requests == 24, f"lidl requests={client.requests}")
-    assert_true(result.pages_fetched == 24, f"pages_fetched={result.pages_fetched}")
-    assert_true(len(result.deals) == 1200, f"deals={len(result.deals)}")
+    assert_true(client.requests == 33, f"lidl requests={client.requests}")
+    assert_true(result.pages_fetched == 33, f"pages_fetched={result.pages_fetched}")
+    assert_true(len(result.deals) == 1650, f"deals={len(result.deals)}")
     assert_true(result.complete is False, "hit max_pages → truncated/complete=False")
-    print("lidl fetch uses 24 pages: OK")
+    print("lidl fetch uses 33 pages: OK")
 
     client_k = CountingClient()
     with patch("scraper.time.sleep", lambda _s: None):
         with patch("scraper.BASE_URL", "https://najcijena.hr"):
             rk = fetch_store(client_k, "kaufland", pages_for_store("kaufland"))
-    assert_true(client_k.requests == 20, f"kaufland requests={client_k.requests}")
-    assert_true(rk.pages_fetched == 20, f"kaufland pages_fetched={rk.pages_fetched}")
-    assert_true(len(rk.deals) == 1000, f"kaufland deals={len(rk.deals)}")
-    print("kaufland fetch uses 20 pages: OK")
+    assert_true(client_k.requests == 30, f"kaufland requests={client_k.requests}")
+    assert_true(rk.pages_fetched == 30, f"kaufland pages_fetched={rk.pages_fetched}")
+    assert_true(len(rk.deals) == 1500, f"kaufland deals={len(rk.deals)}")
+    print("kaufland fetch uses 30 pages: OK")
 
     client_s = CountingClient()
     with patch("scraper.time.sleep", lambda _s: None):
         with patch("scraper.BASE_URL", "https://najcijena.hr"):
             rs = fetch_store(client_s, "eurospin", pages_for_store("eurospin"))
-    assert_true(client_s.requests == 5, f"eurospin requests={client_s.requests}")
-    assert_true(rs.pages_fetched == 5, f"eurospin pages_fetched={rs.pages_fetched}")
-    assert_true(len(rs.deals) == 250, f"eurospin deals={len(rs.deals)}")
-    print("eurospin fetch uses 5 pages: OK")
+    assert_true(client_s.requests == 8, f"eurospin requests={client_s.requests}")
+    assert_true(rs.pages_fetched == 8, f"eurospin pages_fetched={rs.pages_fetched}")
+    assert_true(len(rs.deals) == 400, f"eurospin deals={len(rs.deals)}")
+    print("eurospin fetch uses 8 pages: OK")
 
     print("OK test-bigger-pages")
     return 0

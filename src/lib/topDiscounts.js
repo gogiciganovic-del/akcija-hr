@@ -10,12 +10,25 @@ export const TOP_DISCOUNT_MIN = 40;
 export const TOP_DISCOUNT_MAX = 70;
 export const TOP_DISCOUNT_MAX_ITEMS = 8;
 export const TOP_DISCOUNT_MIN_ITEMS = 5;
+/** Samo akcije koje je scraper vidio u ovom prozoru (scraped_at). */
+export const TOP_DISCOUNT_MAX_SCRAPE_AGE_MS = 2 * 24 * 60 * 60 * 1000;
 export const BF_WINDOW_START = "2026-11-20";
 export const BF_WINDOW_END = "2026-11-30";
 
 function discountOf(product) {
   const d = Number(product?.discount ?? product?.discount_pct);
   return Number.isFinite(d) ? d : 0;
+}
+
+/** scrapedAt / scraped_at unutar maxAgeMs od now; inače false (null/nevaljano → false). */
+export function isScrapedWithinDays(product, now = new Date(), maxAgeMs = TOP_DISCOUNT_MAX_SCRAPE_AGE_MS) {
+  const raw = product?.scrapedAt ?? product?.scraped_at;
+  if (raw == null || raw === "") return false;
+  const t = new Date(raw).getTime();
+  if (!Number.isFinite(t)) return false;
+  const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  if (!Number.isFinite(nowMs)) return false;
+  return t >= nowMs - maxAgeMs;
 }
 
 function chainKey(product) {
@@ -68,9 +81,9 @@ export function shouldShowTopDiscountStrip(now = new Date(), opts = {}) {
 }
 
 /**
- * Najveći popusti: 40–70%, foto, nije istekla; 1 po lancu; max 8; inače [].
+ * Najveći popusti: 40–70%, foto, nije istekla, scraped ≤2 dana; 1 po lancu; max 8; inače [].
  * @param {Array<object>} products
- * @param {{ now?: Date, minDiscount?: number, maxDiscount?: number, maxItems?: number, minItems?: number }} [opts]
+ * @param {{ now?: Date, minDiscount?: number, maxDiscount?: number, maxItems?: number, minItems?: number, maxScrapeAgeMs?: number }} [opts]
  * @returns {object[]}
  */
 export function selectTopDiscounts(products, opts = {}) {
@@ -79,6 +92,7 @@ export function selectTopDiscounts(products, opts = {}) {
   const maxD = opts.maxDiscount ?? TOP_DISCOUNT_MAX;
   const maxItems = opts.maxItems ?? TOP_DISCOUNT_MAX_ITEMS;
   const minItems = opts.minItems ?? TOP_DISCOUNT_MIN_ITEMS;
+  const maxScrapeAgeMs = opts.maxScrapeAgeMs ?? TOP_DISCOUNT_MAX_SCRAPE_AGE_MS;
   const list = Array.isArray(products) ? products : [];
 
   const eligible = [];
@@ -88,6 +102,7 @@ export function selectTopDiscounts(products, opts = {}) {
     if (d < minD || d > maxD) continue;
     if (!hasRealPhoto(p)) continue;
     if (!isDealNotExpired(p, now)) continue;
+    if (!isScrapedWithinDays(p, now, maxScrapeAgeMs)) continue;
     const chain = chainKey(p);
     if (!chain) continue;
     eligible.push({ p, d, chain });
