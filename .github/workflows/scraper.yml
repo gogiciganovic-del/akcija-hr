@@ -2,8 +2,13 @@ name: Scraper
 
 on:
   schedule:
-    - cron: '0 6 * * *'
+    # 02:17 UTC = 03:17 Europe/Zagreb (zima). Minuta ≠ 0 — manje GH schedule kašnjenja.
+    - cron: '17 2 * * *'
   workflow_dispatch:
+
+concurrency:
+  group: scraper
+  cancel-in-progress: false
 
 jobs:
   scrape:
@@ -34,12 +39,4 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      # Faza 2: flyer push s --send (samo Eurospin/Kaufland/Plodine u skripti).
-      - name: Send flyer pushes
-        continue-on-error: true
-        run: python scraper/send_flyer_pushes.py --send --limit 500
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+      # Flyer pushes: zaseban workflow flyer-pushes.yml (~07:xx UTC), ne ovdje.

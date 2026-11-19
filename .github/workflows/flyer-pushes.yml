@@ -1,0 +1,80 @@
+name: Flyer pushes
+
+on:
+  workflow_run:
+    workflows: ["Scraper"]
+    types: [completed]
+  schedule:
+    # Rezerva ako workflow_run padne u noćni prozor ili propusti run.
+    # 07:23 UTC ≈ 08:23 Zagreb (zima); 11:23 UTC ≈ 12:23 Zagreb.
+    - cron: '23 7 * * *'
+    - cron: '23 11 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Preskoči Zagreb 08:00–20:59 satnu zaštitu"
+        type: boolean
+        default: false
+        required: false
+
+concurrency:
+  group: flyer-pushes
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    # workflow_run: samo nakon uspješnog scrapea; schedule/dispatch uvijek ulaze u job.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Zagreb hour window (08–20)
+        id: window
+        env:
+          FORCE_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.force || false }}
+        run: |
+          set -euo pipefail
+          HOUR=$(TZ=Europe/Zagreb date +%H)
+          NOW_ZAGREB=$(TZ=Europe/Zagreb date '+%Y-%m-%d %H:%M %Z')
+          echo "Zagreb now: $NOW_ZAGREB (hour=$HOUR)"
+          echo "event=${{ github.event_name }} force=$FORCE_INPUT"
+
+          if [ "$FORCE_INPUT" = "true" ]; then
+            echo "force=true — satna zaštita preskočena"
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 08:00–20:59 Europe/Zagreb
+          if [ "$HOUR" -ge 8 ] && [ "$HOUR" -le 20 ]; then
+            echo "Unutar prozora 08–20 — nastavljam"
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Izvan prozora 08:00–20:59 Europe/Zagreb — preskačem slanje (exit 0)."
+          echo "Rezervni cron ili kasniji uspješni scrape + workflow_run će pokušati opet; dedup sprječava dvostruko slanje."
+          echo "proceed=false" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - uses: actions/checkout@v3
+        if: steps.window.outputs.proceed == 'true'
+
+      - uses: actions/setup-python@v4
+        if: steps.window.outputs.proceed == 'true'
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        if: steps.window.outputs.proceed == 'true'
+        run: pip install -r scraper/requirements.txt
+
+      # Faza 2: flyer push s --send (samo Eurospin/Kaufland/Plodine u skripti).
+      - name: Send flyer pushes
+        if: steps.window.outputs.proceed == 'true'
+        continue-on-error: true
+        run: python scraper/send_flyer_pushes.py --send --limit 500
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
