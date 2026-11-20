@@ -34,6 +34,17 @@ let flushTimer = null;
 const otvorenoIzAppaState = { seen: false };
 /** Jednom po sesiji — povratak_* bucketing (sve platforme). */
 const povratakState = { seen: false };
+/**
+ * Jedan Umami pageview po otvaranju (data-auto-pageview=false).
+ * url/referrer snimljeni odmah (prije replaceState / strip query).
+ * Eksplicitni url zaobilazi data-exclude-search (inače nestane ?utm_*).
+ */
+const pageviewState = {
+  sent: false,
+  pending: false,
+  url: null,
+  referrer: null,
+};
 
 /** Chrome TWA / Custom Tab iz APK-a postavlja ovaj referrer (paket, ne display-mode). */
 export const ANDROID_APP_REFERRER_PREFIX = "android-app://app.cjenko.akcije";
@@ -50,6 +61,55 @@ function umamiTrack() {
   return umami && typeof umami.track === "function" ? umami.track : null;
 }
 
+/** pathname + search (npr. /?utm_source=tiktok) — bez hash. */
+export function pageviewUrlFromLocation(loc) {
+  if (!loc) return "/";
+  const path = String(loc.pathname || "/");
+  const search = String(loc.search || "");
+  return `${path}${search}` || "/";
+}
+
+/**
+ * Snimi url+referrer sada (prije čišćenja URL-a).
+ * @param {{ url?: string, referrer?: string, location?: Location, documentRef?: { referrer?: string } }} [opts]
+ */
+export function snapshotPageviewContext(opts = {}) {
+  const loc =
+    opts.location ||
+    (typeof window !== "undefined" ? window.location : null);
+  const url =
+    opts.url != null ? String(opts.url) : pageviewUrlFromLocation(loc);
+  let referrer = "";
+  if (opts.referrer != null) {
+    referrer = String(opts.referrer);
+  } else {
+    try {
+      const doc =
+        opts.documentRef ||
+        (typeof document !== "undefined" ? document : null);
+      referrer = String(doc?.referrer || "");
+    } catch {
+      referrer = "";
+    }
+  }
+  return { url, referrer };
+}
+
+/**
+ * umami.track(fn) — eksplicitni url (+ referrer) da query/utm preživi data-exclude-search.
+ * @param {Function} send
+ * @param {{ url: string, referrer?: string }} ctx
+ */
+export function sendPageviewPayload(send, ctx) {
+  const url = String(ctx?.url || "/") || "/";
+  const referrer = String(ctx?.referrer || "");
+  send((props) => ({
+    ...props,
+    url,
+    referrer,
+  }));
+}
+
 /** Čeka umami.track; noviji iznad limita se odbacuju. */
 export function enqueueEvent(queue, name) {
   if (queue.length >= QUEUE_LIMIT) return;
@@ -59,6 +119,11 @@ export function enqueueEvent(queue, name) {
 function flushQueuedEvents() {
   const send = umamiTrack();
   if (!send) return false;
+  if (pageviewState.pending && !pageviewState.sent) {
+    sendPageviewPayload(send, pageviewState);
+    pageviewState.sent = true;
+    pageviewState.pending = false;
+  }
   while (pendingEvents.length) {
     send(pendingEvents.shift());
   }
@@ -67,6 +132,31 @@ function flushQueuedEvents() {
     flushTimer = null;
   }
   return true;
+}
+
+/**
+ * Jedan pageview po sesiji — snimi url/referrer odmah, pošalji kad je umami spreman.
+ * Ne šalje custom event, ne dira postojeće nazive. Bez osobnih payloada.
+ * @param {{ enabled?: boolean, send?: Function|null, state?: object, schedule?: boolean, url?: string, referrer?: string, location?: Location, documentRef?: { referrer?: string } }} [opts]
+ * @returns {'sent'|'queued'|'skipped'}
+ */
+export function trackPageviewOnce(opts = {}) {
+  const state = opts.state || pageviewState;
+  if (state.sent || state.pending) return "skipped";
+  const enabled = opts.enabled ?? isUsageEnabled();
+  if (!enabled) return "skipped";
+  const ctx = snapshotPageviewContext(opts);
+  state.url = ctx.url;
+  state.referrer = ctx.referrer;
+  const send = opts.send !== undefined ? opts.send : umamiTrack();
+  if (typeof send === "function") {
+    state.sent = true;
+    sendPageviewPayload(send, state);
+    return "sent";
+  }
+  state.pending = true;
+  if (opts.schedule !== false && opts.send === undefined) scheduleFlush();
+  return "queued";
 }
 
 function scheduleFlush() {
@@ -375,11 +465,15 @@ export function applyUmamiNotrackFromUrl() {
 
 /**
  * Učitaj Umami samo kad je eksplicitno uključeno.
- * data-auto-pageview=false — tabovi idu kao custom events, ne kao pageview.
+ * data-auto-pageview=false — SPA tabovi su custom events; pageview ručno jednom (trackPageviewOnce).
+ * data-exclude-search=true ostaje (ne curi search query u default payload);
+ * pageview ipak šalje snimljeni url s ?utm_* (sendPageviewPayload).
  */
 export function initUsageTracking() {
   if (typeof window === "undefined") return;
   applyUmamiNotrackFromUrl();
+  // Pageview PRIJE stripPushOpenParam / App replaceState — snimi ?utm_* + document.referrer.
+  trackPageviewOnce();
   consumePushOpenFromUrl();
   if (consumeOtvorenoIzAppa(document.referrer)) {
     trackOtvorenoIzAppa();
